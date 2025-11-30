@@ -1,0 +1,24 @@
+
+cloud_water_chassis_node:
+  ros__parameters:
+    server_address: "192.168.10.10"    #重定位action名称
+    server_port: 31001
+    mark_points_csv_adress: "/home/ymrobot/ros2_ws_guidance/src/guided-robot/assets/mark_points.csv"
+    pub_chassis_status_info_topic: "cloud_chassis_status_info"
+    cloud_water_mark_point_topic_name: "cloud_water_mark_point"
+    cloud_water_move_base_topic: "cloud_cmd_vel"
+    play_fixed_audio_pub_name: "play_fixed_audio"
+    alarm_info_pub_name: "alarm_info"
+    key_vel_move_base_topic: "key_cmd_vel"
+    led_show_topic_name: "cloud_chassis_led_show"
+    cloud_water_nav_target_srv_name: "cloud_water_nav_target"
+    cloud_chassis_nav_action_name: "cloud_chassis_nav_action"
+    cloud_chassis_charge_action_name: "cloud_chassis_charge_action"
+    cloud_chassis_point_upadte_pub_name: "data_list_update"
+    cloud_chassis_reposition_action_name: "cloud_chassis_reposition_action"
+    max_linear_speed_sub_name: "cloud_chassis_max_linear_speed"
+    max_angle_speed_sub_name: "cloud_chassis_max_angle_speed"
+    cancel_current_move_sub_name: "cancel_current_task"
+    max_continuous_retries: 3
+    occupied_tolerance: 0.6
+    traffic_peak_time_threshold: 8.0

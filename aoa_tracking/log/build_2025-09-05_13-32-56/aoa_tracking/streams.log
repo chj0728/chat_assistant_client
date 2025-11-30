@@ -1,0 +1,62 @@
+[0.010s] Invoking command in '/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/ymrobot/ros2_ws_guidance/install/play_mp3_action:/home/ymrobot/ros2_ws_guidance/install/aud_conver:/home/ymrobot/ros2_ws_guidance/install/ymbot_xiaoxue_description:/home/ymrobot/ros2_ws_guidance/install/pedestrian_detector_node:/home/ymrobot/ros2_ws_guidance/install/log_uploader_node:/opt/ros/humble /usr/bin/cmake --build /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking -- -j20 -l20
+[0.030s] -- Found ament_cmake: 1.3.12 (/opt/ros/humble/share/ament_cmake/cmake)
+[0.115s] -- Found rclcpp: 16.0.14 (/opt/ros/humble/share/rclcpp/cmake)
+[0.131s] -- Found rosidl_generator_c: 3.1.7 (/opt/ros/humble/share/rosidl_generator_c/cmake)
+[0.132s] -- Found rosidl_adapter: 3.1.7 (/opt/ros/humble/share/rosidl_adapter/cmake)
+[0.136s] -- Found rosidl_generator_cpp: 3.1.7 (/opt/ros/humble/share/rosidl_generator_cpp/cmake)
+[0.143s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[0.150s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[0.166s] -- Found rmw_implementation_cmake: 6.1.2 (/opt/ros/humble/share/rmw_implementation_cmake/cmake)
+[0.168s] -- Found rmw_fastrtps_cpp: 6.2.8 (/opt/ros/humble/share/rmw_fastrtps_cpp/cmake)
+[0.231s] -- Using RMW implementation 'rmw_fastrtps_cpp' as default
+[0.257s] -- Found ymrobot_msgs: 0.0.0 (/home/ymrobot/ros2_ws_guidance/install/ymrobot_msgs/share/ymrobot_msgs/cmake)
+[0.292s] -- Found serial: 1.2.1 (/usr/local/share/serial/cmake)
+[0.294s] -- Found ament_lint_auto: 0.12.14 (/opt/ros/humble/share/ament_lint_auto/cmake)
+[0.349s] -- Added test 'cppcheck' to perform static code analysis on C / C++ code
+[0.349s] -- Configured cppcheck include dirs: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking
+[0.349s] -- Configured cppcheck exclude dirs and/or files: 
+[0.351s] -- Added test 'flake8' to check Python code syntax and style conventions
+[0.354s] -- Added test 'lint_cmake' to check CMake code style
+[0.355s] -- Added test 'pep257' to check Python code against some of the docstring style conventions in PEP 257
+[0.366s] -- Added test 'uncrustify' to check C / C++ code style
+[0.366s] -- Configured uncrustify additional arguments: 
+[0.368s] -- Added test 'xmllint' to check XML markup files
+[0.368s] -- Configuring done
+[0.375s] -- Generating done
+[0.377s] -- Build files have been written to: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking
+[0.397s] [35m[1mConsolidate compiler generated dependencies of target aoa_tracking_node[0m
+[0.408s] [ 50%] [32mBuilding CXX object CMakeFiles/aoa_tracking_node.dir/src/aoa_tracking_node.cpp.o[0m
+[1.681s] In file included from [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:5[m[K:
+[1.681s] [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:36:25:[m[K [01;31m[Kerror: [m[K‘[01m[Kymrobot_msg[m[K’ was not declared in this scope; did you mean ‘[01m[Kymrobot_msgs[m[K’?
+[1.681s]    36 |       rclcpp::Publisher<[01;31m[Kymrobot_msg[m[K::msg::AoaPosition>::SharedPtr publisher_;
+[1.681s]       |                         [01;31m[K^~~~~~~~~~~[m[K
+[1.681s]       |                         [32m[Kymrobot_msgs[m[K
+[1.681s] [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:36:54:[m[K [01;31m[Kerror: [m[Ktemplate argument 1 is invalid
+[1.681s]    36 |       rclcpp::Publisher<ymrobot_msg::msg::AoaPosition[01;31m[K>[m[K::SharedPtr publisher_;
+[1.681s]       |                                                      [01;31m[K^[m[K
+[1.681s] [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:36:57:[m[K [01;31m[Kerror: [m[Kexpected ‘[01m[K;[m[K’ at end of member declaration
+[1.682s]    36 |       rclcpp::Publisher<ymrobot_msg::msg::AoaPosition>::[01;31m[KSharedPtr[m[K publisher_;
+[1.682s]       |                                                         [01;31m[K^~~~~~~~~[m[K
+[1.682s]       |                                                                  [32m[K;[m[K
+[1.682s] [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:36:67:[m[K [01;31m[Kerror: [m[K‘[01m[Kpublisher_[m[K’ does not name a type; did you mean ‘[01m[Krmw_publisher_t[m[K’?
+[1.682s]    36 |       rclcpp::Publisher<ymrobot_msg::msg::AoaPosition>::SharedPtr [01;31m[Kpublisher_[m[K;
+[1.682s]       |                                                                   [01;31m[K^~~~~~~~~~[m[K
+[1.682s]       |                                                                   [32m[Krmw_publisher_t[m[K
+[1.708s] [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:[m[K In member function ‘[01m[Kvoid ymrobot::AoaTracking::processSingleFrame(const string&)[m[K’:
+[1.709s] [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:177:22:[m[K [01;31m[Kerror: [m[Kexpected initializer before ‘[01m[Kymrobot_msg[m[K’
+[1.709s]   177 |         auto aoa_msg [01;31m[Kymrobot_msg[m[K::msg::AoaPosition();
+[1.709s]       |                      [01;31m[K^~~~~~~~~~~[m[K
+[1.712s] [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:178:9:[m[K [01;31m[Kerror: [m[K‘[01m[Kaoa_msg[m[K’ was not declared in this scope
+[1.712s]   178 |         [01;31m[Kaoa_msg[m[K.x = relative_x;
+[1.712s]       |         [01;31m[K^~~~~~~[m[K
+[1.714s] [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:180:23:[m[K [01;31m[Kerror: [m[K‘[01m[Kyaw[m[K’ was not declared in this scope
+[1.714s]   180 |         aoa_msg.yaw = [01;31m[Kyaw[m[K;
+[1.715s]       |                       [01;31m[K^~~[m[K
+[1.718s] [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:181:9:[m[K [01;31m[Kerror: [m[K‘[01m[Kpublisher_[m[K’ was not declared in this scope; did you mean ‘[01m[Krmw_publisher_t[m[K’?
+[1.718s]   181 |         [01;31m[Kpublisher_[m[K->publish(aoa_msg);
+[1.718s]       |         [01;31m[K^~~~~~~~~~[m[K
+[1.718s]       |         [32m[Krmw_publisher_t[m[K
+[3.130s] gmake[2]: *** [CMakeFiles/aoa_tracking_node.dir/build.make:76：CMakeFiles/aoa_tracking_node.dir/src/aoa_tracking_node.cpp.o] 错误 1
+[3.130s] gmake[1]: *** [CMakeFiles/Makefile2:137：CMakeFiles/aoa_tracking_node.dir/all] 错误 2
+[3.130s] gmake: *** [Makefile:146：all] 错误 2
+[3.132s] Invoked command in '/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking' returned '2': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/ymrobot/ros2_ws_guidance/install/play_mp3_action:/home/ymrobot/ros2_ws_guidance/install/aud_conver:/home/ymrobot/ros2_ws_guidance/install/ymbot_xiaoxue_description:/home/ymrobot/ros2_ws_guidance/install/pedestrian_detector_node:/home/ymrobot/ros2_ws_guidance/install/log_uploader_node:/opt/ros/humble /usr/bin/cmake --build /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking -- -j20 -l20

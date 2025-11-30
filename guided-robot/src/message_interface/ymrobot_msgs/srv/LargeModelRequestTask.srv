@@ -1,0 +1,9 @@
+uint8       larget_mode_task_type   # 请求任务类型 0：导航到某个标记点  1：多点导航  2：导览任务  3: 上肢任务
+string      mark_point_name         # 标记点位名称  --- 用于单点导航
+string[]    mark_point_name_list    # 多点导航
+string      guidance_task_name      # 导览任务名称
+uint8       upper_climb_fixed_action # 上肢固定动作码
+---
+bool        success                 # 是否成功
+uint8       error_code              # 错误码    0 -- 任务失败  1--当前有任务在执行中  2--当前机器在充电  3--当前机器人出现故障  4--当前机器在升级中 
+string      message                 # 消息反馈 -- 失败原因 成功了 啥的......

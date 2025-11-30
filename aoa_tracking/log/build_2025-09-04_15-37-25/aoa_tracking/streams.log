@@ -1,0 +1,24 @@
+[0.008s] Invoking command in '/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/ymrobot/ros2_ws_guidance/install/play_mp3_action:/home/ymrobot/ros2_ws_guidance/install/aud_conver:/home/ymrobot/ros2_ws_guidance/install/ymbot_xiaoxue_description:/home/ymrobot/ros2_ws_guidance/install/pedestrian_detector_node:/home/ymrobot/ros2_ws_guidance/install/log_uploader_node:/opt/ros/humble /usr/bin/cmake --build /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking -- -j20 -l20
+[0.041s] [35m[1mConsolidate compiler generated dependencies of target aoa_tracking_node[0m
+[0.054s] [ 50%] [32mBuilding CXX object CMakeFiles/aoa_tracking_node.dir/src/aoa_tracking_node.cpp.o[0m
+[1.269s] [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:[m[K In constructor ‘[01m[Kymrobot::AoaTracking::AoaTracking()[m[K’:
+[1.269s] [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:16:61:[m[K [01;31m[Kerror: [m[Kcannot bind non-const lvalue reference of type ‘[01m[Kserial::Timeout&[m[K’ to an rvalue of type ‘[01m[Kserial::Timeout[m[K’
+[1.269s]    16 |           serial1_.setTimeout([01;31m[Kserial::Timeout::simpleTimeout(1000)[m[K);
+[1.269s]       |                               [01;31m[K~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~[m[K
+[1.269s] In file included from [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:5[m[K,
+[1.269s]                  from [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:5[m[K:
+[1.269s] [01m[K/usr/local/include/serial/serial.h:461:24:[m[K [01;36m[Knote: [m[K  initializing argument 1 of ‘[01m[Kvoid serial::Serial::setTimeout(serial::Timeout&)[m[K’
+[1.269s]   461 |   setTimeout ([01;36m[KTimeout &timeout[m[K);
+[1.269s]       |               [01;36m[K~~~~~~~~~^~~~~~~[m[K
+[1.269s] [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:25:61:[m[K [01;31m[Kerror: [m[Kcannot bind non-const lvalue reference of type ‘[01m[Kserial::Timeout&[m[K’ to an rvalue of type ‘[01m[Kserial::Timeout[m[K’
+[1.269s]    25 |           serial2_.setTimeout([01;31m[Kserial::Timeout::simpleTimeout(1000)[m[K);
+[1.269s]       |                               [01;31m[K~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~[m[K
+[1.269s] In file included from [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:5[m[K,
+[1.269s]                  from [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:5[m[K:
+[1.269s] [01m[K/usr/local/include/serial/serial.h:461:24:[m[K [01;36m[Knote: [m[K  initializing argument 1 of ‘[01m[Kvoid serial::Serial::setTimeout(serial::Timeout&)[m[K’
+[1.269s]   461 |   setTimeout ([01;36m[KTimeout &timeout[m[K);
+[1.269s]       |               [01;36m[K~~~~~~~~~^~~~~~~[m[K
+[2.564s] gmake[2]: *** [CMakeFiles/aoa_tracking_node.dir/build.make:76：CMakeFiles/aoa_tracking_node.dir/src/aoa_tracking_node.cpp.o] 错误 1
+[2.564s] gmake[1]: *** [CMakeFiles/Makefile2:137：CMakeFiles/aoa_tracking_node.dir/all] 错误 2
+[2.564s] gmake: *** [Makefile:146：all] 错误 2
+[2.566s] Invoked command in '/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking' returned '2': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/ymrobot/ros2_ws_guidance/install/play_mp3_action:/home/ymrobot/ros2_ws_guidance/install/aud_conver:/home/ymrobot/ros2_ws_guidance/install/ymbot_xiaoxue_description:/home/ymrobot/ros2_ws_guidance/install/pedestrian_detector_node:/home/ymrobot/ros2_ws_guidance/install/log_uploader_node:/opt/ros/humble /usr/bin/cmake --build /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking -- -j20 -l20

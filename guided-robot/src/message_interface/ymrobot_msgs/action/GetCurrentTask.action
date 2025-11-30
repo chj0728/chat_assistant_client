@@ -1,0 +1,11 @@
+# goal
+Task current_task   # 当前任务
+---
+# 结果（响应）
+bool success
+string message
+float64 total_elapsed_time
+---
+# 反馈
+string message
+float64 total_elapsed_time

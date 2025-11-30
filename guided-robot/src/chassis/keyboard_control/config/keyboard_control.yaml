@@ -1,0 +1,5 @@
+keyboard_control:
+  ros__parameters:
+    task_topic: "task_guidance/task"
+    is_used_tree: false
+    task_states_feedback_topic: "task_guidance/task_state_feedback"

@@ -1,0 +1,13 @@
+[35m[1mConsolidate compiler generated dependencies of target aoa_tracking_node[0m
+[ 50%] [32mBuilding CXX object CMakeFiles/aoa_tracking_node.dir/src/aoa_tracking_node.cpp.o[0m
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:[m[K In member function ‘[01m[Kvoid ymrobot::AoaTracking::processSerial1Data(const uint8_t*, size_t)[m[K’:
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:109:9:[m[K [01;31m[Kerror: [m[K‘[01m[KcleanupBufferAfterProcessing[m[K’ was not declared in this scope
+  109 |         [01;31m[KcleanupBufferAfterProcessing[m[K();
+      |         [01;31m[K^~~~~~~~~~~~~~~~~~~~~~~~~~~~[m[K
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:[m[K In member function ‘[01m[Kvoid ymrobot::AoaTracking::chissis_status_callback(const CloudChassisStatus&)[m[K’:
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:135:5:[m[K [01;31m[Kerror: [m[K‘[01m[Kelif[m[K’ was not declared in this scope
+  135 |     [01;31m[Kelif[m[K (serial2_.isOpen()){
+      |     [01;31m[K^~~~[m[K
+gmake[2]: *** [CMakeFiles/aoa_tracking_node.dir/build.make:76：CMakeFiles/aoa_tracking_node.dir/src/aoa_tracking_node.cpp.o] 错误 1
+gmake[1]: *** [CMakeFiles/Makefile2:137：CMakeFiles/aoa_tracking_node.dir/all] 错误 2
+gmake: *** [Makefile:146：all] 错误 2

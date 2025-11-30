@@ -1,0 +1,7 @@
+base:
+  amr_id: "YMZZ202500001"
+  amr_version: ymrobot_description
+  use_sim_time: False
+  map_yaml_file: "/home/gu/ros2_ws_tree/src/ceiling/assets/maps/sanlou2/map.yaml"  # 默认 暂时用一下 ， 后面用不到
+  map_pcd_file: "/home/gu/ros2_ws_tree/src/ceiling/assets/maps/sanlou2/map.pcd"
+  is_code_mode: False  # 是否是代码模式控制slam重定位 -- 这个暂时false。等后面整体代码完成后，再改成true  用于控制slam重定位启用。由于建图时候

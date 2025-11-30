@@ -1,0 +1,74 @@
+<root main_tree_to_execute="MainTree">
+    <BehaviorTree ID="MainTree">
+        <include path="./bt_tree_behavior.xml"/>
+        <Blackboard>
+            <entry key="bt_tree_index" value="1" />
+        </Blackboard>
+
+        <Sequence>
+            <!--            二楼固定点位 -->
+            <SetBlackboard output_key="two_floor_init_pose" value="0.0;0.0;0.0;0.0;0.0;0.0"/>
+
+            <SetBlackboard output_key="two_floor_in_elevator_wait" value="8.904749;-0.473392158;0.462999995;0.0;0.0;0.0"/>
+            <SetBlackboard output_key="two_floor_in_elevator_stop" value="9.26259422;1.37273097;0.462999995;0;0;1.455916014"/>
+
+            <SetBlackboard output_key="two_floor_out_elevator_relocation_pose" value="9.26259422;1.37273097;0.462999995;0;0;-1.455916014"/>
+            <SetBlackboard output_key="two_floor_out_elevator_wait" value="9.087093;-0.648493409;0.462999995;0.0;0.0;-1.5708013"/>
+
+            <SetBlackboard output_key="two_floor_201_speek_pose" value="-0.3248092830181122;0.02848830260336399;0.02618938498198986;0.0;0.0;3.0955591201782227"/>
+            <SetBlackboard output_key="two_floor_203_speek_pose" value="15.362079620361328;1.917209506034851;0.19321241974830627;0.0;0.0;-0.2894969582557678"/>
+            <SetBlackboard output_key="two_floor_204_speek_pose" value="15.809739112854004;6.246005058288574;0.02618938498198986;0.0;0.0;-0.2741314172744751"/>
+
+            <SetBlackboard output_key="two_floor_map_name" value="twolou"/>
+
+            <!--            三楼固定点位 -->
+            <SetBlackboard output_key="three_floor_init_pose" value="0.0;0.0;0.0;0.0;0.0;0.0"/>
+
+            <SetBlackboard output_key="three_floor_in_elevator_wait" value="-0.46751804;-0.098000024;0.462999995;-3.141592255;0.000000157;-3.098497541"/>
+            <SetBlackboard output_key="three_floor_in_elevator_stop" value="-0.46751804;-0.098000024;0.462999995;-3.141592255;0.000000157;-3.098497541"/>
+
+            <SetBlackboard output_key="three_floor_out_elevator_relocation_pose" value="9.041062355041504;-0.29046690464019775;0.111932173371315;0.0;0.0;-1.6285343170166016"/>
+            <SetBlackboard output_key="three_floor_out_elevator_wait" value="-0.46751804;-0.098000024;0.462999995;-3.141592255;0.000000157;-3.098497541"/>
+
+            <SetBlackboard output_key="two_floor_map_name" value="-0.46751804;-0.098000024;0.462999995;-3.141592255;0.000000157;-3.098497541"/>
+            <!-- 测试 -->
+            <SetBlackboard output_key="mp3_file_adress" value="/home/ymrobot/ros2_ws/src/ceiling/assets/mp3/M500002V1dBc4CBUwV.mp3"/>
+
+
+            <ParsetaskNode current_task="{current_task}" behavior_index="{behavior_index}" bt_tree_behavior_index="{bt_tree_behavior_index_}"/>
+            <Fallback>
+                <Sequence>
+                    <NeedIndex need_bt_index="{behavior_index}" index="14"/>
+                    <GetMapFile current_task="{current_task}" map_file="{map_name}"/>
+                    <LoadPgmMapNode map_pgm_file="{map_name}"/>
+                    <SendInitPoseNode map_pcd_file="{map_name}" init_pose_list="{two_floor_init_pose}"/>
+                    <SaySomething message="动态加载地图，重定位,完成"/>
+                </Sequence>
+                <Sequence>
+                    <NeedIndex need_bt_index="{behavior_index}" index="15"/>
+                    <SaySomething message="单点导航行为树"/>
+                    <Sequence>
+                        <CheckCurrentMap current_task="{current_task}" />
+                        <GetPoseNode current_task="{current_task}" nav_goal="{nav_target}"/>
+                        <NavigateToPose goal="{nav_target}" behavior_tree=""/>
+                    </Sequence>
+                    <!-- <Sequence>
+                        <SaySomething message="地图不一样，开始执行导航到其他楼层行为"/>
+        </Sequence> -->
+                </Sequence>
+                <Sequence>
+                    <NeedIndex need_bt_index="{behavior_index}" index="16"/>
+                    <SaySomething message="多点导航"/>
+                    <GetPosesNode current_task="{current_task}" nav_goals="{nav_targets}"/>
+                    <NavigateThroughMultiplePosesNode goals="{nav_targets}" behavior_tree=""/>
+                </Sequence>
+                <Sequence>
+                    <NeedIndex need_bt_index="{behavior_index}" index="20"/>
+                    <SaySomething message="行为树固定动作执行"/>
+                    <SetBlackboard output_key="bt_tree_index" value="{bt_tree_behavior_index_}" />
+                    <SubTree ID="BtTreeBehavior"/>
+                </Sequence>
+            </Fallback>
+        </Sequence>
+    </BehaviorTree>
+</root>

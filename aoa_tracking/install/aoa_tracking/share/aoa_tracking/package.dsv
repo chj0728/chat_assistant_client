@@ -1,0 +1,8 @@
+source;share/aoa_tracking/hook/cmake_prefix_path.ps1
+source;share/aoa_tracking/hook/cmake_prefix_path.dsv
+source;share/aoa_tracking/hook/cmake_prefix_path.sh
+source;share/aoa_tracking/local_setup.bash
+source;share/aoa_tracking/local_setup.dsv
+source;share/aoa_tracking/local_setup.ps1
+source;share/aoa_tracking/local_setup.sh
+source;share/aoa_tracking/local_setup.zsh

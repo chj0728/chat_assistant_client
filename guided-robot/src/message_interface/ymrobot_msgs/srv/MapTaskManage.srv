@@ -1,0 +1,8 @@
+MapTaskCommand map_task
+string map_id
+string map_name
+string pcd_name
+string pgm_name
+---
+bool success
+string message

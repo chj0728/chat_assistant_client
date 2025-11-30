@@ -1,0 +1,10 @@
+# goal
+string reposition_pose_name
+---
+# 结果（响应）
+bool success
+string message
+---
+# 反馈
+bool status
+string message

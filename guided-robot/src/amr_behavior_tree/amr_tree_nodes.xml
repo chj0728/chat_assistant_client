@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<root>
+    <TreeNodesModel>
+        <!-- ###################### ACTION NODES   ##################### -->
+        <Action ID="SaySomething">
+            <input_port name="message">Message to say</input_port>
+        </Action>
+        <Action ID="ParsetaskNode">
+            <input_port name="current_task">The task currently received</input_port>
+            <output_port name="behavior_index">nav points selected</output_port>
+            <output_port name="bt_tree_behavior_index">nav points selected</output_port>
+            <output_port name="fixed_action">nav points selected</output_port>
+            <output_port name="voice_message">nav points selected</output_port>
+            <output_port name="image_video">nav points selected</output_port>
+        </Action>
+        <Action ID="HandleNearbyPoint">
+            <input_port name="is_activate_the_nearby_point">activate or close the nearby point</input_port>
+            <input_port name="nearby_point_radius">nearby point radius</output_port>
+            <output_port name="is_activate_the_nearby_point_value">is_activate_the_nearby_point_value</output_port>
+            <output_port name="is_activate_the_nearby_point">is activate the nearby point</output_port>
+            <output_port name="nearby_point_radius_value">nearby point radius value</output_port>
+            <output_port name="nearby_point_radius">nearby_point_radius</output_port>
+        </Action>
+        <Action ID="CloudChassiChargeNode">
+            <input_port name="charge_point_name">The task currently received</input_port>
+        </Action> 
+        <Action ID="CloudChassisNavNode">
+            <input_port name="nav_pose">The task currently received</input_port>
+        </Action>
+        <Action ID="CloudChassisNavNameNode">
+            <input_port name="nav_pose_name">The task currently received</input_port>
+            <input_port name="nearby_point_radius">The nearby point radius</input_port>
+            <input_port name="is_activate_the_nearby_point">is activate the nearby point</input_port>
+        </Action>
+        <Action ID="SetParamsNode">
+            <input_port name="current_task">The task currently received</input_port>
+        </Action>
+        <Action ID="RemovePassedMarkAudiosNode">
+            <input_port name="input_mark_audio_list">The task currently received</input_port>
+            <output_port name="output_mark_audio_list">nav points selected</output_port>
+            <output_port name="mark_audio">nav points selected</output_port>
+        </Action>
+        <Action ID="RemovePassedMarkPointsNode">
+            <input_port name="input_mark_nav_target_list">The task currently received</input_port>
+            <output_port name="output_mark_nav_target_list">nav points selected</output_port>
+            <output_port name="mark_nav_target">nav points selected</output_port>
+        </Action>
+        <Action ID="RemovePassedFixedUpActionNode">
+            <input_port name="input_mark_fixed_up_action_list">The task currently received</input_port>
+            <output_port name="output_mark_fixed_up_action_list">nav points selected</output_port>
+            <output_port name="fixed_action">nav points selected</output_port>
+        </Action>
+        <Action ID="TraverseNavPose">
+            <input_port name="current_task">The task currently received</input_port>
+            <output_port name="the_number_of_cycles">nav points selected</output_port>
+            <output_port name="mark_nav_target_list">nav points selected</output_port>
+            <output_port name="audio_list">nav points selected</output_port>
+            <output_port name="fixed_up_action_list">nav points selected</output_port>
+            <output_port name="is_skip_list">nav points selected</output_port>
+            <output_port name="is_activate_the_nearby_point">nav points selected</output_port>
+            <output_port name="nearby_point_radius">nav points selected</output_port>
+            <output_port name="task_id">nav points selected</output_port>
+        </Action>
+        <Action ID="PlayFixedAudioNode">
+            <input_port name="fixed_audio">The task currently received</input_port>
+        </Action>
+        <Action ID="UpClimbFixedAction">
+            <input_port name="action_fixed_str">The task currently received</input_port>
+        </Action>
+        <Action ID="PubUpClimbStopNode">
+        </Action>
+        <Action ID="GetStandbyPoint">
+            <input_port name="mark_points_adress">The task currently received</input_port>
+            <output_port name="standby_point">nav points selected</output_port>
+        </Action>
+        <Action ID="CloudChassisNavRepositionNode">
+            <input_port name="current_task">The task currently received</input_port>
+        </Action>
+        <Action ID="VoiceInteractionNode">
+            <input_port name="voice_message">The task currently received</input_port>
+        </Action>
+        <Action ID="PublishTaskStateNode">
+            <input_port name="node_task_type">The task currently received</input_port>
+            <input_port name="node_name">The task currently received</input_port>
+            <input_port name="node_task_state">The task currently received</input_port>
+            <input_port name="node_task_error">The task currently received</input_port>
+            <input_port name="node_task_error_message">The task currently received</input_port>
+            <input_port name="node_action_content">The task currently received</input_port>
+            <input_port name="node_task_id">The task currently received</input_port>
+        </Action>
+        <Action ID="RemovePassedIsSikpNode">
+            <input_port name="input_is_skip_list">The task currently received</input_port>
+            <output_port name="output_is_skip_list">nav points selected</output_port>
+            <output_port name="is_open_skip">nav points selected</output_port>
+        </Action>
+        <Action ID="OnSiteInspectionNode">
+            <input_port name="current_task">The task currently received</input_port>
+            <output_port name="the_number_of_cycles">nav points selected</output_port>
+            <output_port name="mark_nav_target_list">nav points selected</output_port>
+            <output_port name="audio_list">nav points selected</output_port>
+            <output_port name="fixed_up_action_list">nav points selected</output_port>
+            <output_port name="image_video_message_list">nav points selected</output_port>
+        </Action>
+        <Action ID="RemovePassedImageVedioActionNode">
+            <input_port name="input_image_vedio_action_list">The task currently received</input_port>
+            <output_port name="output_image_vedio_action_list">nav points selected</output_port>
+            <output_port name="image_vedio_msg">nav points selected</output_port>
+        </Action>
+        <Action ID="VideoCameraFunctionNode">
+            <input_port name="image_vedio_msg">The task currently received</input_port>
+        </Action>
+        <Action ID="PlayFullAudioNode">
+            <input_port name="is_audio_played_throughout_the_entire_process">The task currently received</input_port>
+            <input_port name="full_audio_name">The task currently received</input_port>
+        </Action>
+        <Action ID="IncrementVariableNode">
+            <input_port name="input_increment_variable">The task currently received</input_port>
+            <output_port name="output_increment_variable">The task currently received</input_port>
+        </Action>
+
+        <!-- ###################### CONDITION NODES ##################### -->
+        <Condition ID="NeedIndex">
+            <input_port name="need_bt_index">Command Code and Params</input_port>
+            <input_port name="index" default="">Script Index</input_port>
+        </Condition>
+        <Condition ID="ConditionCheckNode">
+            <input_port name="is_open_skip">Command Code and Params</input_port>
+        </Condition>
+        <!-- ###################### CONTROL NODES   ##################### -->
+
+        <!-- ###################### DECORATOR NODES ##################### -->
+ 
+        <!-- ########################## SUBTREES ######################## -->
+
+    </TreeNodesModel>
+</root>

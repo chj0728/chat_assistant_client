@@ -1,0 +1,14 @@
+# 目标（请求）
+uint8                       up_limb_task_type   # 上肢任务类型 0：末端变化笛卡尔  1：关节变化  2：预设动作变化  3：夹爪动作
+geometry_msgs/PoseStamped   position            # 0 笛卡尔坐标下 导航点  -- 任务类型是0时候
+float64[]                   place_joint_list    # 1：关节变化，数据列表  关节1、关节2、关节3......
+uint8                       action_fixed        # 2: 预设动作变化，标志位，0--动作0  1---动作1
+---
+# 结果（响应）
+bool                        success             # 执行成功或者失败
+string                      message             # 错误信息或者成功信息
+float64                     total_elapsed_time  # 总时间
+---
+# 反馈
+string                      message
+bool                        status

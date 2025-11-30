@@ -1,0 +1,130 @@
+system_master_control:
+  ros__parameters:
+    robot_id: YMZZ202500006
+    client_id: YMZZ202500006
+    mqtt_server_ip: tcp://124.71.181.16:1883
+    mqtt_qs: 1
+    mqtt_topic_pre_fix: ymzz/devices/YMZZ202500006/command
+    mqtt_topic_init_pub_fix: ymzz/devices/YMZZ202500006/data
+    mqtt_topic_device_pub_fix: ymzz/devices/YMZZ202500006/status
+    mqtt_topic_task_pub_fix: ymzz/devices/YMZZ202500006/response
+    mqtt_topic_alarm_sms_fix: ymzz/devices/YMZZ202500006/response
+    mqtt_topic_request_task_fix: ymzz/devices/YMZZ202500006/request_task
+    user_name: ymzz_clent_h_0006
+    pass_word: ymzz_clent_h_0006
+    ca_cert: " "
+    websocket_html_ip: 172.16.21.87
+    websocket_html_port: 8000
+    chassis_task_pub_name: task_guidance/task
+    control_mode_pub_name: control_mode
+    up_control_mode_pub_name: up_control_mode
+    current_robot_status_pub_name: current_robot_status
+    led_show_pub_name: cloud_chassis_led_show
+    chassis_task_status_sub_name: task_guidance/task_states
+    data_update_list_sub_name: data_list_update
+    power_threshold_parameter_update_sub_name: cloud_chassis_power_charge_threshold
+    cloud_chassis_status_sub_name: cloud_chassis_status_info
+    up_limb_control_clinet_name: up_climb_srv
+    emoji_control_clinet_name: emoji_service
+    audio_control_clinet_name: audio_service
+    large_model_request_srv_name: large_model_task_service
+    mp3_file_path: /home/ymrobot/ros2_ws_guidance/src/guided-robot/assets/audios.csv
+    expression_file_path: /home/ymrobot/ros2_ws_guidance/src/guided-robot/assets/expression_list.csv
+    up_action_file_path: /home/ymrobot/ros2_ws_guidance/src/guided-robot/assets/up_action_list.csv
+    pose_file_path: /home/ymrobot/ros2_ws_guidance/src/guided-robot/assets/mark_points.csv
+    service_wait_over_time: 5.0
+    http_time_out: 10000
+    control_move_heart_time: 2
+    low_battery_recharge_threshold: 30
+    execute_task_battery_threshold: 30.0
+    node_task_status_sub_name: bt_node_states
+    is_enable_automatic_recharge: true
+cloud_water_chassis_node:
+  ros__parameters:
+    server_address: 192.168.10.10
+    server_port: 31001
+    mark_points_csv_adress: /home/ymrobot/ros2_ws_guidance/src/guided-robot/assets/mark_points.csv
+    pub_chassis_status_info_topic: cloud_chassis_status_info
+    cloud_water_mark_point_topic_name: cloud_water_mark_point
+    cloud_water_move_base_topic: cloud_cmd_vel
+    play_fixed_audio_pub_name: play_fixed_audio
+    alarm_info_pub_name: alarm_info
+    key_vel_move_base_topic: key_cmd_vel
+    led_show_topic_name: cloud_chassis_led_show
+    cloud_water_nav_target_srv_name: cloud_water_nav_target
+    cloud_chassis_nav_action_name: cloud_chassis_nav_action
+    cloud_chassis_charge_action_name: cloud_chassis_charge_action
+    cloud_chassis_point_upadte_pub_name: data_list_update
+    cloud_chassis_reposition_action_name: cloud_chassis_reposition_action
+    max_linear_speed_sub_name: cloud_chassis_max_linear_speed
+    max_angle_speed_sub_name: cloud_chassis_max_angle_speed
+    cancel_current_move_sub_name: cancel_current_task
+    max_continuous_retries: 3
+    occupied_tolerance: 0.6
+    traffic_peak_time_threshold: 8.0
+audio_control_node:
+  ros__parameters:
+    modify_timbre_sub_name: modify_timbre
+    audio_action_server_name: audio_control_server
+    audio_control_action_name: audio_control_action
+    service_wait_over_time: 5
+set_params_action_node:
+  ros__parameters:
+    cloud_chassis_max_linear_speed_pub_name: cloud_chassis_max_linear_speed
+    cloud_chassis_max_angular_speed_pub_name: cloud_chassis_max_angle_speed
+    power_threshold_parameter_update_pub_name: cloud_chassis_power_charge_threshold
+    modify_timbre_pub_name: modify_timbre
+    active_wake_up_threshold_pub_name: active_wake_up_threshold
+    is_open_active_wake_up_name: is_open_active_wake_up
+    welcome_language_selection_name: welcome_word_update
+    is_open_near_point_explanation_pub_name: is_open_near_point_explanation
+    set_params_action_server_name: set_params_server
+    mark_points_txt_adress: /home/ymrobot/ros2_ws_guidance/src/guided-robot/assets/mark_points.csv
+    concession_distance_threshold_pub_name: concession_distance_threshold
+    is_open_passive_wake_up_name: is_open_passive_wake_up
+    yaml_file_adress: /home/ymrobot/ros2_ws_guidance/src/guided-robot/params/robot.yaml
+    modify_wakeup_word_pub_name: modify_wakeup_word
+up_climb_action_node:
+  ros__parameters:
+    up_limb_srv_name: up_climb_srv
+    up_climb_fixed_action_name: up_climb_action
+    service_wait_over_time: 5
+task_guidance:
+  ros__parameters:
+    cmd_vel_topic: cmd_vel
+    task_topic: task_guidance/task
+    task_states_feedback_topic: task_guidance/task_states
+    is_used_tree: false
+    maps_dir: /home/ymrobot/ros2_ws_guidance/src/guided-robot/assets/maps
+    slam_task_srv_name: /pgo/pgo_map_slam
+    save_pcd_srv_name: /pgo/save_maps
+    save_pgm_srv_name: map_management/map_task_manage
+    relocalizer_task_srv_name: localizer/relocation_map_slam
+    re_pcd_srv_name: relocalize
+    timeout: 100
+    dot_point_update_topic: task_guidance/dot_point_update
+    default_bt_xml_filename: /home/ymrobot/ros2_ws_guidance/src/guided-robot/params/behavior_trees/cloud_bt.xml
+    cancel_current_task_pub_name: cancel_current_task
+    plugin_lib_names:
+      - say_something_node
+      - need_index_node
+      - parse_task_node
+      - cloud_chassis_charge_node
+      - cloud_chassis_nav_node
+      - cloud_chassis_nav_name_node
+      - set_params_node
+      - remove_passed_mark_points_node
+      - remove_passed_mark_audios_node
+      - remove_passed_fixed_up_action_node
+      - traverse_guidance_node
+      - play_fixed_audio_node
+      - up_climb_fixed_action_node
+      - get_standby_point_node
+      - voice_interaction
+      - increment_variable_node
+      - play_fulled_audio_node
+      - video_camera_function_node
+      - on_site_inspection_node
+      - publish_task_state_node
+      - remove_passed_is_skip_node
+      - condition_check_node

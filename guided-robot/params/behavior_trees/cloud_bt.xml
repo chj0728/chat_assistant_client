@@ -1,0 +1,69 @@
+<root main_tree_to_execute="MainTree">
+    <include path="./bt_tree_behavior.xml"/>
+    <Blackboard>
+        <entry key="bt_tree_index" value="1" />
+    </Blackboard>
+    <BehaviorTree ID="MainTree">
+        <Sequence>
+            <SetBlackboard output_key="mark_points_adress" value="/home/ymrobot/ros2_ws_guidance/src/guided-robot/assets/standby_point.txt"/>
+            <SaySomething message="************************"/>
+            <ParsetaskNode current_task="{current_task}" behavior_index="{behavior_index}" bt_tree_behavior_index="{bt_tree_behavior_index_}" nav_pose_name="{nav_pose_name}" fixed_action="{fixed_action}" voice_message="{voice_message}"/>
+            <Fallback>
+                <Sequence>
+                    <NeedIndex need_bt_index="{behavior_index}" index="8"/>
+                    <SaySomething message="开始执行低电量回充"/>
+                    <CloudChassiChargeNode charge_point_name=""/>
+                    <SaySomething message="低电量回充执行成功"/>
+                </Sequence>
+                <Sequence>
+                    <NeedIndex need_bt_index="{behavior_index}" index="21"/>
+                    <SaySomething message="开始执行单点导航"/>
+                    <CloudChassisNavNameNode nav_pose_name="{nav_pose_name}"/>
+                    <SaySomething message="点位名导航执行成功"/>
+                </Sequence>
+                <Sequence>
+                    <NeedIndex need_bt_index="{behavior_index}" index="24"/>
+                    <SaySomething message="行为树固定动作执行"/>
+                    <SetBlackboard output_key="bt_tree_index" value="{bt_tree_behavior_index_}" />
+                    <SubTree ID="BtTreeBehavior" __shared_blackboard="true"/>
+                </Sequence>
+                <Sequence>
+                    <NeedIndex need_bt_index="{behavior_index}" index="27"/>
+                    <SaySomething message="执行上肢预设动作"/>
+                    <UpClimbFixedAction action_fixed_str="{fixed_action}" />
+                    <SaySomething message="上肢预设动作执行成功"/>
+                </Sequence>
+                <Sequence>
+                    <NeedIndex need_bt_index="{behavior_index}" index="31"/>
+                    <SaySomething message="播放固定音频"/>
+                    <VoiceInteractionNode voice_message="{voice_message}" />
+                </Sequence>
+                <Sequence>
+                    <NeedIndex need_bt_index="{behavior_index}" index="32"/>
+                    <SaySomething message="文字转语音"/>
+                    <VoiceInteractionNode voice_message="{voice_message}" />
+                </Sequence>
+                <Sequence>
+                    <NeedIndex need_bt_index="{behavior_index}" index="34"/>
+                    <SaySomething message="执行唤醒"/>
+                    <SetParamsNode current_task="{current_task}" />
+                </Sequence>
+                <Sequence>
+                    <NeedIndex need_bt_index="{behavior_index}" index="37"/>
+                    <SaySomething message="执行参数设置动作"/>
+                    <SetParamsNode current_task="{current_task}" />
+                </Sequence>
+                <Sequence>
+                    <NeedIndex need_bt_index="{behavior_index}" index="40"/>
+                    <SaySomething message="上传语音日志"/>
+                    <VoiceInteractionNode voice_message="{voice_message}" />
+                </Sequence>
+                <Sequence>
+                    <NeedIndex need_bt_index="{behavior_index}" index="42"/>
+                    <SaySomething message="播放在线音频"/>
+                    <VoiceInteractionNode voice_message="{voice_message}" />
+                </Sequence>
+            </Fallback>
+        </Sequence>
+    </BehaviorTree>
+</root>

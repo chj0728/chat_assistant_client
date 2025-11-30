@@ -1,0 +1,10 @@
+# goal
+Task current_task   # 当前任务
+---
+# 结果（响应）
+bool success
+string message
+---
+# 反馈
+bool status
+string message

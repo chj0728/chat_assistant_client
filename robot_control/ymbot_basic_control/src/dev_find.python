@@ -1,0 +1,171 @@
+#!/usr/bin/env python3
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import String
+import serial
+import glob
+import time
+
+BAUD_RATE = 115200
+DEVICE_QUERY_CMD = "#FRead-ym_info.txt\r\n"
+QUERY_RESPONSE_TIMEOUT = 2.0
+
+class SerialPortIdentifierNode(Node):
+    """串口识别节点"""
+    def __init__(self):
+        super().__init__('serial_port_identifier_node')
+        self.node_logger = self.get_logger()
+        self.node_logger.info('串口识别节点已启动。')
+
+        self.left_serial_port = None
+        self.right_serial_port = None
+        self.head_serial_port = None  # 新增一个变量用于头部设备
+        
+        self.left_pub = self.create_publisher(String, 'left_hand_dev', 10)
+        self.right_pub = self.create_publisher(String, 'right_hand_dev', 10)
+        self.head_pub = self.create_publisher(String, 'head_dev', 10)
+
+        self._identify_and_setup_serial_ports()
+
+        # 创建一个定时器，每2秒调用一次发送话题的回调函数
+        self.timer = self.create_timer(2.0, self.publish_topic)
+
+    def _identify_and_setup_serial_ports(self):
+        """串口初始化与识别"""
+        potential_devices = glob.glob('/dev/ttyCH*')
+        self.node_logger.info(f"检测到潜在设备: {potential_devices}")
+
+        if not potential_devices:
+            self.node_logger.error("未找到 /dev/ttyCH* 设备。无法控制机械手。")
+            return
+
+        for device_path in potential_devices:
+            if self.left_serial_port and self.right_serial_port and self.head_serial_port:
+                self.node_logger.info("左右手及头部设备串口均已配置完毕。")
+                break
+
+            temp_ser = None
+            try:
+                self.node_logger.info(f"尝试打开并识别设备: {device_path}")
+                temp_ser = serial.Serial(device_path, BAUD_RATE, timeout=QUERY_RESPONSE_TIMEOUT)
+                
+                temp_ser.write(DEVICE_QUERY_CMD.encode('utf-8'))
+                time.sleep(0.2)
+                
+                line1_bytes = temp_ser.readline()
+                line2_bytes = temp_ser.readline()
+                line3_bytes = temp_ser.readline()
+
+                line1 = line1_bytes.decode('utf-8').strip()
+                device_char = line2_bytes.decode('utf-8').strip()
+                line3 = line3_bytes.decode('utf-8').strip()
+
+                self.node_logger.info(f"设备 {device_path} 响应: 第一行='{line1}', 设备标识='{device_char}', 第三行='{line3}'")
+
+                identified_type = None
+                if line1 == "#Start":
+                    if device_char == 'R':
+                        identified_type = "右手"
+                        if not self.right_serial_port:
+                            self.right_serial_port = temp_ser
+                            temp_ser = None
+                            self.right_pub.publish(String(data=f"{device_path}"))
+                        else:
+                            self.node_logger.warn(f"右手串口已配置。设备 {device_path} 也识别为右手，将忽略此设备。")
+                            if temp_ser and temp_ser.is_open: temp_ser.close()
+                            continue
+                    elif device_char == 'L':
+                        identified_type = "左手"
+                        if not self.left_serial_port:
+                            self.left_serial_port = temp_ser
+                            temp_ser = None
+                            self.left_pub.publish(String(data=f"{device_path}"))
+                        else:
+                            self.node_logger.warn(f"左手串口已配置。设备 {device_path} 也识别为左手，将忽略此设备。")
+                            if temp_ser and temp_ser.is_open: temp_ser.close()
+                            continue
+                    elif device_char == 'H':
+                        identified_type = "头部"
+                        if not self.head_serial_port:  # 头部设备初始化
+                            self.head_serial_port = temp_ser
+                            temp_ser = None
+                            self.head_pub.publish(String(data=f"{device_path}"))
+                        else:
+                            self.node_logger.warn(f"头部设备已配置。设备 {device_path} 也识别为头部，将忽略此设备。")
+                            if temp_ser and temp_ser.is_open: temp_ser.close()
+                            continue
+                    else:
+                        self.node_logger.warn(f"设备 {device_path} 返回了有效的起始/结束标志，但设备标识符无法识别: '{device_char}'")
+                else:
+                    self.node_logger.warn(f"设备 {device_path} 的响应与预期的 #Start/char/#End 格式不符。响应内容: 第一行='{line1}', 设备标识='{device_char}', 第三行='{line3}'")
+                
+                if identified_type and temp_ser is None:
+                    self.node_logger.info(f"成功识别并配置 {identified_type} 于 {device_path}")
+
+            except serial.SerialTimeoutException:
+                self.node_logger.warn(f"读取 {device_path} 超时。发送查询指令后无响应或响应不完整。")
+            except serial.SerialException as e:
+                self.node_logger.error(f"串口操作异常 {device_path}: {e}")
+            except Exception as e:
+                self.node_logger.error(f"处理设备 {device_path} 时发生意外错误: {e}")
+            finally:
+                if temp_ser and temp_ser.is_open:
+                    temp_ser.close()
+                    self.node_logger.info(f"尝试操作后关闭临时端口 {device_path}。")
+        
+        if not self.left_serial_port:
+            self.node_logger.error("左手舵机控制板未识别或打开失败。")
+        else:
+            self.node_logger.info(f"左手控制板已连接: {self.left_serial_port.portstr}")
+        if not self.right_serial_port:
+            self.node_logger.error("右手舵机控制板未识别或打开失败。")
+        else:
+            self.node_logger.info(f"右手控制板已连接: {self.right_serial_port.portstr}")
+        if not self.head_serial_port:
+            self.node_logger.error("头部控制板未识别或打开失败。")
+        else:
+            self.node_logger.info(f"头部控制板已连接: {self.head_serial_port.portstr}")
+
+    def publish_topic(self):
+        """每2秒发布一次话题"""
+        if self.left_serial_port:
+            self.left_pub.publish(String(data=f"{self.left_serial_port.portstr}"))
+        if self.right_serial_port:
+            self.right_pub.publish(String(data=f"{self.right_serial_port.portstr}"))
+        if self.head_serial_port:
+            self.head_pub.publish(String(data=f"{self.head_serial_port.portstr}"))
+
+
+    def destroy_node(self):
+        self.node_logger.info("销毁串口识别节点。")
+        if hasattr(self, 'left_serial_port') and self.left_serial_port:
+            if self.left_serial_port.is_open:
+                self.left_serial_port.close()
+            self.node_logger.info("左手串口已关闭 (如果之前是打开状态)。")
+        if hasattr(self, 'right_serial_port') and self.right_serial_port:
+            if self.right_serial_port.is_open:
+                self.right_serial_port.close()
+            self.node_logger.info("右手串口已关闭 (如果之前是打开状态)。")
+        if hasattr(self, 'head_serial_port') and self.head_serial_port:
+            if self.head_serial_port.is_open:
+                self.head_serial_port.close()
+            self.node_logger.info("头部串口已关闭 (如果之前是打开状态)。")
+        super().destroy_node()
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = SerialPortIdentifierNode()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        if hasattr(node, 'node_logger') and node.node_logger:
+             node.node_logger.info("因键盘中断，正在关闭串口识别节点...")
+        else:
+            print("因键盘中断，正在关闭串口识别节点...")
+    finally:
+        if rclpy.ok():
+            node.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()

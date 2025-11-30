@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>语音样本展示</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f5f7fa;
+            color: #333;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #6e8efb, #a777e3);
+            color: white;
+            padding: 25px 30px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .description {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .controls {
+            padding: 15px 20px;
+            background-color: #f0f3f8;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px 20px 12px 45px;
+            border: 1px solid #dce1e8;
+            border-radius: 30px;
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .search-box input:focus {
+            border-color: #a777e3;
+            box-shadow: 0 0 0 3px rgba(167, 119, 227, 0.2);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #8c98a9;
+        }
+
+        .filter {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .filter select {
+            padding: 10px 15px;
+            border: 1px solid #dce1e8;
+            border-radius: 8px;
+            background: white;
+            color: #444;
+            font-size: 0.95rem;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            padding: 0 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1000px;
+        }
+
+        thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        th {
+            background-color: #5c6bc0;
+            color: white;
+            padding: 16px 12px;
+            text-align: left;
+            font-weight: 500;
+            position: relative;
+        }
+
+        th:after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            height: 60%;
+            width: 1px;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        th:last-child:after {
+            display: none;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f8f9fc;
+        }
+
+        tr {
+            border-bottom: 1px solid #eaeef2;
+            transition: background-color 0.2s;
+        }
+
+        tr:hover {
+            background-color: #edf2ff;
+        }
+
+        td {
+            padding: 14px 12px;
+            vertical-align: middle;
+        }
+
+        .voice-name {
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        audio {
+            width: 100%;
+            height: 40px;
+            outline: none;
+        }
+
+        audio::-webkit-media-controls-panel {
+            background-color: #e9eef7;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            background: #e0e7ff;
+            color: #4f46e5;
+        }
+
+        .language {
+            font-weight: 500;
+            color: #5c6bc0;
+        }
+
+        .sample-rate {
+            text-align: center;
+            font-weight: 500;
+            color: #666;
+        }
+
+        .footer {
+            padding: 20px;
+            text-align: center;
+            color: #6b7280;
+            font-size: 0.9rem;
+            border-top: 1px solid #eaeef2;
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .filter {
+                justify-content: center;
+            }
+
+            header {
+                padding: 20px 15px;
+            }
+
+            h1 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>语音样本库</h1>
+            <p class="description">多种高质量语音样本，适用于不同场景和需求。点击播放按钮试听，使用筛选功能快速找到您需要的语音。</p>
+        </header>
+
+        <div class="controls">
+            <div class="search-box">
+                <div class="search-icon">🔍</div>
+                <input type="text" placeholder="搜索语音名称、特色或适用场景...">
+            </div>
+
+            <div class="filter">
+                <select>
+                    <option>所有语言</option>
+                    <option>中文+英文</option>
+                    <option>英文</option>
+                    <option>西班牙语</option>
+                    <option>意大利语</option>
+                    <option>其他语言</option>
+                </select>
+
+                <select>
+                    <option>所有采样率</option>
+                    <option>48kHz</option>
+                    <option>16kHz</option>
+                </select>
+
+                <select>
+                    <option>所有场景</option>
+                    <option>通用场景</option>
+                    <option>新闻播报</option>
+                    <option>配音解说</option>
+                    <option>客服</option>
+                    <option>数字人</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>音色</th>
+                        <th>音频试听</th>
+                        <th>模型参数</th>
+                        <th>时间戳支持</th>
+                        <th>适用场景</th>
+                        <th>特色</th>
+                        <th>语言</th>
+                        <th>默认采样率</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="voice-name">知楠</span></td>
+                        <td><audio controls>
+                                <source
+                                    src="https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20230713/cymq/知楠.wav"
+                                    type="audio/wav">
+                            </audio></td>
+                        <td>sambert-zhinan-v1</td>
+                        <td>是</td>
+                        <td>通用场景</td>
+                        <td><span class="tag">广告男声</span></td>
+                        <td><span class="language">中文+英文</span></td>
+                        <td class="sample-rate">48kHz</td>
+                    </tr>
+                    <tr>
+                        <td><span class="voice-name">知琪</span></td>
+                        <td><audio controls>
+                                <source
+                                    src="https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20230712/wnqs/知琪.wav"
+                                    type="audio/wav">
+                            </audio></td>
+                        <td>sambert-zhiqi-v1</td>
+                        <td>是</td>
+                        <td>通用场景</td>
+                        <td><span class="tag">温柔女声</span></td>
+                        <td><span class="language">中文+英文</span></td>
+                        <td class="sample-rate">48kHz</td>
+                    </tr>
+                    <tr>
+                        <td><span class="voice-name">知厨</span></td>
+                        <td><audio controls>
+                                <source
+                                    src="https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20230712/enuf/知厨.wav"
+                                    type="audio/wav">
+                            </audio></td>
+                        <td>sambert-zhichu-v1</td>
+                        <td>是</td>
+                        <td>新闻播报</td>
+                        <td><span class="tag">舌尖男声</span></td>
+                        <td><span class="language">中文+英文</span></td>
+                        <td class="sample-rate">48kHz</td>
+                    </tr>
+                    <tr>
+                        <td><span class="voice-name">知德</span></td>
+                        <td><audio controls>
+                                <source
+                                    src="https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20230713/bfcm/知德.wav"
+                                    type="audio/wav">
+                            </audio></td>
+                        <td>sambert-zhide-v1</td>
+                        <td>是</td>
+                        <td>新闻播报</td>
+                        <td><span class="tag">新闻男声</span></td>
+                        <td><span class="language">中文+英文</span></td>
+                        <td class="sample-rate">48kHz</td>
+                    </tr>
+                    <tr>
+                        <td><span class="voice-name">知佳</span></td>
+                        <td><audio controls>
+                                <source
+                                    src="https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20230712/acre/知佳.wav"
+                                    type="audio/wav">
+                            </audio></td>
+                        <td>sambert-zhijia-v1</td>
+                        <td>是</td>
+                        <td>新闻播报</td>
+                        <td><span class="tag">标准女声</span></td>
+                        <td><span class="language">中文+英文</span></td>
+                        <td class="sample-rate">48kHz</td>
+                    </tr>
+                    <tr>
+                        <td><span class="voice-name">知妙（多情感）</span></td>
+                        <td>
+                            <audio controls>
+                                <source
+                                    src="https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20230713/vept/知妙.wav"
+                                    type="audio/wav">
+                            </audio>
+                            <audio controls>
+                                <source
+                                    src="https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20230712/lyna/知妙_播报.wav"
+                                    type="audio/wav">
+                            </audio>
+                        </td>
+                        <td>sambert-zhimiao-emo-v1</td>
+                        <td>是</td>
+                        <td>阅读产品简介、数字人、直播</td>
+                        <td><span class="tag">多种情感女声</span></td>
+                        <td><span class="language">中文+英文</span></td>
+                        <td class="sample-rate">16kHz</td>
+                    </tr>
+                    <tr>
+                        <td><span class="voice-name">Beth</span></td>
+                        <td><audio controls>
+                                <source
+                                    src="https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20230713/zgct/Beth.wav"
+                                    type="audio/wav">
+                            </audio></td>
+                        <td>sambert-beth-v1</td>
+                        <td>是</td>
+                        <td>通用场景</td>
+                        <td><span class="tag">咨询女声</span></td>
+                        <td><span class="language">美式英文</span></td>
+                        <td class="sample-rate">16kHz</td>
+                    </tr>
+                    <tr>
+                        <td><span class="voice-name">Brian</span></td>
+                        <td><audio controls>
+                                <source
+                                    src="https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20230713/jcwr/Brian.wav"
+                                    type="audio/wav">
+                            </audio></td>
+                        <td>sambert-brian-v1</td>
+                        <td>是</td>
+                        <td>通用场景</td>
+                        <td><span class="tag">客服男声</span></td>
+                        <td><span class="language">美式英文</span></td>
+                        <td class="sample-rate">16kHz</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="footer">
+            <p>© 2025 语音样本库 | 共收录 30+ 种音色 | 最后更新: 2025年8月</p>
+        </div>
+    </div>
+
+    <script>
+        // 简单搜索功能
+        document.querySelector('.search-box input').addEventListener('keyup', function () {
+            const searchText = this.value.toLowerCase();
+            const rows = document.querySelectorAll('tbody tr');
+
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                if (text.includes(searchText)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+
+        // 筛选功能
+        document.querySelectorAll('.filter select').forEach(select => {
+            select.addEventListener('change', filterTable);
+        });
+
+        function filterTable() {
+            const languageFilter = document.querySelectorAll('.filter select')[0].value;
+            const rateFilter = document.querySelectorAll('.filter select')[1].value;
+            const sceneFilter = document.querySelectorAll('.filter select')[2].value;
+
+            const rows = document.querySelectorAll('tbody tr');
+
+            rows.forEach(row => {
+                const language = row.cells[6].textContent;
+                const rate = row.cells[7].textContent;
+                const scene = row.cells[4].textContent;
+
+                const languageMatch = languageFilter === '所有语言' || language.includes(languageFilter);
+                const rateMatch = rateFilter === '所有采样率' || rate.includes(rateFilter);
+                const sceneMatch = sceneFilter === '所有场景' || scene.includes(sceneFilter);
+
+                if (languageMatch && rateMatch && sceneMatch) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+    </script>
+</body>
+
+</html>

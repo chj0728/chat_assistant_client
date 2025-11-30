@@ -1,0 +1,10 @@
+# goal
+string charge_point_name   # 充电桩名称
+---
+# 结果（响应）
+bool success               # 是否成功
+string message
+---
+# 反馈
+bool status
+string message

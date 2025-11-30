@@ -1,0 +1,38 @@
+system_master_control:
+  ros__parameters:
+    robot_id: "YMZZ202500001"                                                              # 机器人id
+    client_id: "YMZZ202500001"                                                              # mqtt客户端id
+    mqtt_server_ip: "tcp://120.27.245.248:1883"                                             # mqtt 服务器ip
+    mqtt_qs: 1                                                                              # mqtt 数据质量
+    mqtt_topic_pre_fix: "ymzz/devices/YMZZ202500001/command"                                # mqtt 主题前缀
+    mqtt_topic_init_pub_fix: "ymzz/devices/YMZZ202500001/data"                              # mqtt 发送数据前缀 -- 初始化上传数据
+    mqtt_topic_device_pub_fix: "ymzz/devices/YMZZ202500001/status"                          # mqtt 发送数据前缀 -- 设备上传数据
+    mqtt_topic_task_pub_fix: "ymzz/devices/YMZZ202500001/response"                          # mqtt 发送数据前缀 -- 任务上传数据
+    mqtt_topic_alarm_sms_fix: "ymzz/devices/YMZZ202500001/response"                          # mqtt 发送数据前缀 -- 机器人报警短信上传
+    mqtt_topic_request_task_fix: "ymzz/devices/YMZZ202500001/request_task"                          # mqtt 发送数据前缀 -- 机器人报警短信上传
+    user_name: "ymzz"                                                                       # 用户名
+    pass_word: "ymzz"                                                                       # 密码
+    ca_cert: " "                                                                            # CA证书
+    websocket_html_ip: "172.16.21.87"                                                       # websocket HTML IP
+    websocket_html_port: 8000                                                               # websocket HTML 端口
+    chassis_task_pub_name: "task_guidance/task"                                             # 底盘任务发布名称
+    control_mode_pub_name: "control_mode"                                                   # 控制模式发布名称
+    up_control_mode_pub_name: "up_control_mode"                                             # 上层控制模式发布名称
+    led_show_pub_name: "cloud_chassis_led_show"
+    chassis_task_status_sub_name: "task_guidance/task_states"                               # 底盘任务状态订阅名称
+    data_update_list_sub_name: "data_list_update"                                           # 数据更新列表订阅名称
+    power_threshold_parameter_update_sub_name: "cloud_chassis_power_charge_threshold"       # 电量阈值更新topic
+    cloud_chassis_status_sub_name: "cloud_chassis_status_info"                              # 云迹底盘状态订阅topic
+    up_limb_control_clinet_name: "upper_limb_task_service"                                  # 上肢控制服务名
+    emoji_control_clinet_name: "emoji_service"                                              # 表情控制服务名
+    audio_control_clinet_name: "audio_service"                                              # 音频控制服务名
+    large_model_request_srv_name: "large_model_task_service"                                # 大型模型控制服务名
+    mp3_file_path: "/home/ymrobot/ros2_ws_guidance/src/guided-robot/assets/mp3.csv"                       # mp3文件路径
+    expression_file_path: "/home/ymrobot/ros2_ws_guidance/src/guided-robot/assets/expression_list.csv"    # 表情文件路径
+    up_action_file_path: "/home/ymrobot/ros2_ws_guidance/src/guided-robot/assets/up_action_list.csv"      # 上肢动作文件路径
+    pose_file_path: "/home/ymrobot/ros2_ws_guidance/src/guided-robot/assets/mark_points.csv"              # 标定点文件路径
+    service_wait_over_time: 5.0                                                             # ros2服务等待超时 5s
+    http_time_out: 10000                                                                    # http超时时间
+    control_move_heart_time: 2                                                              # 控制移动心跳时间
+    low_battery_recharge_threshold: 20.0                                                    # 低电量充电阈值
+    execute_task_battery_threshold: 80.0                                                    # 执行任务电量阈值

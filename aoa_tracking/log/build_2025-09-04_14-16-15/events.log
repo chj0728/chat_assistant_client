@@ -1,0 +1,629 @@
+[0.000000] (-) TimerEvent: {}
+[0.000384] (aoa_tracking) JobQueued: {'identifier': 'aoa_tracking', 'dependencies': OrderedDict()}
+[0.000705] (aoa_tracking) JobStarted: {'identifier': 'aoa_tracking'}
+[0.007183] (aoa_tracking) JobProgress: {'identifier': 'aoa_tracking', 'progress': 'cmake'}
+[0.008325] (aoa_tracking) JobProgress: {'identifier': 'aoa_tracking', 'progress': 'build'}
+[0.008364] (aoa_tracking) Command: {'cmd': ['/usr/bin/cmake', '--build', '/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking', '--', '-j20', '-l20'], 'cwd': '/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking', 'env': OrderedDict([('LESSOPEN', '| /usr/bin/lesspipe %s'), ('LANGUAGE', 'zh_CN:zh'), ('USER', 'ymrobot'), ('XDG_SESSION_TYPE', 'x11'), ('SHLVL', '1'), ('LD_LIBRARY_PATH', '/home/ymrobot/ros2_ws_guidance/install/amr_behavior_tree/lib:/home/ymrobot/ros2_ws_guidance/install/ymrobot_msgs/lib:/home/ymrobot/ros2_ws_guidance/install/ymbot_hardware_interface/lib:/home/ymrobot/ros2_ws_guidance/install/ymbot_hardware_driver/lib:/home/ymrobot/ros2_ws_guidance/install/usb_cam/lib:/home/ymrobot/ros2_ws_guidance/install/orbbec_camera_msgs/lib:/home/ymrobot/ros2_ws_guidance/install/interface/lib:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib:/home/ymrobot/ros2_ws_guidance/src/aud_conver/aud_conver/client_modules/wake/bin:/home/ymrobot/ros2_ws_guidance/src/aud_conver/aud_conver/client_modules/wake/libs'), ('HOME', '/home/ymrobot'), ('OLDPWD', '/home/ymrobot/ros2_ws_guidance/src'), ('DESKTOP_SESSION', 'ubuntu'), ('ROS_PYTHON_VERSION', '3'), ('GNOME_SHELL_SESSION_MODE', 'ubuntu'), ('GTK_MODULES', 'gail:atk-bridge'), ('XDG_SEAT_PATH', '/org/freedesktop/DisplayManager/Seat0'), ('DBUS_STARTER_BUS_TYPE', 'session'), ('SYSTEMD_EXEC_PID', '2177'), ('DBUS_SESSION_BUS_ADDRESS', 'unix:path=/run/user/1000/bus,guid=ee868ac21cee9bcf71d0678c68b90132'), ('COLORTERM', 'truecolor'), ('MANDATORY_PATH', '/usr/share/gconf/ubuntu.mandatory.path'), ('IM_CONFIG_PHASE', '1'), ('COLCON_PREFIX_PATH', '/home/ymrobot/ros2_ws_guidance/install'), ('ROS_DISTRO', 'humble'), ('GTK_IM_MODULE', 'ibus'), ('LOGNAME', 'ymrobot'), ('DASHSCOPE_API_KEY', 'sk-1ee75c04bb3c4cfbb5a7f624b8cbfbb2'), ('_', '/usr/bin/colcon'), ('ROS_VERSION', '2'), ('XDG_SESSION_CLASS', 'user'), ('DEFAULTS_PATH', '/usr/share/gconf/ubuntu.default.path'), ('TERM', 'xterm-256color'), ('GNOME_DESKTOP_SESSION_ID', 'this-is-deprecated'), ('ROS_LOCALHOST_ONLY', '0'), ('PATH', '/opt/ros/humble/bin:/home/ymrobot/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin'), ('SESSION_MANAGER', 'local/ymrobot-M9-PRO:@/tmp/.ICE-unix/2177,unix/ymrobot-M9-PRO:/tmp/.ICE-unix/2177'), ('GDM_LANG', 'zh_CN'), ('XDG_SESSION_PATH', '/org/freedesktop/DisplayManager/Session0'), ('XDG_MENU_PREFIX', 'gnome-'), ('GNOME_TERMINAL_SCREEN', '/org/gnome/Terminal/screen/e6f1de09_4a71_4492_acc6_83193b4839d1'), ('XDG_RUNTIME_DIR', '/run/user/1000'), ('DISPLAY', ':0'), ('LANG', 'zh_CN.UTF-8'), ('XDG_CURRENT_DESKTOP', 'ubuntu:GNOME'), ('XMODIFIERS', '@im=ibus'), ('XDG_SESSION_DESKTOP', 'ubuntu'), ('XAUTHORITY', '/home/ymrobot/.Xauthority'), ('LS_COLORS', 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:'), ('GNOME_TERMINAL_SERVICE', ':1.146'), ('SSH_AGENT_LAUNCHER', 'gnome-keyring'), ('SSH_AUTH_SOCK', '/run/user/1000/keyring/ssh'), ('ROS_DOMAIN_ID', '25'), ('XDG_GREETER_DATA_DIR', '/var/lib/lightdm-data/ymrobot'), ('AMENT_PREFIX_PATH', '/home/ymrobot/ros2_ws_guidance/install/ymbot_basic_control:/home/ymrobot/ros2_ws_guidance/install/up_climb_action_node:/home/ymrobot/ros2_ws_guidance/install/task_guidance:/home/ymrobot/ros2_ws_guidance/install/system_master_control:/home/ymrobot/ros2_ws_guidance/install/set_params_action_node:/home/ymrobot/ros2_ws_guidance/install/robot_pose_manager_action_node:/home/ymrobot/ros2_ws_guidance/install/relocation_node:/home/ymrobot/ros2_ws_guidance/install/play_mp3_action:/home/ymrobot/ros2_ws_guidance/install/keyboard_control:/home/ymrobot/ros2_ws_guidance/install/cloud_water_chassis_node:/home/ymrobot/ros2_ws_guidance/install/camera_function_node:/home/ymrobot/ros2_ws_guidance/install/audio_control_node:/home/ymrobot/ros2_ws_guidance/install/aud_conver:/home/ymrobot/ros2_ws_guidance/install/amr_behavior_tree:/home/ymrobot/ros2_ws_guidance/install/ymrobot_msgs:/home/ymrobot/ros2_ws_guidance/install/ymbot_xiaoxue_moveit_config:/home/ymrobot/ros2_ws_guidance/install/ymbot_xiaoxue_description:/home/ymrobot/ros2_ws_guidance/install/ymbot_hardware_interface:/home/ymrobot/ros2_ws_guidance/install/ymbot_hardware_driver:/home/ymrobot/ros2_ws_guidance/install/usb_cam:/home/ymrobot/ros2_ws_guidance/install/pedestrian_detector_node:/home/ymrobot/ros2_ws_guidance/install/orbbec_description:/home/ymrobot/ros2_ws_guidance/install/orbbec_camera_msgs:/home/ymrobot/ros2_ws_guidance/install/log_uploader_node:/home/ymrobot/ros2_ws_guidance/install/log_update_node:/home/ymrobot/ros2_ws_guidance/install/interface:/home/ymrobot/ros2_ws_guidance/install/expression_action_node:/home/ymrobot/ros2_ws_guidance/install/awaken_node:/opt/ros/humble'), ('SHELL', '/bin/bash'), ('QT_ACCESSIBILITY', '1'), ('GDMSESSION', 'ubuntu'), ('LESSCLOSE', '/usr/bin/lesspipe %s %s'), ('GPG_AGENT_INFO', '/run/user/1000/gnupg/S.gpg-agent:0:1'), ('QT_IM_MODULE', 'ibus'), ('PWD', '/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking'), ('XDG_CONFIG_DIRS', '/etc/xdg/xdg-ubuntu:/etc/xdg'), ('DBUS_STARTER_ADDRESS', 'unix:path=/run/user/1000/bus,guid=ee868ac21cee9bcf71d0678c68b90132'), ('XDG_DATA_DIRS', '/usr/share/ubuntu:/usr/share/gnome:/usr/local/share:/usr/share:/var/lib/snapd/desktop'), ('PYTHONPATH', '/home/ymrobot/ros2_ws_guidance/install/play_mp3_action/lib/python3.10/site-packages:/home/ymrobot/ros2_ws_guidance/install/aud_conver/lib/python3.10/site-packages:/home/ymrobot/ros2_ws_guidance/install/ymrobot_msgs/local/lib/python3.10/dist-packages:/home/ymrobot/ros2_ws_guidance/install/ymbot_xiaoxue_description/lib/python3.10/site-packages:/home/ymrobot/ros2_ws_guidance/install/pedestrian_detector_node/lib/python3.10/site-packages:/home/ymrobot/ros2_ws_guidance/install/orbbec_camera_msgs/local/lib/python3.10/dist-packages:/home/ymrobot/ros2_ws_guidance/install/log_uploader_node/lib/python3.10/site-packages:/home/ymrobot/ros2_ws_guidance/install/interface/local/lib/python3.10/dist-packages:/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages'), ('COLCON', '1'), ('VTE_VERSION', '6800'), ('CMAKE_PREFIX_PATH', '/home/ymrobot/ros2_ws_guidance/install/ymbot_basic_control:/home/ymrobot/ros2_ws_guidance/install/up_climb_action_node:/home/ymrobot/ros2_ws_guidance/install/task_guidance:/home/ymrobot/ros2_ws_guidance/install/system_master_control:/home/ymrobot/ros2_ws_guidance/install/set_params_action_node:/home/ymrobot/ros2_ws_guidance/install/robot_pose_manager_action_node:/home/ymrobot/ros2_ws_guidance/install/relocation_node:/home/ymrobot/ros2_ws_guidance/install/keyboard_control:/home/ymrobot/ros2_ws_guidance/install/cloud_water_chassis_node:/home/ymrobot/ros2_ws_guidance/install/camera_function_node:/home/ymrobot/ros2_ws_guidance/install/audio_control_node:/home/ymrobot/ros2_ws_guidance/install/amr_behavior_tree:/home/ymrobot/ros2_ws_guidance/install/ymrobot_msgs:/home/ymrobot/ros2_ws_guidance/install/ymbot_xiaoxue_moveit_config:/home/ymrobot/ros2_ws_guidance/install/ymbot_hardware_interface:/home/ymrobot/ros2_ws_guidance/install/ymbot_hardware_driver:/home/ymrobot/ros2_ws_guidance/install/usb_cam:/home/ymrobot/ros2_ws_guidance/install/orbbec_description:/home/ymrobot/ros2_ws_guidance/install/orbbec_camera_msgs:/home/ymrobot/ros2_ws_guidance/install/log_update_node:/home/ymrobot/ros2_ws_guidance/install/interface:/home/ymrobot/ros2_ws_guidance/install/expression_action_node:/home/ymrobot/ros2_ws_guidance/install/awaken_node:/home/ymrobot/ros2_ws_guidance/install/play_mp3_action:/home/ymrobot/ros2_ws_guidance/install/aud_conver:/home/ymrobot/ros2_ws_guidance/install/ymbot_xiaoxue_description:/home/ymrobot/ros2_ws_guidance/install/pedestrian_detector_node:/home/ymrobot/ros2_ws_guidance/install/log_uploader_node:/opt/ros/humble')]), 'shell': False}
+[0.043419] (aoa_tracking) StdoutLine: {'line': b'\x1b[35m\x1b[1mConsolidate compiler generated dependencies of target aoa_tracking_node\x1b[0m\n'}
+[0.058831] (aoa_tracking) StdoutLine: {'line': b'[ 50%] \x1b[32mBuilding CXX object CMakeFiles/aoa_tracking_node.dir/src/aoa_tracking_node.cpp.o\x1b[0m\n'}
+[0.066072] (aoa_tracking) StderrLine: {'line': b'In file included from \x1b[01m\x1b[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:5\x1b[m\x1b[K:\n'}
+[0.066199] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:1:12:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kstray \xe2\x80\x98\x1b[01m\x1b[K#\x1b[m\x1b[K\xe2\x80\x99 in program\n'}
+[0.066251] (aoa_tracking) StderrLine: {'line': b'    1 | AoaTracking\x1b[01;31m\x1b[K#\x1b[m\x1b[Kinclude <chrono>\n'}
+[0.066291] (aoa_tracking) StderrLine: {'line': b'      |            \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.099981] (-) TimerEvent: {}
+[0.163437] (aoa_tracking) StderrLine: {'line': b'In file included from \x1b[01m\x1b[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:5\x1b[m\x1b[K:\n'}
+[0.163588] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:1:1:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[KAoaTracking\x1b[m\x1b[K\xe2\x80\x99 does not name a type\n'}
+[0.163623] (aoa_tracking) StderrLine: {'line': b'    1 | \x1b[01;31m\x1b[KAoaTracking\x1b[m\x1b[K#include <chrono>\n'}
+[0.163651] (aoa_tracking) StderrLine: {'line': b'      | \x1b[01;31m\x1b[K^~~~~~~~~~~\x1b[m\x1b[K\n'}
+[0.164016] (aoa_tracking) StderrLine: {'line': b'In file included from \x1b[01m\x1b[K/usr/include/c++/11/bits/move.h:57\x1b[m\x1b[K,\n'}
+[0.164087] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/usr/include/c++/11/bits/stl_function.h:60\x1b[m\x1b[K,\n'}
+[0.164123] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/usr/include/c++/11/functional:49\x1b[m\x1b[K,\n'}
+[0.164150] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:2\x1b[m\x1b[K,\n'}
+[0.164176] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:5\x1b[m\x1b[K:\n'}
+[0.164200] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:227:27:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.164234] (aoa_tracking) StderrLine: {'line': b'  227 |   template <typename _Tp, \x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K = sizeof(_Tp)>\n'}
+[0.164257] (aoa_tracking) StderrLine: {'line': b'      |                           \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.164281] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:431:26:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Kstd::size_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.164305] (aoa_tracking) StderrLine: {'line': b'  431 |   template<typename _Tp, \x1b[01;31m\x1b[Kstd\x1b[m\x1b[K::size_t _Size>\n'}
+[0.164329] (aoa_tracking) StderrLine: {'line': b'      |                          \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.164963] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:432:25:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Size\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.165039] (aoa_tracking) StderrLine: {'line': b'  432 |     struct is_array<_Tp[\x1b[01;31m\x1b[K_Size\x1b[m\x1b[K]>\n'}
+[0.165071] (aoa_tracking) StderrLine: {'line': b'      |                         \x1b[01;31m\x1b[K^~~~~\x1b[m\x1b[K\n'}
+[0.165101] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:432:31:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 1 is invalid\n'}
+[0.165126] (aoa_tracking) StderrLine: {'line': b'  432 |     struct is_array<_Tp[_Size]\x1b[01;31m\x1b[K>\x1b[m\x1b[K\n'}
+[0.165150] (aoa_tracking) StderrLine: {'line': b'      |                               \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.165175] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:537:42:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Knullptr_t\x1b[m\x1b[K\xe2\x80\x99 is not a member of \xe2\x80\x98\x1b[01m\x1b[Kstd\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.165199] (aoa_tracking) StderrLine: {'line': b'  537 |     struct __is_null_pointer_helper<std::\x1b[01;31m\x1b[Knullptr_t\x1b[m\x1b[K>\n'}
+[0.165225] (aoa_tracking) StderrLine: {'line': b'      |                                          \x1b[01;31m\x1b[K^~~~~~~~~\x1b[m\x1b[K\n'}
+[0.165247] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:537:51:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 1 is invalid\n'}
+[0.165270] (aoa_tracking) StderrLine: {'line': b'  537 |     struct __is_null_pointer_helper<std::nullptr_t\x1b[01;31m\x1b[K>\x1b[m\x1b[K\n'}
+[0.165292] (aoa_tracking) StderrLine: {'line': b'      |                                                   \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.166395] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1361:37:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is not a member of \xe2\x80\x98\x1b[01m\x1b[Kstd\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.166463] (aoa_tracking) StderrLine: {'line': b' 1361 |     : public integral_constant<std::\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K, alignof(_Tp)>\n'}
+[0.166492] (aoa_tracking) StderrLine: {'line': b'      |                                     \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.166524] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1361:57:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 1 is invalid\n'}
+[0.166549] (aoa_tracking) StderrLine: {'line': b' 1361 |     : public integral_constant<std::size_t, alignof(_Tp)\x1b[01;31m\x1b[K>\x1b[m\x1b[K\n'}
+[0.166572] (aoa_tracking) StderrLine: {'line': b'      |                                                         \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.166595] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1361:57:\x1b[m\x1b[K \x1b[01;36m\x1b[Knote: \x1b[m\x1b[Kinvalid template non-type parameter\n'}
+[0.166618] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1370:37:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is not a member of \xe2\x80\x98\x1b[01m\x1b[Kstd\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.166645] (aoa_tracking) StderrLine: {'line': b' 1370 |     : public integral_constant<std::\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K, 0> { };\n'}
+[0.166669] (aoa_tracking) StderrLine: {'line': b'      |                                     \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.166691] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1370:46:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 1 is invalid\n'}
+[0.166715] (aoa_tracking) StderrLine: {'line': b' 1370 |     : public integral_constant<std::size_t, 0\x1b[01;31m\x1b[K>\x1b[m\x1b[K { };\n'}
+[0.166752] (aoa_tracking) StderrLine: {'line': b'      |                                              \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.166775] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1370:46:\x1b[m\x1b[K \x1b[01;36m\x1b[Knote: \x1b[m\x1b[Kinvalid template non-type parameter\n'}
+[0.166801] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1372:26:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Kstd::size_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.166843] (aoa_tracking) StderrLine: {'line': b' 1372 |   template<typename _Tp, \x1b[01;31m\x1b[Kstd\x1b[m\x1b[K::size_t _Size>\n'}
+[0.166866] (aoa_tracking) StderrLine: {'line': b'      |                          \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.167086] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1373:21:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Size\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.167153] (aoa_tracking) StderrLine: {'line': b' 1373 |     struct rank<_Tp[\x1b[01;31m\x1b[K_Size\x1b[m\x1b[K]>\n'}
+[0.167183] (aoa_tracking) StderrLine: {'line': b'      |                     \x1b[01;31m\x1b[K^~~~~\x1b[m\x1b[K\n'}
+[0.167208] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1373:27:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 1 is invalid\n'}
+[0.167233] (aoa_tracking) StderrLine: {'line': b' 1373 |     struct rank<_Tp[_Size]\x1b[01;31m\x1b[K>\x1b[m\x1b[K\n'}
+[0.167257] (aoa_tracking) StderrLine: {'line': b'      |                           \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.167281] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1374:37:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is not a member of \xe2\x80\x98\x1b[01m\x1b[Kstd\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.167305] (aoa_tracking) StderrLine: {'line': b' 1374 |     : public integral_constant<std::\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K, 1 + rank<_Tp>::value> { };\n'}
+[0.167329] (aoa_tracking) StderrLine: {'line': b'      |                                     \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.167352] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1374:65:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 1 is invalid\n'}
+[0.167377] (aoa_tracking) StderrLine: {'line': b' 1374 |     : public integral_constant<std::size_t, 1 + rank<_Tp>::value\x1b[01;31m\x1b[K>\x1b[m\x1b[K { };\n'}
+[0.167400] (aoa_tracking) StderrLine: {'line': b'      |                                                                 \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.167423] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1374:65:\x1b[m\x1b[K \x1b[01;36m\x1b[Knote: \x1b[m\x1b[Kinvalid template non-type parameter\n'}
+[0.167446] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1378:37:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is not a member of \xe2\x80\x98\x1b[01m\x1b[Kstd\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.167473] (aoa_tracking) StderrLine: {'line': b' 1378 |     : public integral_constant<std::\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K, 1 + rank<_Tp>::value> { };\n'}
+[0.167494] (aoa_tracking) StderrLine: {'line': b'      |                                     \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.167517] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1378:65:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 1 is invalid\n'}
+[0.167539] (aoa_tracking) StderrLine: {'line': b' 1378 |     : public integral_constant<std::size_t, 1 + rank<_Tp>::value\x1b[01;31m\x1b[K>\x1b[m\x1b[K { };\n'}
+[0.167571] (aoa_tracking) StderrLine: {'line': b'      |                                                                 \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.167592] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1378:65:\x1b[m\x1b[K \x1b[01;36m\x1b[Knote: \x1b[m\x1b[Kinvalid template non-type parameter\n'}
+[0.167614] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1383:37:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is not a member of \xe2\x80\x98\x1b[01m\x1b[Kstd\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.167637] (aoa_tracking) StderrLine: {'line': b' 1383 |     : public integral_constant<std::\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K, 0> { };\n'}
+[0.167661] (aoa_tracking) StderrLine: {'line': b'      |                                     \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.167742] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1383:46:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 1 is invalid\n'}
+[0.167766] (aoa_tracking) StderrLine: {'line': b' 1383 |     : public integral_constant<std::size_t, 0\x1b[01;31m\x1b[K>\x1b[m\x1b[K { };\n'}
+[0.167788] (aoa_tracking) StderrLine: {'line': b'      |                                              \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.167812] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1383:46:\x1b[m\x1b[K \x1b[01;36m\x1b[Knote: \x1b[m\x1b[Kinvalid template non-type parameter\n'}
+[0.167835] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1385:42:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Kstd::size_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.167858] (aoa_tracking) StderrLine: {'line': b' 1385 |   template<typename _Tp, unsigned _Uint, \x1b[01;31m\x1b[Kstd\x1b[m\x1b[K::size_t _Size>\n'}
+[0.167880] (aoa_tracking) StderrLine: {'line': b'      |                                          \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.167902] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1386:23:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Size\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.167930] (aoa_tracking) StderrLine: {'line': b' 1386 |     struct extent<_Tp[\x1b[01;31m\x1b[K_Size\x1b[m\x1b[K], _Uint>\n'}
+[0.167957] (aoa_tracking) StderrLine: {'line': b'      |                       \x1b[01;31m\x1b[K^~~~~\x1b[m\x1b[K\n'}
+[0.167984] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1386:36:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 1 is invalid\n'}
+[0.168008] (aoa_tracking) StderrLine: {'line': b' 1386 |     struct extent<_Tp[_Size], _Uint\x1b[01;31m\x1b[K>\x1b[m\x1b[K\n'}
+[0.168031] (aoa_tracking) StderrLine: {'line': b'      |                                    \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.168054] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1387:37:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is not a member of \xe2\x80\x98\x1b[01m\x1b[Kstd\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.168080] (aoa_tracking) StderrLine: {'line': b' 1387 |     : public integral_constant<std::\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K,\n'}
+[0.168103] (aoa_tracking) StderrLine: {'line': b'      |                                     \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.168359] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1388:45:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Size\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.168425] (aoa_tracking) StderrLine: {'line': b' 1388 |                                _Uint == 0 ? \x1b[01;31m\x1b[K_Size\x1b[m\x1b[K : extent<_Tp,\n'}
+[0.168462] (aoa_tracking) StderrLine: {'line': b'      |                                             \x1b[01;31m\x1b[K^~~~~\x1b[m\x1b[K\n'}
+[0.168489] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1389:77:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 1 is invalid\n'}
+[0.168515] (aoa_tracking) StderrLine: {'line': b' 1389 |                                                      _Uint - 1>::value\x1b[01;31m\x1b[K>\x1b[m\x1b[K\n'}
+[0.168540] (aoa_tracking) StderrLine: {'line': b'      |                                                                       \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.168565] (aoa_tracking) StderrLine: {'line': b'\n'}
+[0.168588] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1389:77:\x1b[m\x1b[K \x1b[01;36m\x1b[Knote: \x1b[m\x1b[Kinvalid template non-type parameter\n'}
+[0.168613] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1394:37:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is not a member of \xe2\x80\x98\x1b[01m\x1b[Kstd\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.168637] (aoa_tracking) StderrLine: {'line': b' 1394 |     : public integral_constant<std::\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K,\n'}
+[0.168661] (aoa_tracking) StderrLine: {'line': b'      |                                     \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.168682] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1396:73:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 1 is invalid\n'}
+[0.168704] (aoa_tracking) StderrLine: {'line': b' 1396 |                                                      _Uint - 1>::value\x1b[01;31m\x1b[K>\x1b[m\x1b[K\n'}
+[0.168726] (aoa_tracking) StderrLine: {'line': b'      |                                                                       \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.168748] (aoa_tracking) StderrLine: {'line': b'\n'}
+[0.168770] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1396:73:\x1b[m\x1b[K \x1b[01;36m\x1b[Knote: \x1b[m\x1b[Kinvalid template non-type parameter\n'}
+[0.168862] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1759:26:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 does not name a type\n'}
+[0.168890] (aoa_tracking) StderrLine: {'line': b' 1759 |       { static constexpr \x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K __size = sizeof(_Tp); };\n'}
+[0.168923] (aoa_tracking) StderrLine: {'line': b'      |                          \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.168949] (aoa_tracking) StderrLine: {'line': b'In file included from \x1b[01m\x1b[K/usr/include/c++/11/bits/move.h:57\x1b[m\x1b[K,\n'}
+[0.168971] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/usr/include/c++/11/bits/stl_function.h:60\x1b[m\x1b[K,\n'}
+[0.168994] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/usr/include/c++/11/functional:49\x1b[m\x1b[K,\n'}
+[0.169016] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:2\x1b[m\x1b[K,\n'}
+[0.169039] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:5\x1b[m\x1b[K:\n'}
+[0.169062] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1:1:\x1b[m\x1b[K \x1b[01;36m\x1b[Knote: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is defined in header \xe2\x80\x98\x1b[01m\x1b[K<cstddef>\x1b[m\x1b[K\xe2\x80\x99; did you forget to \xe2\x80\x98\x1b[01m\x1b[K#include <cstddef>\x1b[m\x1b[K\xe2\x80\x99?\n'}
+[0.169088] (aoa_tracking) StderrLine: {'line': b'  +++ |+\x1b[32m\x1b[K#include <cstddef>\x1b[m\x1b[K\n'}
+[0.169110] (aoa_tracking) StderrLine: {'line': b'    1 | // C++11 <type_traits> -*- C++ -*-\n'}
+[0.169132] (aoa_tracking) StderrLine: {'line': b'In file included from \x1b[01m\x1b[K/usr/include/c++/11/bits/move.h:57\x1b[m\x1b[K,\n'}
+[0.169157] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/usr/include/c++/11/bits/stl_function.h:60\x1b[m\x1b[K,\n'}
+[0.169180] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/usr/include/c++/11/functional:49\x1b[m\x1b[K,\n'}
+[0.169202] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:2\x1b[m\x1b[K,\n'}
+[0.169224] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:5\x1b[m\x1b[K:\n'}
+[0.169246] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1761:14:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.169267] (aoa_tracking) StderrLine: {'line': b' 1761 |     template<\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K _Sz, typename _Tp, bool = (_Sz <= _Tp::__size)>\n'}
+[0.169289] (aoa_tracking) StderrLine: {'line': b'      |              \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.169757] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1761:48:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Sz\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.169784] (aoa_tracking) StderrLine: {'line': b' 1761 |     template<size_t _Sz, typename _Tp, bool = (\x1b[01;31m\x1b[K_Sz\x1b[m\x1b[K <= _Tp::__size)>\n'}
+[0.169807] (aoa_tracking) StderrLine: {'line': b'      |                                                \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.169829] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1762:14:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kno default argument for \xe2\x80\x98\x1b[01m\x1b[K_Tp\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.169853] (aoa_tracking) StderrLine: {'line': b' 1762 |       struct \x1b[01;31m\x1b[K__select\x1b[m\x1b[K;\n'}
+[0.169875] (aoa_tracking) StderrLine: {'line': b'      |              \x1b[01;31m\x1b[K^~~~~~~~\x1b[m\x1b[K\n'}
+[0.169899] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1764:14:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.169926] (aoa_tracking) StderrLine: {'line': b' 1764 |     template<\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K _Sz, typename _Uint, typename... _UInts>\n'}
+[0.169950] (aoa_tracking) StderrLine: {'line': b'      |              \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.170453] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1765:23:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Sz\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.170482] (aoa_tracking) StderrLine: {'line': b' 1765 |       struct __select<\x1b[01;31m\x1b[K_Sz\x1b[m\x1b[K, _List<_Uint, _UInts...>, true>\n'}
+[0.170506] (aoa_tracking) StderrLine: {'line': b'      |                       \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.170530] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1765:57:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 1 is invalid\n'}
+[0.170555] (aoa_tracking) StderrLine: {'line': b' 1765 |       struct __select<_Sz, _List<_Uint, _UInts...>, true\x1b[01;31m\x1b[K>\x1b[m\x1b[K\n'}
+[0.170579] (aoa_tracking) StderrLine: {'line': b'      |                                                         \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.170601] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1768:14:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.170623] (aoa_tracking) StderrLine: {'line': b' 1768 |     template<\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K _Sz, typename _Uint, typename... _UInts>\n'}
+[0.170645] (aoa_tracking) StderrLine: {'line': b'      |              \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.171251] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1769:23:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Sz\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.171316] (aoa_tracking) StderrLine: {'line': b' 1769 |       struct __select<\x1b[01;31m\x1b[K_Sz\x1b[m\x1b[K, _List<_Uint, _UInts...>, false>\n'}
+[0.171347] (aoa_tracking) StderrLine: {'line': b'      |                       \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.171373] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1769:58:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 1 is invalid\n'}
+[0.171399] (aoa_tracking) StderrLine: {'line': b' 1769 |       struct __select<_Sz, _List<_Uint, _UInts...>, false\x1b[01;31m\x1b[K>\x1b[m\x1b[K\n'}
+[0.171423] (aoa_tracking) StderrLine: {'line': b'      |                                                          \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.171926] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1770:18:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Sz\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.171992] (aoa_tracking) StderrLine: {'line': b' 1770 |       : __select<\x1b[01;31m\x1b[K_Sz\x1b[m\x1b[K, _List<_UInts...>>\n'}
+[0.172024] (aoa_tracking) StderrLine: {'line': b'      |                  \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.172050] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1770:38:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 1 is invalid\n'}
+[0.172078] (aoa_tracking) StderrLine: {'line': b' 1770 |       : __select<_Sz, _List<_UInts...\x1b[01;31m\x1b[K>>\x1b[m\x1b[K\n'}
+[0.172101] (aoa_tracking) StderrLine: {'line': b'      |                                      \x1b[01;31m\x1b[K^~\x1b[m\x1b[K\n'}
+[0.172124] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1761:60:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K__size\x1b[m\x1b[K\xe2\x80\x99 is not a member of \xe2\x80\x98\x1b[01m\x1b[Kstd::__make_unsigned_selector_base::_List<unsigned char, short unsigned int, unsigned int, long unsigned int, long long unsigned int>\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.172151] (aoa_tracking) StderrLine: {'line': b' 1761 |     template<size_t _Sz, typename _Tp, bool = (_Sz <= _Tp::\x1b[01;31m\x1b[K__size\x1b[m\x1b[K)>\n'}
+[0.172174] (aoa_tracking) StderrLine: {'line': b'      |                                                            \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.172201] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1783:68:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 3 is invalid\n'}
+[0.172224] (aoa_tracking) StderrLine: {'line': b' 1783 | using __unsigned_type = typename __select<sizeof(_Tp), _UInts\x1b[01;31m\x1b[K>\x1b[m\x1b[K::__type;\n'}
+[0.172246] (aoa_tracking) StderrLine: {'line': b'      |                                                              \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.172268] (aoa_tracking) StderrLine: {'line': b'\n'}
+[0.174592] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1787:47:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K__unsigned_type\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.174662] (aoa_tracking) StderrLine: {'line': b' 1787 |         = typename __match_cv_qualifiers<_Tp, \x1b[01;31m\x1b[K__unsigned_type\x1b[m\x1b[K>::__type;\n'}
+[0.174693] (aoa_tracking) StderrLine: {'line': b'      |                                               \x1b[01;31m\x1b[K^~~~~~~~~~~~~~~\x1b[m\x1b[K\n'}
+[0.174719] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1787:62:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 2 is invalid\n'}
+[0.174746] (aoa_tracking) StderrLine: {'line': b' 1787 |         = typename __match_cv_qualifiers<_Tp, __unsigned_type\x1b[01;31m\x1b[K>\x1b[m\x1b[K::__type;\n'}
+[0.174771] (aoa_tracking) StderrLine: {'line': b'      |                                                              \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.174795] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1799:68:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K__type\x1b[m\x1b[K\xe2\x80\x99 in \xe2\x80\x98\x1b[01m\x1b[Kclass std::__make_unsigned_selector<wchar_t, false, true>\x1b[m\x1b[K\xe2\x80\x99 does not name a type\n'}
+[0.174820] (aoa_tracking) StderrLine: {'line': b' 1799 |      = typename __make_unsigned_selector<wchar_t, false, true>::\x1b[01;31m\x1b[K__type\x1b[m\x1b[K;\n'}
+[0.174845] (aoa_tracking) StderrLine: {'line': b'      |                                                                 \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.174906] (aoa_tracking) StderrLine: {'line': b'\n'}
+[0.174935] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1816:69:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K__type\x1b[m\x1b[K\xe2\x80\x99 in \xe2\x80\x98\x1b[01m\x1b[Kclass std::__make_unsigned_selector<char16_t, false, true>\x1b[m\x1b[K\xe2\x80\x99 does not name a type\n'}
+[0.174961] (aoa_tracking) StderrLine: {'line': b' 1816 |     = typename __make_unsigned_selector<char16_t, false, true>::\x1b[01;31m\x1b[K__type\x1b[m\x1b[K;\n'}
+[0.174984] (aoa_tracking) StderrLine: {'line': b'      |                                                                 \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.175008] (aoa_tracking) StderrLine: {'line': b'\n'}
+[0.175032] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1823:69:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K__type\x1b[m\x1b[K\xe2\x80\x99 in \xe2\x80\x98\x1b[01m\x1b[Kclass std::__make_unsigned_selector<char32_t, false, true>\x1b[m\x1b[K\xe2\x80\x99 does not name a type\n'}
+[0.175059] (aoa_tracking) StderrLine: {'line': b' 1823 |     = typename __make_unsigned_selector<char32_t, false, true>::\x1b[01;31m\x1b[K__type\x1b[m\x1b[K;\n'}
+[0.175082] (aoa_tracking) StderrLine: {'line': b'      |                                                                 \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.175107] (aoa_tracking) StderrLine: {'line': b'\n'}
+[0.175130] (aoa_tracking) StderrLine: {'line': b'/usr/include/c++/11/type_traits: In instantiation of \xe2\x80\x98\x1b[01m\x1b[Kclass std::__make_unsigned_selector<wchar_t, true, false>\x1b[m\x1b[K\xe2\x80\x99:\n'}
+[0.175156] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1912:62:\x1b[m\x1b[K   required from \xe2\x80\x98\x1b[01m\x1b[Kclass std::__make_signed_selector<wchar_t, false, true>\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.175183] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1927:57:\x1b[m\x1b[K   required from here\n'}
+[0.175207] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1744:13:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kno type named \xe2\x80\x98\x1b[01m\x1b[K__type\x1b[m\x1b[K\xe2\x80\x99 in \xe2\x80\x98\x1b[01m\x1b[Kstruct std::__make_unsigned<wchar_t>\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.175234] (aoa_tracking) StderrLine: {'line': b' 1744 |       using \x1b[01;31m\x1b[K__unsigned_type\x1b[m\x1b[K\n'}
+[0.175260] (aoa_tracking) StderrLine: {'line': b'      |             \x1b[01;31m\x1b[K^~~~~~~~~~~~~~~\x1b[m\x1b[K\n'}
+[0.175285] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1748:13:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kno type named \xe2\x80\x98\x1b[01m\x1b[K__type\x1b[m\x1b[K\xe2\x80\x99 in \xe2\x80\x98\x1b[01m\x1b[Kstruct std::__make_unsigned<wchar_t>\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.175310] (aoa_tracking) StderrLine: {'line': b' 1748 |       using \x1b[01;31m\x1b[K__type\x1b[m\x1b[K\n'}
+[0.175335] (aoa_tracking) StderrLine: {'line': b'      |             \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.175360] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1927:66:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kinvalid combination of multiple type-specifiers\n'}
+[0.175384] (aoa_tracking) StderrLine: {'line': b' 1927 |        = typename __make_signed_selector<wchar_t, false, true>::\x1b[01;31m\x1b[K__type\x1b[m\x1b[K;\n'}
+[0.175408] (aoa_tracking) StderrLine: {'line': b'      |                                                                 \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.175433] (aoa_tracking) StderrLine: {'line': b'\n'}
+[0.175456] (aoa_tracking) StderrLine: {'line': b'/usr/include/c++/11/type_traits: In instantiation of \xe2\x80\x98\x1b[01m\x1b[Kclass std::__make_unsigned_selector<char16_t, true, false>\x1b[m\x1b[K\xe2\x80\x99:\n'}
+[0.175480] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1912:62:\x1b[m\x1b[K   required from \xe2\x80\x98\x1b[01m\x1b[Kclass std::__make_signed_selector<char16_t, false, true>\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.175505] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1944:58:\x1b[m\x1b[K   required from here\n'}
+[0.175530] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1744:13:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kno type named \xe2\x80\x98\x1b[01m\x1b[K__type\x1b[m\x1b[K\xe2\x80\x99 in \xe2\x80\x98\x1b[01m\x1b[Kstruct std::__make_unsigned<char16_t>\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.175744] (aoa_tracking) StderrLine: {'line': b' 1744 |       using \x1b[01;31m\x1b[K__unsigned_type\x1b[m\x1b[K\n'}
+[0.175789] (aoa_tracking) StderrLine: {'line': b'      |             \x1b[01;31m\x1b[K^~~~~~~~~~~~~~~\x1b[m\x1b[K\n'}
+[0.175817] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1748:13:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kno type named \xe2\x80\x98\x1b[01m\x1b[K__type\x1b[m\x1b[K\xe2\x80\x99 in \xe2\x80\x98\x1b[01m\x1b[Kstruct std::__make_unsigned<char16_t>\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.175844] (aoa_tracking) StderrLine: {'line': b' 1748 |       using \x1b[01;31m\x1b[K__type\x1b[m\x1b[K\n'}
+[0.175869] (aoa_tracking) StderrLine: {'line': b'      |             \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.175897] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1944:67:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kinvalid combination of multiple type-specifiers\n'}
+[0.176131] (aoa_tracking) StderrLine: {'line': b' 1944 |       = typename __make_signed_selector<char16_t, false, true>::\x1b[01;31m\x1b[K__type\x1b[m\x1b[K;\n'}
+[0.176170] (aoa_tracking) StderrLine: {'line': b'      |                                                                 \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.176199] (aoa_tracking) StderrLine: {'line': b'\n'}
+[0.176225] (aoa_tracking) StderrLine: {'line': b'/usr/include/c++/11/type_traits: In instantiation of \xe2\x80\x98\x1b[01m\x1b[Kclass std::__make_unsigned_selector<char32_t, true, false>\x1b[m\x1b[K\xe2\x80\x99:\n'}
+[0.176252] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1912:62:\x1b[m\x1b[K   required from \xe2\x80\x98\x1b[01m\x1b[Kclass std::__make_signed_selector<char32_t, false, true>\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.176276] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1951:58:\x1b[m\x1b[K   required from here\n'}
+[0.176304] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1744:13:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kno type named \xe2\x80\x98\x1b[01m\x1b[K__type\x1b[m\x1b[K\xe2\x80\x99 in \xe2\x80\x98\x1b[01m\x1b[Kstruct std::__make_unsigned<char32_t>\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.176328] (aoa_tracking) StderrLine: {'line': b' 1744 |       using \x1b[01;31m\x1b[K__unsigned_type\x1b[m\x1b[K\n'}
+[0.176353] (aoa_tracking) StderrLine: {'line': b'      |             \x1b[01;31m\x1b[K^~~~~~~~~~~~~~~\x1b[m\x1b[K\n'}
+[0.176376] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1748:13:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kno type named \xe2\x80\x98\x1b[01m\x1b[K__type\x1b[m\x1b[K\xe2\x80\x99 in \xe2\x80\x98\x1b[01m\x1b[Kstruct std::__make_unsigned<char32_t>\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.176401] (aoa_tracking) StderrLine: {'line': b' 1748 |       using \x1b[01;31m\x1b[K__type\x1b[m\x1b[K\n'}
+[0.176423] (aoa_tracking) StderrLine: {'line': b'      |             \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.176445] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1951:67:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kinvalid combination of multiple type-specifiers\n'}
+[0.176468] (aoa_tracking) StderrLine: {'line': b' 1951 |       = typename __make_signed_selector<char32_t, false, true>::\x1b[01;31m\x1b[K__type\x1b[m\x1b[K;\n'}
+[0.176492] (aoa_tracking) StderrLine: {'line': b'      |                                                                 \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.176513] (aoa_tracking) StderrLine: {'line': b'\n'}
+[0.176535] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1984:26:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Kstd::size_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.176557] (aoa_tracking) StderrLine: {'line': b' 1984 |   template<typename _Tp, \x1b[01;31m\x1b[Kstd\x1b[m\x1b[K::size_t _Size>\n'}
+[0.176582] (aoa_tracking) StderrLine: {'line': b'      |                          \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.176604] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1985:30:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Size\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.176638] (aoa_tracking) StderrLine: {'line': b' 1985 |     struct remove_extent<_Tp[\x1b[01;31m\x1b[K_Size\x1b[m\x1b[K]>\n'}
+[0.176660] (aoa_tracking) StderrLine: {'line': b'      |                              \x1b[01;31m\x1b[K^~~~~\x1b[m\x1b[K\n'}
+[0.176681] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1985:36:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 1 is invalid\n'}
+[0.176715] (aoa_tracking) StderrLine: {'line': b' 1985 |     struct remove_extent<_Tp[_Size]\x1b[01;31m\x1b[K>\x1b[m\x1b[K\n'}
+[0.176902] (aoa_tracking) StderrLine: {'line': b'      |                                    \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.176952] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1997:26:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Kstd::size_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.176984] (aoa_tracking) StderrLine: {'line': b' 1997 |   template<typename _Tp, \x1b[01;31m\x1b[Kstd\x1b[m\x1b[K::size_t _Size>\n'}
+[0.177015] (aoa_tracking) StderrLine: {'line': b'      |                          \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.177043] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1998:35:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Size\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.177070] (aoa_tracking) StderrLine: {'line': b' 1998 |     struct remove_all_extents<_Tp[\x1b[01;31m\x1b[K_Size\x1b[m\x1b[K]>\n'}
+[0.177095] (aoa_tracking) StderrLine: {'line': b'      |                                   \x1b[01;31m\x1b[K^~~~~\x1b[m\x1b[K\n'}
+[0.177124] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:1998:41:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 1 is invalid\n'}
+[0.177150] (aoa_tracking) StderrLine: {'line': b' 1998 |     struct remove_all_extents<_Tp[_Size]\x1b[01;31m\x1b[K>\x1b[m\x1b[K\n'}
+[0.177173] (aoa_tracking) StderrLine: {'line': b'      |                                         \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.177196] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2056:12:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Kstd::size_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.177223] (aoa_tracking) StderrLine: {'line': b' 2056 |   template<\x1b[01;31m\x1b[Kstd\x1b[m\x1b[K::size_t _Len>\n'}
+[0.177249] (aoa_tracking) StderrLine: {'line': b'      |            \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.177275] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2061:30:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Len\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.177299] (aoa_tracking) StderrLine: {'line': b' 2061 |         unsigned char __data[\x1b[01;31m\x1b[K_Len\x1b[m\x1b[K];\n'}
+[0.177323] (aoa_tracking) StderrLine: {'line': b'      |                              \x1b[01;31m\x1b[K^~~~\x1b[m\x1b[K\n'}
+[0.177346] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2076:12:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Kstd::size_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.177370] (aoa_tracking) StderrLine: {'line': b' 2076 |   template<\x1b[01;31m\x1b[Kstd\x1b[m\x1b[K::size_t _Len, std::size_t _Align =\n'}
+[0.177395] (aoa_tracking) StderrLine: {'line': b'      |            \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.177418] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2076:30:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Kstd::size_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.177442] (aoa_tracking) StderrLine: {'line': b' 2076 |   template<std::size_t _Len, \x1b[01;31m\x1b[Kstd\x1b[m\x1b[K::size_t _Align =\n'}
+[0.177466] (aoa_tracking) StderrLine: {'line': b'      |                              \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.177623] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2077:55:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Len\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.177685] (aoa_tracking) StderrLine: {'line': b' 2077 |            __alignof__(typename __aligned_storage_msa<\x1b[01;31m\x1b[K_Len\x1b[m\x1b[K>::__type)>\n'}
+[0.177715] (aoa_tracking) StderrLine: {'line': b'      |                                                       \x1b[01;31m\x1b[K^~~~\x1b[m\x1b[K\n'}
+[0.177741] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2077:59:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 1 is invalid\n'}
+[0.177767] (aoa_tracking) StderrLine: {'line': b' 2077 |            __alignof__(typename __aligned_storage_msa<_Len\x1b[01;31m\x1b[K>\x1b[m\x1b[K::__type)>\n'}
+[0.177791] (aoa_tracking) StderrLine: {'line': b'      |                                                           \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.178027] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2082:30:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Len\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.178059] (aoa_tracking) StderrLine: {'line': b' 2082 |         unsigned char __data[\x1b[01;31m\x1b[K_Len\x1b[m\x1b[K];\n'}
+[0.178084] (aoa_tracking) StderrLine: {'line': b'      |                              \x1b[01;31m\x1b[K^~~~\x1b[m\x1b[K\n'}
+[0.179075] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2083:44:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Align\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.179149] (aoa_tracking) StderrLine: {'line': b' 2083 |         struct __attribute__((__aligned__((\x1b[01;31m\x1b[K_Align\x1b[m\x1b[K)))) { } __align;\n'}
+[0.179179] (aoa_tracking) StderrLine: {'line': b'      |                                            \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.179207] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2090:20:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 does not name a type\n'}
+[0.179232] (aoa_tracking) StderrLine: {'line': b' 2090 |       static const \x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K _S_alignment = 0;\n'}
+[0.179256] (aoa_tracking) StderrLine: {'line': b'      |                    \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.179281] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2090:20:\x1b[m\x1b[K \x1b[01;36m\x1b[Knote: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is defined in header \xe2\x80\x98\x1b[01m\x1b[K<cstddef>\x1b[m\x1b[K\xe2\x80\x99; did you forget to \xe2\x80\x98\x1b[01m\x1b[K#include <cstddef>\x1b[m\x1b[K\xe2\x80\x99?\n'}
+[0.179306] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2091:20:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 does not name a type\n'}
+[0.179329] (aoa_tracking) StderrLine: {'line': b' 2091 |       static const \x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K _S_size = 0;\n'}
+[0.179354] (aoa_tracking) StderrLine: {'line': b'      |                    \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.179377] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2091:20:\x1b[m\x1b[K \x1b[01;36m\x1b[Knote: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is defined in header \xe2\x80\x98\x1b[01m\x1b[K<cstddef>\x1b[m\x1b[K\xe2\x80\x99; did you forget to \xe2\x80\x98\x1b[01m\x1b[K#include <cstddef>\x1b[m\x1b[K\xe2\x80\x99?\n'}
+[0.179404] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2097:20:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 does not name a type\n'}
+[0.179427] (aoa_tracking) StderrLine: {'line': b' 2097 |       static const \x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K _S_alignment =\n'}
+[0.179449] (aoa_tracking) StderrLine: {'line': b'      |                    \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.179472] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2097:20:\x1b[m\x1b[K \x1b[01;36m\x1b[Knote: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is defined in header \xe2\x80\x98\x1b[01m\x1b[K<cstddef>\x1b[m\x1b[K\xe2\x80\x99; did you forget to \xe2\x80\x98\x1b[01m\x1b[K#include <cstddef>\x1b[m\x1b[K\xe2\x80\x99?\n'}
+[0.179495] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2100:20:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 does not name a type\n'}
+[0.179519] (aoa_tracking) StderrLine: {'line': b' 2100 |       static const \x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K _S_size =\n'}
+[0.179540] (aoa_tracking) StderrLine: {'line': b'      |                    \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.179562] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2100:20:\x1b[m\x1b[K \x1b[01;36m\x1b[Knote: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is defined in header \xe2\x80\x98\x1b[01m\x1b[K<cstddef>\x1b[m\x1b[K\xe2\x80\x99; did you forget to \xe2\x80\x98\x1b[01m\x1b[K#include <cstddef>\x1b[m\x1b[K\xe2\x80\x99?\n'}
+[0.179587] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2115:13:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.179610] (aoa_tracking) StderrLine: {'line': b' 2115 |   template <\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K _Len, typename... _Types>\n'}
+[0.179636] (aoa_tracking) StderrLine: {'line': b'      |             \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.179660] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2122:20:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 does not name a type\n'}
+[0.179684] (aoa_tracking) StderrLine: {'line': b' 2122 |       static const \x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K _S_len = _Len > __strictest::_S_size\n'}
+[0.179708] (aoa_tracking) StderrLine: {'line': b'      |                    \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.179732] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2122:20:\x1b[m\x1b[K \x1b[01;36m\x1b[Knote: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is defined in header \xe2\x80\x98\x1b[01m\x1b[K<cstddef>\x1b[m\x1b[K\xe2\x80\x99; did you forget to \xe2\x80\x98\x1b[01m\x1b[K#include <cstddef>\x1b[m\x1b[K\xe2\x80\x99?\n'}
+[0.179757] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2126:20:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 does not name a type\n'}
+[0.179783] (aoa_tracking) StderrLine: {'line': b' 2126 |       static const \x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K alignment_value = __strictest::_S_alignment;\n'}
+[0.179808] (aoa_tracking) StderrLine: {'line': b'      |                    \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.179832] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2126:20:\x1b[m\x1b[K \x1b[01;36m\x1b[Knote: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is defined in header \xe2\x80\x98\x1b[01m\x1b[K<cstddef>\x1b[m\x1b[K\xe2\x80\x99; did you forget to \xe2\x80\x98\x1b[01m\x1b[K#include <cstddef>\x1b[m\x1b[K\xe2\x80\x99?\n'}
+[0.180034] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2128:40:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_S_len\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.180103] (aoa_tracking) StderrLine: {'line': b' 2128 |       typedef typename aligned_storage<\x1b[01;31m\x1b[K_S_len\x1b[m\x1b[K, alignment_value>::type type;\n'}
+[0.180136] (aoa_tracking) StderrLine: {'line': b'      |                                        \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.181123] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2128:48:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Kalignment_value\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope; did you mean \xe2\x80\x98\x1b[01m\x1b[Kalignment_of\x1b[m\x1b[K\xe2\x80\x99?\n'}
+[0.181190] (aoa_tracking) StderrLine: {'line': b' 2128 |       typedef typename aligned_storage<_S_len, \x1b[01;31m\x1b[Kalignment_value\x1b[m\x1b[K>::type type;\n'}
+[0.181220] (aoa_tracking) StderrLine: {'line': b'      |                                                \x1b[01;31m\x1b[K^~~~~~~~~~~~~~~\x1b[m\x1b[K\n'}
+[0.181245] (aoa_tracking) StderrLine: {'line': b'      |                                                \x1b[32m\x1b[Kalignment_of\x1b[m\x1b[K\n'}
+[0.181270] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2128:63:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 1 is invalid\n'}
+[0.181295] (aoa_tracking) StderrLine: {'line': b' 2128 |     typedef typename aligned_storage<_S_len, alignment_value\x1b[01;31m\x1b[K>\x1b[m\x1b[K::type type;\n'}
+[0.181319] (aoa_tracking) StderrLine: {'line': b'      |                                                             \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.181343] (aoa_tracking) StderrLine: {'line': b'\n'}
+[0.181368] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2128:63:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 2 is invalid\n'}
+[0.181398] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2131:13:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.181423] (aoa_tracking) StderrLine: {'line': b' 2131 |   template <\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K _Len, typename... _Types>\n'}
+[0.181448] (aoa_tracking) StderrLine: {'line': b'      |             \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.181472] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2132:11:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 does not name a type\n'}
+[0.181497] (aoa_tracking) StderrLine: {'line': b' 2132 |     const \x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K aligned_union<_Len, _Types...>::alignment_value;\n'}
+[0.181521] (aoa_tracking) StderrLine: {'line': b'      |           \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.181547] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2132:11:\x1b[m\x1b[K \x1b[01;36m\x1b[Knote: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is defined in header \xe2\x80\x98\x1b[01m\x1b[K<cstddef>\x1b[m\x1b[K\xe2\x80\x99; did you forget to \xe2\x80\x98\x1b[01m\x1b[K#include <cstddef>\x1b[m\x1b[K\xe2\x80\x99?\n'}
+[0.181894] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2566:12:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.181988] (aoa_tracking) StderrLine: {'line': b' 2566 |   template<\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K _Len, size_t _Align =\n'}
+[0.182022] (aoa_tracking) StderrLine: {'line': b'      |            \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.182049] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2566:25:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.182074] (aoa_tracking) StderrLine: {'line': b' 2566 |   template<size_t _Len, \x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K _Align =\n'}
+[0.182100] (aoa_tracking) StderrLine: {'line': b'      |                         \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.182473] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2567:56:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Len\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.182539] (aoa_tracking) StderrLine: {'line': b' 2567 |             __alignof__(typename __aligned_storage_msa<\x1b[01;31m\x1b[K_Len\x1b[m\x1b[K>::__type)>\n'}
+[0.182570] (aoa_tracking) StderrLine: {'line': b'      |                                                        \x1b[01;31m\x1b[K^~~~\x1b[m\x1b[K\n'}
+[0.182595] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2567:60:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 1 is invalid\n'}
+[0.182620] (aoa_tracking) StderrLine: {'line': b' 2567 |             __alignof__(typename __aligned_storage_msa<_Len\x1b[01;31m\x1b[K>\x1b[m\x1b[K::__type)>\n'}
+[0.182643] (aoa_tracking) StderrLine: {'line': b'      |                                                            \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.183043] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2568:56:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Len\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.183119] (aoa_tracking) StderrLine: {'line': b' 2568 |     using aligned_storage_t = typename aligned_storage<\x1b[01;31m\x1b[K_Len\x1b[m\x1b[K, _Align>::type;\n'}
+[0.183150] (aoa_tracking) StderrLine: {'line': b'      |                                                        \x1b[01;31m\x1b[K^~~~\x1b[m\x1b[K\n'}
+[0.183672] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2568:62:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Align\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.183738] (aoa_tracking) StderrLine: {'line': b' 2568 |    using aligned_storage_t = typename aligned_storage<_Len, \x1b[01;31m\x1b[K_Align\x1b[m\x1b[K>::type;\n'}
+[0.183768] (aoa_tracking) StderrLine: {'line': b'      |                                                             \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.183795] (aoa_tracking) StderrLine: {'line': b'\n'}
+[0.183818] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2568:68:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 1 is invalid\n'}
+[0.183843] (aoa_tracking) StderrLine: {'line': b' 2568 | using aligned_storage_t = typename aligned_storage<_Len, _Align\x1b[01;31m\x1b[K>\x1b[m\x1b[K::type;\n'}
+[0.183867] (aoa_tracking) StderrLine: {'line': b'      |                                                                \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.183890] (aoa_tracking) StderrLine: {'line': b'\n'}
+[0.183921] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2568:68:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 2 is invalid\n'}
+[0.183948] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2570:13:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.183972] (aoa_tracking) StderrLine: {'line': b' 2570 |   template <\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K _Len, typename... _Types>\n'}
+[0.183997] (aoa_tracking) StderrLine: {'line': b'      |             \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.184212] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2571:52:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Len\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.184423] (aoa_tracking) StderrLine: {'line': b' 2571 |     using aligned_union_t = typename aligned_union<\x1b[01;31m\x1b[K_Len\x1b[m\x1b[K, _Types...>::type;\n'}
+[0.184456] (aoa_tracking) StderrLine: {'line': b'      |                                                    \x1b[01;31m\x1b[K^~~~\x1b[m\x1b[K\n'}
+[0.184482] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2571:67:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 1 is invalid\n'}
+[0.184507] (aoa_tracking) StderrLine: {'line': b' 2571 |  using aligned_union_t = typename aligned_union<_Len, _Types...\x1b[01;31m\x1b[K>\x1b[m\x1b[K::type;\n'}
+[0.184530] (aoa_tracking) StderrLine: {'line': b'      |                                                                \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.184555] (aoa_tracking) StderrLine: {'line': b'\n'}
+[0.184581] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2680:26:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.184605] (aoa_tracking) StderrLine: {'line': b' 2680 |   template<typename _Tp, \x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K _Nm>\n'}
+[0.184627] (aoa_tracking) StderrLine: {'line': b'      |                          \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.184845] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2684:21:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Nm\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.184914] (aoa_tracking) StderrLine: {'line': b' 2684 |     swap(_Tp (&__a)[\x1b[01;31m\x1b[K_Nm\x1b[m\x1b[K], _Tp (&__b)[_Nm])\n'}
+[0.184951] (aoa_tracking) StderrLine: {'line': b'      |                     \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.184979] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2684:24:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ktemplate<class _Tp, <declaration error> > std::__enable_if_t<std::__is_swappable<_Tp>::value> std::swap\x1b[m\x1b[K\xe2\x80\x99 conflicts with a previous declaration\n'}
+[0.185015] (aoa_tracking) StderrLine: {'line': b' 2684 |     swap(_Tp (&__a)[_Nm\x1b[01;31m\x1b[K]\x1b[m\x1b[K, _Tp (&__b)[_Nm])\n'}
+[0.185042] (aoa_tracking) StderrLine: {'line': b'      |                        \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.185069] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2676:5:\x1b[m\x1b[K \x1b[01;36m\x1b[Knote: \x1b[m\x1b[Kprevious declaration \xe2\x80\x98\x1b[01m\x1b[Kstd::_Require<std::__not_<std::__is_tuple_like<_Tp> >, std::is_move_constructible<_Tp>, std::is_move_assignable<_Tp> > std::swap(_Tp&, _Tp&)\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.185098] (aoa_tracking) StderrLine: {'line': b' 2676 |     \x1b[01;36m\x1b[Kswap\x1b[m\x1b[K(_Tp&, _Tp&)\n'}
+[0.185123] (aoa_tracking) StderrLine: {'line': b'      |     \x1b[01;36m\x1b[K^~~~\x1b[m\x1b[K\n'}
+[0.185348] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2684:16:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K__a\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.185419] (aoa_tracking) StderrLine: {'line': b' 2684 |     swap(_Tp (&\x1b[01;31m\x1b[K__a\x1b[m\x1b[K)[_Nm], _Tp (&__b)[_Nm])\n'}
+[0.185451] (aoa_tracking) StderrLine: {'line': b'      |                \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.185960] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2684:21:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Nm\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.186029] (aoa_tracking) StderrLine: {'line': b' 2684 |     swap(_Tp (&__a)[\x1b[01;31m\x1b[K_Nm\x1b[m\x1b[K], _Tp (&__b)[_Nm])\n'}
+[0.186061] (aoa_tracking) StderrLine: {'line': b'      |                     \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.186443] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2684:33:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K__b\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.186508] (aoa_tracking) StderrLine: {'line': b' 2684 |     swap(_Tp (&__a)[_Nm], _Tp (&\x1b[01;31m\x1b[K__b\x1b[m\x1b[K)[_Nm])\n'}
+[0.186538] (aoa_tracking) StderrLine: {'line': b'      |                                 \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.186928] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2684:38:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Nm\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.186992] (aoa_tracking) StderrLine: {'line': b' 2684 |     swap(_Tp (&__a)[_Nm], _Tp (&__b)[\x1b[01;31m\x1b[K_Nm\x1b[m\x1b[K])\n'}
+[0.187023] (aoa_tracking) StderrLine: {'line': b'      |                                      \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.187049] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:2684:43:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kexpected \xe2\x80\x98\x1b[01m\x1b[K;\x1b[m\x1b[K\xe2\x80\x99 before \xe2\x80\x98\x1b[01m\x1b[Knoexcept\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.187076] (aoa_tracking) StderrLine: {'line': b' 2684 |     swap(_Tp (&__a)[_Nm], _Tp (&__b)[_Nm])\n'}
+[0.187100] (aoa_tracking) StderrLine: {'line': b'      |                                           \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.187125] (aoa_tracking) StderrLine: {'line': b'      |                                           \x1b[32m\x1b[K;\x1b[m\x1b[K\n'}
+[0.187148] (aoa_tracking) StderrLine: {'line': b' 2685 |     \x1b[32m\x1b[Knoexcept\x1b[m\x1b[K(__is_nothrow_swappable<_Tp>::value);\n'}
+[0.187173] (aoa_tracking) StderrLine: {'line': b'      |     \x1b[32m\x1b[K~~~~~~~~\x1b[m\x1b[K                               \n'}
+[0.187873] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:3244:20:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 does not name a type\n'}
+[0.187940] (aoa_tracking) StderrLine: {'line': b' 3244 |   inline constexpr \x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K alignment_of_v = alignment_of<_Tp>::value;\n'}
+[0.188127] (aoa_tracking) StderrLine: {'line': b'      |                    \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.188162] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:3244:20:\x1b[m\x1b[K \x1b[01;36m\x1b[Knote: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is defined in header \xe2\x80\x98\x1b[01m\x1b[K<cstddef>\x1b[m\x1b[K\xe2\x80\x99; did you forget to \xe2\x80\x98\x1b[01m\x1b[K#include <cstddef>\x1b[m\x1b[K\xe2\x80\x99?\n'}
+[0.188193] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:3246:20:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 does not name a type\n'}
+[0.188219] (aoa_tracking) StderrLine: {'line': b' 3246 |   inline constexpr \x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K rank_v = rank<_Tp>::value;\n'}
+[0.188243] (aoa_tracking) StderrLine: {'line': b'      |                    \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.188266] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:3246:20:\x1b[m\x1b[K \x1b[01;36m\x1b[Knote: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is defined in header \xe2\x80\x98\x1b[01m\x1b[K<cstddef>\x1b[m\x1b[K\xe2\x80\x99; did you forget to \xe2\x80\x98\x1b[01m\x1b[K#include <cstddef>\x1b[m\x1b[K\xe2\x80\x99?\n'}
+[0.188289] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:3248:20:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 does not name a type\n'}
+[0.188312] (aoa_tracking) StderrLine: {'line': b' 3248 |   inline constexpr \x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K extent_v = extent<_Tp, _Idx>::value;\n'}
+[0.188334] (aoa_tracking) StderrLine: {'line': b'      |                    \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.188356] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/type_traits:3248:20:\x1b[m\x1b[K \x1b[01;36m\x1b[Knote: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is defined in header \xe2\x80\x98\x1b[01m\x1b[K<cstddef>\x1b[m\x1b[K\xe2\x80\x99; did you forget to \xe2\x80\x98\x1b[01m\x1b[K#include <cstddef>\x1b[m\x1b[K\xe2\x80\x99?\n'}
+[0.188378] (aoa_tracking) StderrLine: {'line': b'In file included from \x1b[01m\x1b[K/usr/include/c++/11/bits/stl_function.h:60\x1b[m\x1b[K,\n'}
+[0.188401] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/usr/include/c++/11/functional:49\x1b[m\x1b[K,\n'}
+[0.188423] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:2\x1b[m\x1b[K,\n'}
+[0.188446] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:5\x1b[m\x1b[K:\n'}
+[0.188468] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/bits/move.h:212:26:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.188490] (aoa_tracking) StderrLine: {'line': b'  212 |   template<typename _Tp, \x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K _Nm>\n'}
+[0.188512] (aoa_tracking) StderrLine: {'line': b'      |                          \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.188602] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/bits/move.h:220:21:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Nm\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.188626] (aoa_tracking) StderrLine: {'line': b'  220 |     swap(_Tp (&__a)[\x1b[01;31m\x1b[K_Nm\x1b[m\x1b[K], _Tp (&__b)[_Nm])\n'}
+[0.188656] (aoa_tracking) StderrLine: {'line': b'      |                     \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.188678] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/bits/move.h:220:24:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ktemplate<class _Tp, <declaration error> > typename std::enable_if<std::__is_swappable<_Tp>::value, void>::type std::swap\x1b[m\x1b[K\xe2\x80\x99 conflicts with a previous declaration\n'}
+[0.188705] (aoa_tracking) StderrLine: {'line': b'  220 |     swap(_Tp (&__a)[_Nm\x1b[01;31m\x1b[K]\x1b[m\x1b[K, _Tp (&__b)[_Nm])\n'}
+[0.188725] (aoa_tracking) StderrLine: {'line': b'      |                        \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.188748] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/bits/move.h:196:5:\x1b[m\x1b[K \x1b[01;36m\x1b[Knote: \x1b[m\x1b[Kprevious declaration \xe2\x80\x98\x1b[01m\x1b[Kstd::_Require<std::__not_<std::__is_tuple_like<_Tp> >, std::is_move_constructible<_Tp>, std::is_move_assignable<_Tp> > std::swap(_Tp&, _Tp&)\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.188772] (aoa_tracking) StderrLine: {'line': b'  196 |     \x1b[01;36m\x1b[Kswap\x1b[m\x1b[K(_Tp& __a, _Tp& __b)\n'}
+[0.188795] (aoa_tracking) StderrLine: {'line': b'      |     \x1b[01;36m\x1b[K^~~~\x1b[m\x1b[K\n'}
+[0.189162] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/bits/move.h:220:16:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K__a\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.189266] (aoa_tracking) StderrLine: {'line': b'  220 |     swap(_Tp (&\x1b[01;31m\x1b[K__a\x1b[m\x1b[K)[_Nm], _Tp (&__b)[_Nm])\n'}
+[0.189331] (aoa_tracking) StderrLine: {'line': b'      |                \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.189628] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/bits/move.h:220:21:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Nm\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.189713] (aoa_tracking) StderrLine: {'line': b'  220 |     swap(_Tp (&__a)[\x1b[01;31m\x1b[K_Nm\x1b[m\x1b[K], _Tp (&__b)[_Nm])\n'}
+[0.189777] (aoa_tracking) StderrLine: {'line': b'      |                     \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.190144] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/bits/move.h:220:33:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K__b\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.190233] (aoa_tracking) StderrLine: {'line': b'  220 |     swap(_Tp (&__a)[_Nm], _Tp (&\x1b[01;31m\x1b[K__b\x1b[m\x1b[K)[_Nm])\n'}
+[0.190300] (aoa_tracking) StderrLine: {'line': b'      |                                 \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.190569] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/bits/move.h:220:38:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Nm\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.190654] (aoa_tracking) StderrLine: {'line': b'  220 |     swap(_Tp (&__a)[_Nm], _Tp (&__b)[\x1b[01;31m\x1b[K_Nm\x1b[m\x1b[K])\n'}
+[0.190717] (aoa_tracking) StderrLine: {'line': b'      |                                      \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.190775] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/bits/move.h:220:43:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kexpected \xe2\x80\x98\x1b[01m\x1b[K;\x1b[m\x1b[K\xe2\x80\x99 before \xe2\x80\x98\x1b[01m\x1b[Knoexcept\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.190833] (aoa_tracking) StderrLine: {'line': b'  220 |     swap(_Tp (&__a)[_Nm], _Tp (&__b)[_Nm])\n'}
+[0.190888] (aoa_tracking) StderrLine: {'line': b'      |                                           \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.190956] (aoa_tracking) StderrLine: {'line': b'      |                                           \x1b[32m\x1b[K;\x1b[m\x1b[K\n'}
+[0.193647] (aoa_tracking) StderrLine: {'line': b'In file included from \x1b[01m\x1b[K/usr/include/c++/11/functional:53\x1b[m\x1b[K,\n'}
+[0.193724] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:2\x1b[m\x1b[K,\n'}
+[0.193754] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:5\x1b[m\x1b[K:\n'}
+[0.193787] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:89:25:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kfound \xe2\x80\x98\x1b[01m\x1b[K:\x1b[m\x1b[K\xe2\x80\x99 in nested-name-specifier, expected \xe2\x80\x98\x1b[01m\x1b[K::\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.193817] (aoa_tracking) StderrLine: {'line': b'   89 |   enum class align_val_t\x1b[01;31m\x1b[K:\x1b[m\x1b[K size_t {};\n'}
+[0.193845] (aoa_tracking) StderrLine: {'line': b'      |                         \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.193871] (aoa_tracking) StderrLine: {'line': b'      |                         \x1b[32m\x1b[K::\x1b[m\x1b[K\n'}
+[0.193896] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:89:27:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 in \xe2\x80\x98\x1b[01m\x1b[Kenum class std::align_val_t\x1b[m\x1b[K\xe2\x80\x99 does not name a type\n'}
+[0.193928] (aoa_tracking) StderrLine: {'line': b'   89 |   enum class align_val_t: \x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K {};\n'}
+[0.193954] (aoa_tracking) StderrLine: {'line': b'      |                           \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.193980] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:89:34:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kexpected unqualified-id before \xe2\x80\x98\x1b[01m\x1b[K{\x1b[m\x1b[K\xe2\x80\x99 token\n'}
+[0.194006] (aoa_tracking) StderrLine: {'line': b'   89 |   enum class align_val_t: size_t \x1b[01;31m\x1b[K{\x1b[m\x1b[K};\n'}
+[0.194031] (aoa_tracking) StderrLine: {'line': b'      |                                  \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.194055] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:126:26:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kdeclaration of \xe2\x80\x98\x1b[01m\x1b[Koperator new\x1b[m\x1b[K\xe2\x80\x99 as non-function\n'}
+[0.194081] (aoa_tracking) StderrLine: {'line': b'  126 | _GLIBCXX_NODISCARD void* \x1b[01;31m\x1b[Koperator\x1b[m\x1b[K new(std::size_t) _GLIBCXX_THROW (std::bad_alloc)\n'}
+[0.194107] (aoa_tracking) StderrLine: {'line': b'      |                          \x1b[01;31m\x1b[K^~~~~~~~\x1b[m\x1b[K\n'}
+[0.194131] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:126:44:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is not a member of \xe2\x80\x98\x1b[01m\x1b[Kstd\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.194193] (aoa_tracking) StderrLine: {'line': b'  126 | _GLIBCXX_NODISCARD void* operator new(std::\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K) _GLIBCXX_THROW (std::bad_alloc)\n'}
+[0.194226] (aoa_tracking) StderrLine: {'line': b'      |                                            \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.194253] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:127:41:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kattributes after parenthesized initializer ignored [\x1b[01;31m\x1b[K\x1b]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-fpermissive\x07-fpermissive\x1b]8;;\x07\x1b[m\x1b[K]\n'}
+[0.194550] (aoa_tracking) StderrLine: {'line': b'  127 |   __attribute__((__externally_visible__)\x1b[01;31m\x1b[K)\x1b[m\x1b[K;\n'}
+[0.194609] (aoa_tracking) StderrLine: {'line': b'      |                                         \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.194756] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:128:26:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kdeclaration of \xe2\x80\x98\x1b[01m\x1b[Koperator new []\x1b[m\x1b[K\xe2\x80\x99 as non-function\n'}
+[0.194797] (aoa_tracking) StderrLine: {'line': b'  128 | _GLIBCXX_NODISCARD void* \x1b[01;31m\x1b[Koperator\x1b[m\x1b[K new[](std::size_t) _GLIBCXX_THROW (std::bad_alloc)\n'}
+[0.194827] (aoa_tracking) StderrLine: {'line': b'      |                          \x1b[01;31m\x1b[K^~~~~~~~\x1b[m\x1b[K\n'}
+[0.194852] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:128:46:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is not a member of \xe2\x80\x98\x1b[01m\x1b[Kstd\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.195004] (aoa_tracking) StderrLine: {'line': b'  128 | _GLIBCXX_NODISCARD void* operator new[](std::\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K) _GLIBCXX_THROW (std::bad_alloc)\n'}
+[0.195053] (aoa_tracking) StderrLine: {'line': b'      |                                              \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.195082] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:129:41:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kattributes after parenthesized initializer ignored [\x1b[01;31m\x1b[K\x1b]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-fpermissive\x07-fpermissive\x1b]8;;\x07\x1b[m\x1b[K]\n'}
+[0.195110] (aoa_tracking) StderrLine: {'line': b'  129 |   __attribute__((__externally_visible__)\x1b[01;31m\x1b[K)\x1b[m\x1b[K;\n'}
+[0.195136] (aoa_tracking) StderrLine: {'line': b'      |                                         \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.195160] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:135:29:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Kstd::size_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.195185] (aoa_tracking) StderrLine: {'line': b'  135 | void operator delete(void*, \x1b[01;31m\x1b[Kstd\x1b[m\x1b[K::size_t) _GLIBCXX_USE_NOEXCEPT\n'}
+[0.195210] (aoa_tracking) StderrLine: {'line': b'      |                             \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.195237] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:137:31:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Kstd::size_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.195264] (aoa_tracking) StderrLine: {'line': b'  137 | void operator delete[](void*, \x1b[01;31m\x1b[Kstd\x1b[m\x1b[K::size_t) _GLIBCXX_USE_NOEXCEPT\n'}
+[0.195290] (aoa_tracking) StderrLine: {'line': b'      |                               \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.195314] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:140:26:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kdeclaration of \xe2\x80\x98\x1b[01m\x1b[Koperator new\x1b[m\x1b[K\xe2\x80\x99 as non-function\n'}
+[0.195340] (aoa_tracking) StderrLine: {'line': b'  140 | _GLIBCXX_NODISCARD void* \x1b[01;31m\x1b[Koperator\x1b[m\x1b[K new(std::size_t, const std::nothrow_t&) _GLIBCXX_USE_NOEXCEPT\n'}
+[0.195364] (aoa_tracking) StderrLine: {'line': b'      |                          \x1b[01;31m\x1b[K^~~~~~~~\x1b[m\x1b[K\n'}
+[0.195388] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:140:44:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is not a member of \xe2\x80\x98\x1b[01m\x1b[Kstd\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.195413] (aoa_tracking) StderrLine: {'line': b'  140 | _GLIBCXX_NODISCARD void* operator new(std::\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K, const std::nothrow_t&) _GLIBCXX_USE_NOEXCEPT\n'}
+[0.195438] (aoa_tracking) StderrLine: {'line': b'      |                                            \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.195463] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:140:52:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kexpected primary-expression before \xe2\x80\x98\x1b[01m\x1b[Kconst\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.195487] (aoa_tracking) StderrLine: {'line': b'  140 | _GLIBCXX_NODISCARD void* operator new(std::size_t, \x1b[01;31m\x1b[Kconst\x1b[m\x1b[K std::nothrow_t&) _GLIBCXX_USE_NOEXCEPT\n'}
+[0.195511] (aoa_tracking) StderrLine: {'line': b'      |                                                    \x1b[01;31m\x1b[K^~~~~\x1b[m\x1b[K\n'}
+[0.195535] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:142:26:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kdeclaration of \xe2\x80\x98\x1b[01m\x1b[Koperator new []\x1b[m\x1b[K\xe2\x80\x99 as non-function\n'}
+[0.195565] (aoa_tracking) StderrLine: {'line': b'  142 | _GLIBCXX_NODISCARD void* \x1b[01;31m\x1b[Koperator\x1b[m\x1b[K new[](std::size_t, const std::nothrow_t&) _GLIBCXX_USE_NOEXCEPT\n'}
+[0.195588] (aoa_tracking) StderrLine: {'line': b'      |                          \x1b[01;31m\x1b[K^~~~~~~~\x1b[m\x1b[K\n'}
+[0.195610] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:142:46:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is not a member of \xe2\x80\x98\x1b[01m\x1b[Kstd\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.195633] (aoa_tracking) StderrLine: {'line': b'  142 | _GLIBCXX_NODISCARD void* operator new[](std::\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K, const std::nothrow_t&) _GLIBCXX_USE_NOEXCEPT\n'}
+[0.195777] (aoa_tracking) StderrLine: {'line': b'      |                                              \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.195822] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:142:54:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kexpected primary-expression before \xe2\x80\x98\x1b[01m\x1b[Kconst\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.195856] (aoa_tracking) StderrLine: {'line': b'  142 | _GLIBCXX_NODISCARD void* operator new[](std::size_t, \x1b[01;31m\x1b[Kconst\x1b[m\x1b[K std::nothrow_t&) _GLIBCXX_USE_NOEXCEPT\n'}
+[0.195881] (aoa_tracking) StderrLine: {'line': b'      |                                                      \x1b[01;31m\x1b[K^~~~~\x1b[m\x1b[K\n'}
+[0.195906] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:149:26:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kdeclaration of \xe2\x80\x98\x1b[01m\x1b[Koperator new\x1b[m\x1b[K\xe2\x80\x99 as non-function\n'}
+[0.195938] (aoa_tracking) StderrLine: {'line': b'  149 | _GLIBCXX_NODISCARD void* \x1b[01;31m\x1b[Koperator\x1b[m\x1b[K new(std::size_t, std::align_val_t)\n'}
+[0.195962] (aoa_tracking) StderrLine: {'line': b'      |                          \x1b[01;31m\x1b[K^~~~~~~~\x1b[m\x1b[K\n'}
+[0.195987] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:149:44:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is not a member of \xe2\x80\x98\x1b[01m\x1b[Kstd\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.196015] (aoa_tracking) StderrLine: {'line': b'  149 | _GLIBCXX_NODISCARD void* operator new(std::\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K, std::align_val_t)\n'}
+[0.196042] (aoa_tracking) StderrLine: {'line': b'      |                                            \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.196065] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:149:68:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kexpected primary-expression before \xe2\x80\x98\x1b[01m\x1b[K)\x1b[m\x1b[K\xe2\x80\x99 token\n'}
+[0.196090] (aoa_tracking) StderrLine: {'line': b'  149 | _GLIBCXX_NODISCARD void* operator new(std::size_t, std::align_val_t\x1b[01;31m\x1b[K)\x1b[m\x1b[K\n'}
+[0.196113] (aoa_tracking) StderrLine: {'line': b'      |                                                                    \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.196137] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:150:73:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kattributes after parenthesized initializer ignored [\x1b[01;31m\x1b[K\x1b]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-fpermissive\x07-fpermissive\x1b]8;;\x07\x1b[m\x1b[K]\n'}
+[0.196160] (aoa_tracking) StderrLine: {'line': b'  150 | _attribute__((__externally_visible__, __alloc_size__ (1), __malloc__)\x1b[01;31m\x1b[K)\x1b[m\x1b[K;\n'}
+[0.196183] (aoa_tracking) StderrLine: {'line': b'      |                                                                      \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.196205] (aoa_tracking) StderrLine: {'line': b'\n'}
+[0.196227] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:151:26:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kdeclaration of \xe2\x80\x98\x1b[01m\x1b[Koperator new\x1b[m\x1b[K\xe2\x80\x99 as non-function\n'}
+[0.196253] (aoa_tracking) StderrLine: {'line': b'  151 | _GLIBCXX_NODISCARD void* \x1b[01;31m\x1b[Koperator\x1b[m\x1b[K new(std::size_t, std::align_val_t, const std::nothrow_t&)\n'}
+[0.196275] (aoa_tracking) StderrLine: {'line': b'      |                          \x1b[01;31m\x1b[K^~~~~~~~\x1b[m\x1b[K\n'}
+[0.196297] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:151:44:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is not a member of \xe2\x80\x98\x1b[01m\x1b[Kstd\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.196321] (aoa_tracking) StderrLine: {'line': b'  151 | _GLIBCXX_NODISCARD void* operator new(std::\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K, std::align_val_t, const std::nothrow_t&)\n'}
+[0.196343] (aoa_tracking) StderrLine: {'line': b'      |                                            \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.196364] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:151:68:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kexpected primary-expression before \xe2\x80\x98\x1b[01m\x1b[K,\x1b[m\x1b[K\xe2\x80\x99 token\n'}
+[0.196386] (aoa_tracking) StderrLine: {'line': b'  151 | X_NODISCARD void* operator new(std::size_t, std::align_val_t\x1b[01;31m\x1b[K,\x1b[m\x1b[K const std::nothrow_t&)\n'}
+[0.196408] (aoa_tracking) StderrLine: {'line': b'      |                                                             \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.196430] (aoa_tracking) StderrLine: {'line': b'\n'}
+[0.196452] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:151:70:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kexpected primary-expression before \xe2\x80\x98\x1b[01m\x1b[Kconst\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.196474] (aoa_tracking) StderrLine: {'line': b'  151 | NODISCARD void* operator new(std::size_t, std::align_val_t, \x1b[01;31m\x1b[Kconst\x1b[m\x1b[K std::nothrow_t&)\n'}
+[0.196497] (aoa_tracking) StderrLine: {'line': b'      |                                                             \x1b[01;31m\x1b[K^~~~~\x1b[m\x1b[K\n'}
+[0.196519] (aoa_tracking) StderrLine: {'line': b'\n'}
+[0.196540] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:157:26:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kdeclaration of \xe2\x80\x98\x1b[01m\x1b[Koperator new []\x1b[m\x1b[K\xe2\x80\x99 as non-function\n'}
+[0.196562] (aoa_tracking) StderrLine: {'line': b'  157 | _GLIBCXX_NODISCARD void* \x1b[01;31m\x1b[Koperator\x1b[m\x1b[K new[](std::size_t, std::align_val_t)\n'}
+[0.196583] (aoa_tracking) StderrLine: {'line': b'      |                          \x1b[01;31m\x1b[K^~~~~~~~\x1b[m\x1b[K\n'}
+[0.196605] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:157:46:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is not a member of \xe2\x80\x98\x1b[01m\x1b[Kstd\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.196626] (aoa_tracking) StderrLine: {'line': b'  157 | _GLIBCXX_NODISCARD void* operator new[](std::\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K, std::align_val_t)\n'}
+[0.196648] (aoa_tracking) StderrLine: {'line': b'      |                                              \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.196671] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:157:70:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kexpected primary-expression before \xe2\x80\x98\x1b[01m\x1b[K)\x1b[m\x1b[K\xe2\x80\x99 token\n'}
+[0.196693] (aoa_tracking) StderrLine: {'line': b'  157 | _GLIBCXX_NODISCARD void* operator new[](std::size_t, std::align_val_t\x1b[01;31m\x1b[K)\x1b[m\x1b[K\n'}
+[0.196717] (aoa_tracking) StderrLine: {'line': b'      |                                                                      \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.196738] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:158:73:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kattributes after parenthesized initializer ignored [\x1b[01;31m\x1b[K\x1b]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-fpermissive\x07-fpermissive\x1b]8;;\x07\x1b[m\x1b[K]\n'}
+[0.196763] (aoa_tracking) StderrLine: {'line': b'  158 | _attribute__((__externally_visible__, __alloc_size__ (1), __malloc__)\x1b[01;31m\x1b[K)\x1b[m\x1b[K;\n'}
+[0.196785] (aoa_tracking) StderrLine: {'line': b'      |                                                                      \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.196807] (aoa_tracking) StderrLine: {'line': b'\n'}
+[0.196829] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:159:26:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kdeclaration of \xe2\x80\x98\x1b[01m\x1b[Koperator new []\x1b[m\x1b[K\xe2\x80\x99 as non-function\n'}
+[0.196852] (aoa_tracking) StderrLine: {'line': b'  159 | _GLIBCXX_NODISCARD void* \x1b[01;31m\x1b[Koperator\x1b[m\x1b[K new[](std::size_t, std::align_val_t, const std::nothrow_t&)\n'}
+[0.196875] (aoa_tracking) StderrLine: {'line': b'      |                          \x1b[01;31m\x1b[K^~~~~~~~\x1b[m\x1b[K\n'}
+[0.196897] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:159:46:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is not a member of \xe2\x80\x98\x1b[01m\x1b[Kstd\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.196926] (aoa_tracking) StderrLine: {'line': b'  159 | _GLIBCXX_NODISCARD void* operator new[](std::\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K, std::align_val_t, const std::nothrow_t&)\n'}
+[0.196949] (aoa_tracking) StderrLine: {'line': b'      |                                              \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.196972] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:159:70:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kexpected primary-expression before \xe2\x80\x98\x1b[01m\x1b[K,\x1b[m\x1b[K\xe2\x80\x99 token\n'}
+[0.196994] (aoa_tracking) StderrLine: {'line': b'  159 | NODISCARD void* operator new[](std::size_t, std::align_val_t\x1b[01;31m\x1b[K,\x1b[m\x1b[K const std::nothrow_t&)\n'}
+[0.197016] (aoa_tracking) StderrLine: {'line': b'      |                                                             \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.197039] (aoa_tracking) StderrLine: {'line': b'\n'}
+[0.197061] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:159:72:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kexpected primary-expression before \xe2\x80\x98\x1b[01m\x1b[Kconst\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.197083] (aoa_tracking) StderrLine: {'line': b'  159 | DISCARD void* operator new[](std::size_t, std::align_val_t, \x1b[01;31m\x1b[Kconst\x1b[m\x1b[K std::nothrow_t&)\n'}
+[0.197105] (aoa_tracking) StderrLine: {'line': b'      |                                                             \x1b[01;31m\x1b[K^~~~~\x1b[m\x1b[K\n'}
+[0.197131] (aoa_tracking) StderrLine: {'line': b'\n'}
+[0.197153] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:166:29:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Kstd::size_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.197209] (aoa_tracking) StderrLine: {'line': b'  166 | void operator delete(void*, \x1b[01;31m\x1b[Kstd\x1b[m\x1b[K::size_t, std::align_val_t)\n'}
+[0.197233] (aoa_tracking) StderrLine: {'line': b'      |                             \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.197257] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:168:31:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Kstd::size_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.197279] (aoa_tracking) StderrLine: {'line': b'  168 | void operator delete[](void*, \x1b[01;31m\x1b[Kstd\x1b[m\x1b[K::size_t, std::align_val_t)\n'}
+[0.197301] (aoa_tracking) StderrLine: {'line': b'      |                               \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.197323] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:174:33:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kdeclaration of \xe2\x80\x98\x1b[01m\x1b[Koperator new\x1b[m\x1b[K\xe2\x80\x99 as non-function\n'}
+[0.197347] (aoa_tracking) StderrLine: {'line': b'  174 | _GLIBCXX_NODISCARD inline void* \x1b[01;31m\x1b[Koperator\x1b[m\x1b[K new(std::size_t, void* __p) _GLIBCXX_USE_NOEXCEPT\n'}
+[0.197369] (aoa_tracking) StderrLine: {'line': b'      |                                 \x1b[01;31m\x1b[K^~~~~~~~\x1b[m\x1b[K\n'}
+[0.197391] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:174:51:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is not a member of \xe2\x80\x98\x1b[01m\x1b[Kstd\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.197413] (aoa_tracking) StderrLine: {'line': b'  174 | _GLIBCXX_NODISCARD inline void* operator new(std::\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K, void* __p) _GLIBCXX_USE_NOEXCEPT\n'}
+[0.197436] (aoa_tracking) StderrLine: {'line': b'      |                                                   \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.197458] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:174:59:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kexpected primary-expression before \xe2\x80\x98\x1b[01m\x1b[Kvoid\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.197480] (aoa_tracking) StderrLine: {'line': b'  174 | _GLIBCXX_NODISCARD inline void* operator new(std::size_t, \x1b[01;31m\x1b[Kvoid\x1b[m\x1b[K* __p) _GLIBCXX_USE_NOEXCEPT\n'}
+[0.197502] (aoa_tracking) StderrLine: {'line': b'      |                                                           \x1b[01;31m\x1b[K^~~~\x1b[m\x1b[K\n'}
+[0.197524] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:176:33:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kdeclaration of \xe2\x80\x98\x1b[01m\x1b[Koperator new []\x1b[m\x1b[K\xe2\x80\x99 as non-function\n'}
+[0.197546] (aoa_tracking) StderrLine: {'line': b'  176 | _GLIBCXX_NODISCARD inline void* \x1b[01;31m\x1b[Koperator\x1b[m\x1b[K new[](std::size_t, void* __p) _GLIBCXX_USE_NOEXCEPT\n'}
+[0.197568] (aoa_tracking) StderrLine: {'line': b'      |                                 \x1b[01;31m\x1b[K^~~~~~~~\x1b[m\x1b[K\n'}
+[0.197590] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:176:53:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is not a member of \xe2\x80\x98\x1b[01m\x1b[Kstd\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.197614] (aoa_tracking) StderrLine: {'line': b'  176 | _GLIBCXX_NODISCARD inline void* operator new[](std::\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K, void* __p) _GLIBCXX_USE_NOEXCEPT\n'}
+[0.197636] (aoa_tracking) StderrLine: {'line': b'      |                                                     \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.197659] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/new:176:61:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kexpected primary-expression before \xe2\x80\x98\x1b[01m\x1b[Kvoid\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.197681] (aoa_tracking) StderrLine: {'line': b'  176 | _GLIBCXX_NODISCARD inline void* operator new[](std::size_t, \x1b[01;31m\x1b[Kvoid\x1b[m\x1b[K* __p) _GLIBCXX_USE_NOEXCEPT\n'}
+[0.197703] (aoa_tracking) StderrLine: {'line': b'      |                                                             \x1b[01;31m\x1b[K^~~~\x1b[m\x1b[K\n'}
+[0.197725] (aoa_tracking) StderrLine: {'line': b'In file included from \x1b[01m\x1b[K/usr/include/c++/11/utility:70\x1b[m\x1b[K,\n'}
+[0.197747] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/usr/include/c++/11/tuple:38\x1b[m\x1b[K,\n'}
+[0.197769] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/usr/include/c++/11/functional:54\x1b[m\x1b[K,\n'}
+[0.197791] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:2\x1b[m\x1b[K,\n'}
+[0.197813] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:5\x1b[m\x1b[K:\n'}
+[0.197834] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/bits/stl_pair.h:92:12:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.197858] (aoa_tracking) StderrLine: {'line': b'   92 |   template<\x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K...>\n'}
+[0.197879] (aoa_tracking) StderrLine: {'line': b'      |            \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.197901] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/bits/stl_pair.h:449:36:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.197929] (aoa_tracking) StderrLine: {'line': b'  449 |       template<typename... _Args1, \x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K... _Indexes1,\n'}
+[0.197955] (aoa_tracking) StderrLine: {'line': b'      |                                    \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.197978] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/bits/stl_pair.h:450:36:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.198001] (aoa_tracking) StderrLine: {'line': b'  450 |                typename... _Args2, \x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K... _Indexes2>\n'}
+[0.198023] (aoa_tracking) StderrLine: {'line': b'      |                                    \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.198046] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/bits/stl_pair.h:453:27:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Indexes1\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.198070] (aoa_tracking) StderrLine: {'line': b'  453 |              _Index_tuple<\x1b[01;31m\x1b[K_Indexes1\x1b[m\x1b[K...>, _Index_tuple<_Indexes2...>);\n'}
+[0.198091] (aoa_tracking) StderrLine: {'line': b'      |                           \x1b[01;31m\x1b[K^~~~~~~~~\x1b[m\x1b[K\n'}
+[0.198113] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/bits/stl_pair.h:453:36:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kexpected parameter pack before \xe2\x80\x98\x1b[01m\x1b[K...\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.198134] (aoa_tracking) StderrLine: {'line': b'  453 |              _Index_tuple<_Indexes1\x1b[01;31m\x1b[K...\x1b[m\x1b[K>, _Index_tuple<_Indexes2...>);\n'}
+[0.198156] (aoa_tracking) StderrLine: {'line': b'      |                                    \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.198177] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/bits/stl_pair.h:453:39:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 1 is invalid\n'}
+[0.198198] (aoa_tracking) StderrLine: {'line': b'  453 |              _Index_tuple<_Indexes1...\x1b[01;31m\x1b[K>\x1b[m\x1b[K, _Index_tuple<_Indexes2...>);\n'}
+[0.198220] (aoa_tracking) StderrLine: {'line': b'      |                                       \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.198662] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/bits/stl_pair.h:453:55:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[K_Indexes2\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[0.198689] (aoa_tracking) StderrLine: {'line': b'  453 |              _Index_tuple<_Indexes1...>, _Index_tuple<\x1b[01;31m\x1b[K_Indexes2\x1b[m\x1b[K...>);\n'}
+[0.198713] (aoa_tracking) StderrLine: {'line': b'      |                                                       \x1b[01;31m\x1b[K^~~~~~~~~\x1b[m\x1b[K\n'}
+[0.198735] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/bits/stl_pair.h:453:64:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Kexpected parameter pack before \xe2\x80\x98\x1b[01m\x1b[K...\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.198758] (aoa_tracking) StderrLine: {'line': b'  453 |              _Index_tuple<_Indexes1...>, _Index_tuple<_Indexes2\x1b[01;31m\x1b[K...\x1b[m\x1b[K>);\n'}
+[0.198780] (aoa_tracking) StderrLine: {'line': b'      |                                                                \x1b[01;31m\x1b[K^~~\x1b[m\x1b[K\n'}
+[0.198803] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/bits/stl_pair.h:453:67:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[Ktemplate argument 1 is invalid\n'}
+[0.198826] (aoa_tracking) StderrLine: {'line': b'  453 |              _Index_tuple<_Indexes1...>, _Index_tuple<_Indexes2...\x1b[01;31m\x1b[K>\x1b[m\x1b[K);\n'}
+[0.198848] (aoa_tracking) StderrLine: {'line': b'      |                                                                   \x1b[01;31m\x1b[K^\x1b[m\x1b[K\n'}
+[0.199179] (aoa_tracking) StderrLine: {'line': b'In file included from \x1b[01m\x1b[K/usr/include/c++/11/utility:76\x1b[m\x1b[K,\n'}
+[0.199249] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/usr/include/c++/11/tuple:38\x1b[m\x1b[K,\n'}
+[0.199280] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/usr/include/c++/11/functional:54\x1b[m\x1b[K,\n'}
+[0.199306] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:2\x1b[m\x1b[K,\n'}
+[0.199330] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:5\x1b[m\x1b[K:\n'}
+[0.199353] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/initializer_list:53:15:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 does not name a type\n'}
+[0.199376] (aoa_tracking) StderrLine: {'line': b'   53 |       typedef \x1b[01;31m\x1b[Ksize_t\x1b[m\x1b[K            size_type;\n'}
+[0.199400] (aoa_tracking) StderrLine: {'line': b'      |               \x1b[01;31m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[0.199423] (aoa_tracking) StderrLine: {'line': b'In file included from \x1b[01m\x1b[K/usr/include/c++/11/utility:76\x1b[m\x1b[K,\n'}
+[0.199446] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/usr/include/c++/11/tuple:38\x1b[m\x1b[K,\n'}
+[0.199468] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/usr/include/c++/11/functional:54\x1b[m\x1b[K,\n'}
+[0.199492] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:2\x1b[m\x1b[K,\n'}
+[0.199514] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:5\x1b[m\x1b[K:\n'}
+[0.199537] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/initializer_list:1:1:\x1b[m\x1b[K \x1b[01;36m\x1b[Knote: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_t\x1b[m\x1b[K\xe2\x80\x99 is defined in header \xe2\x80\x98\x1b[01m\x1b[K<cstddef>\x1b[m\x1b[K\xe2\x80\x99; did you forget to \xe2\x80\x98\x1b[01m\x1b[K#include <cstddef>\x1b[m\x1b[K\xe2\x80\x99?\n'}
+[0.199562] (aoa_tracking) StderrLine: {'line': b'  +++ |+\x1b[32m\x1b[K#include <cstddef>\x1b[m\x1b[K\n'}
+[0.199584] (aoa_tracking) StderrLine: {'line': b'    1 | // std::initializer_list support -*- C++ -*-\n'}
+[0.199711] (aoa_tracking) StderrLine: {'line': b'In file included from \x1b[01m\x1b[K/usr/include/c++/11/utility:76\x1b[m\x1b[K,\n'}
+[0.199739] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/usr/include/c++/11/tuple:38\x1b[m\x1b[K,\n'}
+[0.199763] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/usr/include/c++/11/functional:54\x1b[m\x1b[K,\n'}
+[0.199787] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:2\x1b[m\x1b[K,\n'}
+[0.199812] (aoa_tracking) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:5\x1b[m\x1b[K:\n'}
+[0.199834] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/initializer_list:59:7:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_type\x1b[m\x1b[K\xe2\x80\x99 does not name a type; did you mean \xe2\x80\x98\x1b[01m\x1b[Ktrue_type\x1b[m\x1b[K\xe2\x80\x99?\n'}
+[0.199862] (aoa_tracking) StderrLine: {'line': b'   59 |       \x1b[01;31m\x1b[Ksize_type\x1b[m\x1b[K                 _M_len;\n'}
+[0.199884] (aoa_tracking) StderrLine: {'line': b'      |       \x1b[01;31m\x1b[K^~~~~~~~~\x1b[m\x1b[K\n'}
+[0.199906] (aoa_tracking) StderrLine: {'line': b'      |       \x1b[32m\x1b[Ktrue_type\x1b[m\x1b[K\n'}
+[0.199935] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/initializer_list:62:54:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_type\x1b[m\x1b[K\xe2\x80\x99 has not been declared\n'}
+[0.199958] (aoa_tracking) StderrLine: {'line': b'   62 |       constexpr initializer_list(const_iterator __a, \x1b[01;31m\x1b[Ksize_type\x1b[m\x1b[K __l)\n'}
+[0.199982] (-) TimerEvent: {}
+[0.200042] (aoa_tracking) StderrLine: {'line': b'      |                                                      \x1b[01;31m\x1b[K^~~~~~~~~\x1b[m\x1b[K\n'}
+[0.200355] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/initializer_list:70:17:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Ksize_type\x1b[m\x1b[K\xe2\x80\x99 does not name a type; did you mean \xe2\x80\x98\x1b[01m\x1b[Ktrue_type\x1b[m\x1b[K\xe2\x80\x99?\n'}
+[0.200419] (aoa_tracking) StderrLine: {'line': b'   70 |       constexpr \x1b[01;31m\x1b[Ksize_type\x1b[m\x1b[K\n'}
+[0.200444] (aoa_tracking) StderrLine: {'line': b'      |                 \x1b[01;31m\x1b[K^~~~~~~~~\x1b[m\x1b[K\n'}
+[0.200468] (aoa_tracking) StderrLine: {'line': b'      |                 \x1b[32m\x1b[Ktrue_type\x1b[m\x1b[K\n'}
+[0.200490] (aoa_tracking) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/11/initializer_list:47:11:\x1b[m\x1b[K \x1b[01;31m\x1b[Kfatal error: \x1b[m\x1b[Kdefinition of \xe2\x80\x98\x1b[01m\x1b[Kclass std::initializer_list<_E>\x1b[m\x1b[K\xe2\x80\x99 does not match \xe2\x80\x98\x1b[01m\x1b[K#include <initializer_list>\x1b[m\x1b[K\xe2\x80\x99\n'}
+[0.200515] (aoa_tracking) StderrLine: {'line': b'   47 |     class \x1b[01;31m\x1b[Kinitializer_list\x1b[m\x1b[K\n'}
+[0.200538] (aoa_tracking) StderrLine: {'line': b'      |           \x1b[01;31m\x1b[K^~~~~~~~~~~~~~~~\x1b[m\x1b[K\n'}
+[0.200561] (aoa_tracking) StderrLine: {'line': b'compilation terminated.\n'}
+[0.202351] (aoa_tracking) StderrLine: {'line': b'gmake[2]: *** [CMakeFiles/aoa_tracking_node.dir/build.make:76\xef\xbc\x9aCMakeFiles/aoa_tracking_node.dir/src/aoa_tracking_node.cpp.o] \xe9\x94\x99\xe8\xaf\xaf 1\n'}
+[0.202466] (aoa_tracking) StderrLine: {'line': b'gmake[1]: *** [CMakeFiles/Makefile2:137\xef\xbc\x9aCMakeFiles/aoa_tracking_node.dir/all] \xe9\x94\x99\xe8\xaf\xaf 2\n'}
+[0.202686] (aoa_tracking) StderrLine: {'line': b'gmake: *** [Makefile:146\xef\xbc\x9aall] \xe9\x94\x99\xe8\xaf\xaf 2\n'}
+[0.204444] (aoa_tracking) CommandEnded: {'returncode': 2}
+[0.210607] (aoa_tracking) JobEnded: {'identifier': 'aoa_tracking', 'rc': 2}
+[0.220877] (-) EventReactorShutdown: {}

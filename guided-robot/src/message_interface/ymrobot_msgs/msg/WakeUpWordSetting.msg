@@ -1,0 +1,1 @@
+string[] wake_up_word

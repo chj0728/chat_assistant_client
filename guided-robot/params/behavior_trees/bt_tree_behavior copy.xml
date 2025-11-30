@@ -1,0 +1,140 @@
+<root>
+    <BehaviorTree ID="BtTreeBehavior">
+        <Sequence>
+            <!-- 根节点状态发布 -->
+            <PublishState node="root" state="started"/>
+
+            <SaySomething message="子行为树" />
+            <Fallback>
+                <Sequence name="main_sequence">
+                    <PublishState node="main_sequence" state="started"/>
+
+                    <NeedIndex need_bt_index="{bt_tree_index}" index="1" />
+                    <SaySomething message="导览行为树" />
+
+                    <TraverseNavPose current_task="{current_task}" the_number_of_cycles="{the_number_of_cycles}" mark_nav_target_list="{mark_nav_target_list}" audio_list="{audio_list}" fixed_up_action_list="{fixed_up_action_list}" />
+
+                    <Repeat num_cycles="{the_number_of_cycles}">
+                        <Sequence name="cycle_sequence">
+                            <PublishState node="cycle_sequence" state="started" cycle="{current_cycle}"/>
+
+                            <!-- 点位处理 -->
+                            <Fallback name="point_processing">
+                                <Sequence>
+                                    <RemovePassedMarkPointsNode input_mark_nav_target_list="{mark_nav_target_list}" output_mark_nav_target_list="{mark_nav_target_list}" mark_nav_target="{mark_nav_target}" />
+                                    <PublishState node="point_processing" state="success"/>
+                                </Sequence>
+                                <Sequence>
+                                    <PublishState node="point_processing" state="failure" error="no_more_points"/>
+                                    <Script code=":='mark_nav_target'=''"/>
+                                </Sequence>
+                            </Fallback>
+
+                            <!-- 音频处理 -->
+                            <Fallback name="audio_processing">
+                                <Sequence>
+                                    <RemovePassedMarkAudiosNode input_mark_audio_list="{audio_list}" output_mark_audio_list="{audio_list}" mark_audio="{fixed_audio}" />
+                                    <PublishState node="audio_processing" state="success"/>
+                                </Sequence>
+                                <Sequence>
+                                    <PublishState node="audio_processing" state="failure" error="no_audio_available"/>
+                                    <Script code=":='fixed_audio'=''"/>
+                                </Sequence>
+                            </Fallback>
+
+                            <!-- 动作处理 -->
+                            <Fallback name="action_processing">
+                                <Sequence>
+                                    <RemovePassedFixedUpActionNode input_mark_fixed_up_action_list="{fixed_up_action_list}" output_mark_fixed_up_action_list="{fixed_up_action_list}" fixed_action="{fixed_action}" />
+                                    <PublishState node="action_processing" state="success"/>
+                                </Sequence>
+                                <Sequence>
+                                    <PublishState node="action_processing" state="failure" error="no_action_available"/>
+                                    <Script code=":='fixed_action'='0'"/>
+                                    <!-- 默认待机动作 -->
+                                </Sequence>
+                            </Fallback>
+
+                            <SaySomething message="解析点位成功，开始导航到点位" />
+
+                            <!-- 导航节点（带状态监控） -->
+                            <Fallback name="navigation">
+                                <Sequence>
+                                    <PublishState node="navigation" state="started" target="{mark_nav_target}"/>
+                                    <CloudChassisNavNameNode nav_pose_name="{mark_nav_target}" />
+                                    <PublishState node="navigation" state="success" target="{mark_nav_target}"/>
+                                </Sequence>
+                                <Sequence>
+                                    <PublishState node="navigation" state="failure" target="{mark_nav_target}" error="navigation_failed"/>
+                                    <SaySomething message="导航失败，尝试恢复"/>
+                                    <!-- 恢复逻辑 -->
+                                    <CloudChassisNavNameNode nav_pose_name="{standby_point}" />
+                                </Sequence>
+                            </Fallback>
+
+                            <SaySomething message="导航完成，开始音频和上肢固定动作" />
+
+                            <!-- 并行执行音频和动作（带状态监控） -->
+                            <Parallel name="media_actions" success_threshold="2">
+                                <Sequence name="audio_sequence">
+                                    <Fallback>
+                                        <Sequence>
+                                            <PublishState node="audio_playback" state="started" audio="{fixed_audio}"/>
+                                            <PlayFixedAudioNode fixed_audio="{fixed_audio}" />
+                                            <PublishState node="audio_playback" state="success" audio="{fixed_audio}"/>
+                                        </Sequence>
+                                        <Sequence>
+                                            <PublishState node="audio_playback" state="failure" audio="{fixed_audio}" error="playback_failed"/>
+                                            <SaySomething message="音频播放失败"/>
+                                        </Sequence>
+                                    </Fallback>
+                                </Sequence>
+
+                                <Sequence name="action_sequence">
+                                    <Fallback>
+                                        <Sequence>
+                                            <PublishState node="arm_action" state="started" action="{fixed_action}"/>
+                                            <UpClimbFixedAction action_fixed_str="{fixed_action}" />
+                                            <PublishState node="arm_action" state="success" action="{fixed_action}"/>
+                                        </Sequence>
+                                        <Sequence>
+                                            <PublishState node="arm_action" state="failure" action="{fixed_action}" error="action_execution_failed"/>
+                                            <SaySomething message="上肢动作执行失败"/>
+                                        </Sequence>
+                                    </Fallback>
+                                </Sequence>
+                            </Parallel>
+
+                            <PublishState node="cycle_sequence" state="success" cycle="{current_cycle}"/>
+                        </Sequence>
+                    </Repeat>
+
+                    <!-- 返回待命点 -->
+                    <Fallback name="return_to_standby">
+                        <Sequence>
+                            <PublishState node="return_to_standby" state="started" target="{standby_point}"/>
+                            <CloudChassisNavNameNode nav_pose_name="{standby_point}" />
+                            <PublishState node="return_to_standby" state="success" target="{standby_point}"/>
+                        </Sequence>
+                        <Sequence>
+                            <PublishState node="return_to_standby" state="failure" target="{standby_point}" error="return_failed"/>
+                            <SaySomething message="返回待命点失败"/>
+                        </Sequence>
+                    </Fallback>
+
+                    <PublishState node="main_sequence" state="success"/>
+                </Sequence>
+
+                <!-- 主序列失败处理 -->
+                <Sequence>
+                    <PublishState node="main_sequence" state="failure" error="main_sequence_failed"/>
+                    <SaySomething message="导览任务执行失败"/>
+                    <!-- 紧急恢复逻辑 -->
+                    <CloudChassisNavNameNode nav_pose_name="{emergency_point}" />
+                </Sequence>
+            </Fallback>
+
+            <PublishState node="root" state="success"/>
+        </Sequence>
+    </BehaviorTree>
+</root>

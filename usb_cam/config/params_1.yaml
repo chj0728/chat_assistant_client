@@ -1,0 +1,59 @@
+/**:
+    # ros__parameters:
+    #   video_device: "/dev/video0"  # 使用正确的设备路径
+    #   framerate: 30.0              # 设置为30帧
+    #   io_method: "mmap"
+    #   frame_id: "head_camera"
+    #   pixel_format: "yuyv"         # 设置为MJPG格式
+    #   image_width: 640            # 选择适当的分辨率
+    #   image_height: 480            # 选择适当的分辨率
+    #   camera_name: "head_camera"
+    #   camera_info_url: ""         # 忽略校准文件警告
+
+    #   # 摄像头实际支持的参数
+    #   brightness: 40
+    #   contrast: 25
+    #   saturation: 40
+    #   sharpness: 35
+    #   auto_white_balance: false
+    #   white_balance: 5000         # 自定义白平衡温度
+    #   power_line_frequency: 1    # 50Hz
+
+    #   # 禁用不支持的参数
+    #   autoexposure: false
+    #   exposure: 10
+    #   autofocus: true
+    #   gain: 10
+    #   focus: -1
+
+    ros__parameters:
+      video_device: "/dev/video0"
+      framerate: 30.0
+      io_method: "mmap"
+      frame_id: "head_camera"
+      pixel_format: "yuyv"           # 保持YUYV格式（如果支持MJPG可改为"mjpg"）
+      image_width: 640
+      image_height: 480
+      camera_name: "head_camera"
+      camera_info_url: ""
+
+      # 用户控制参数（User Controls）
+      brightness: 64                 # 原value=64（范围-64~64）
+      contrast: 15                   # 原value=15（范围0~95）
+      saturation: 100                # 原value=100（范围0~100）
+      hue: 0                       # 原value=168（范围-2000~2000）
+      gamma: 100                     # 原value=127（范围100~300）
+      sharpness: 4                   # 原value=4（范围1~7）
+      backlight_compensation: 0      # 原value=0（范围0~1）
+
+      # 白平衡设置
+      auto_white_balance: false      # 对应white_balance_automatic=0
+      white_balance: 2910            # 原white_balance_temperature=2910（范围2800~6500）
+      power_line_frequency: 2        # 原value=2（0=禁用，1=50Hz，2=60Hz）
+
+      # 相机控制参数（Camera Controls）
+      autoexposure: false            # 对应auto_exposure=1（Manual Mode）
+      exposure: 198                  # 原exposure_time_absolute=198（范围3~2047）
+      autofocus: false               # 对应focus_automatic_continuous=0
+      focus: 0                       # 原focus_absolute=0（范围0~1023）
+

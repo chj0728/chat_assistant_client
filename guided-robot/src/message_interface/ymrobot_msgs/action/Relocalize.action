@@ -1,0 +1,12 @@
+# Relocalize.action
+# 目标（请求）
+string pcd_path
+float64[] init_pose_list
+---
+# 结果（响应）
+bool success
+string message
+---
+# 反馈
+string message
+bool status

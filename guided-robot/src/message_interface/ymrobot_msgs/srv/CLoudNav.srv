@@ -1,0 +1,8 @@
+uint8   nav_mode            #导航模式  0: 目标名导航  1：坐标点导航
+string  nav_target_name     #导航目标名
+float64 nav_target_x        #导航目标x坐标
+float64 nav_target_y        #导航目标y坐标
+float64 nav_target_yaw      #导航目标yaw角度
+---
+bool                        success            #是否成功           
+string                      message            #消息反馈  --失败原因 成功了 啥的........

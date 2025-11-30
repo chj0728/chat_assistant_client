@@ -1,0 +1,5 @@
+uint8                       emoji_task_type     # 表情任务类型 0：固定，不用管，固定是0就行。为后期表情其他功能留一个接口
+uint8                       action_code         # 动作码     --- 看对应表格就行： 0--眨眼  1--眼球转动  2--微笑等等
+---
+bool                        success            #是否成功           
+string                      message            #消息反馈  --失败原因 成功了 啥的........

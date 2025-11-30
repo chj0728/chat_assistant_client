@@ -1,0 +1,12 @@
+set_params_action_node:
+  ros__parameters:
+    cloud_chassis_max_linear_speed_pub_name: "cloud_chassis_max_linear_speed"                              
+    cloud_chassis_max_angular_speed_pub_name: "cloud_chassis_max_angle_speed"                        
+    power_threshold_parameter_update_pub_name: "cloud_chassis_power_charge_threshold"    
+    modify_timbre_pub_name: "modify_timbre"
+    active_wake_up_threshold_pub_name: "active_wake_up_threshold"
+    is_open_active_wake_up_name: "is_open_active_wake_up"
+    welcome_language_selection_name: "welcome_language_selection"
+    set_params_action_server_name: "set_params_server"
+    mark_points_txt_adress: "/home/ymrobot/ros2_ws_guidance/src/guided-robot/assets/待命点.txt"     
+    modify_wakeup_word_pub_name: "modify_wakeup_word"                                   

@@ -1,0 +1,965 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This URDF was automatically created by SolidWorks to URDF Exporter! Originally created by Stephen Brawner (brawner@gmail.com) 
+     Commit Version: 1.6.0-4-g7f85cfe  Build Version: 1.6.7995.38578
+     For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
+<robot name="ymbot_xiaoxue_description">
+
+  <link name="dummy_link" />
+  <joint name="dummy_joint" type="fixed">
+    <parent link="dummy_link" />
+    <child link="base_link" />
+  </joint>
+
+
+  <link name="base_link">
+    <inertial>
+      <origin xyz="0.0125889880465297 1.42018774518249E-08 0.0310122702224599" rpy="0 0 0" />
+      <mass value="7.85799312195161" />
+      <inertia ixx="0.07930667" ixy="0.00000000" ixz="-0.00637667" iyy="0.02874599" iyz="-0.00000421" izz="0.06537176" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/base_link.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.698039215686274 0.698039215686274 0.698039215686274 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/base_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+
+
+
+  <link name="Body_Link1">
+    <inertial>
+      <origin xyz="-0.0423890433231751 8.96778651338082E-10 -0.000137870987974409" rpy="0 0 0" />
+      <mass value="0.290021192517815" />
+      <inertia ixx="0.00070516" ixy="0.00000000" ixz="0.00000169" iyy="0.00084259" iyz="0.00000000" izz="0.00041912" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Body_Link1.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.698039215686274 0.698039215686274 0.698039215686274 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Body_Link1.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Body_Joint1" type="revolute">
+    <origin xyz="0.0404476644611749 0 0.1" rpy="0 1.5707963267949 0" />
+    <parent link="base_link" />
+    <child link="Body_Link1" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Body_Link2">
+    <inertial>
+      <origin xyz="0.000408407855018694 5.10949227372492E-09 -0.195083167902317" rpy="0 0 0" />
+      <mass value="5.55051252235334" />
+      <inertia ixx="0.12763546" ixy="0.00000000" ixz="0.00022650" iyy="0.10724404" iyz="0.00000000" izz="0.02533414" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Body_Link2.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.698039215686274 0.698039215686274 0.698039215686274 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Body_Link2.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Body_Joint2" type="revolute">
+    <origin xyz="-0.0725 0 0" rpy="0 1.5707963267949 0" />
+    <parent link="Body_Link1" />
+    <child link="Body_Link2" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+
+
+
+
+
+
+  <link name="Neck_Link1">
+    <inertial>
+      <origin xyz="3.908E-11 0.0214 -0.045727" rpy="0 0 0" />
+      <mass value="0.48911" />
+      <inertia ixx="0.00014569" ixy="0.00000000" ixz="0.00000000" iyy="0.00016149" iyz="0.00003445" izz="0.00009383" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Neck_Link1.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.69804 0.69804 0.69804 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Neck_Link1.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Neck_Joint1" type="revolute">
+    <!-- <origin xyz="0 0 -0.3551" rpy="0 0 0" /> -->
+    <origin xyz="0 0 -0.3751" rpy="0 0 0" />
+    <parent link="Body_Link2" />
+    <child link="Neck_Link1" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Neck_Link2">
+    <inertial>
+      <origin xyz="2.7756E-17 -0.020092 -1.5E-05" rpy="0 0 0" />
+      <mass value="0.064116" />
+      <inertia ixx="0.00005244" ixy="0.00000000" ixz="0.00000000" iyy="0.00004979" iyz="0.00000000" izz="0.00002243" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Neck_Link2.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.69804 0.69804 0.69804 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Neck_Link2.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Neck_Joint2" type="revolute">
+    <origin xyz="0 0 -0.049" rpy="1.5708 0 0" />
+    <parent link="Neck_Link1" />
+    <child link="Neck_Link2" />
+    <axis xyz="0 0 1" />
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+
+
+
+
+
+
+  <link name="Left_Arm_Link1">
+    <inertial>
+      <origin xyz="-0.0214 3.908E-11 -0.045727" rpy="0 0 0" />
+      <mass value="0.48911" />
+      <inertia ixx="0.00016149" ixy="0.00000000" ixz="-0.00003445" iyy="0.00014569" iyz="0.00000000" izz="0.00009383" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Arm_Link1.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.69804 0.69804 0.69804 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Arm_Link1.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Left_Arm_Joint1" type="revolute">
+    <!-- <origin xyz="0 0.116 -0.35" rpy="1.5708 0 0" /> -->
+    <origin xyz="0 0.106 -0.35" rpy="1.5708 0 0" />
+    <parent link="Body_Link2" />
+    <child link="Left_Arm_Link1" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Left_Arm_Link2">
+    <inertial>
+      <origin xyz="-2.77555756156289E-17 0.0200924845017263 -8.32667268468867E-17" rpy="0 0 0" />
+      <mass value="0.0641160510599203" />
+      <inertia ixx="0.00005244" ixy="0.00000000" ixz="0.00000000" iyy="0.00004979" iyz="0.00000000" izz="0.00002243" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Arm_Link2.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.698039215686274 0.698039215686274 0.698039215686274 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Arm_Link2.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Left_Arm_Joint2" type="revolute">
+    <origin xyz="0 0 -0.049" rpy="-1.5708 1.3963 -1.5708" />
+    <parent link="Left_Arm_Link1" />
+    <child link="Left_Arm_Link2" />
+    <axis xyz="0 0 1" />
+    <limit lower="-1.57" upper="0.34888" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Left_Arm_Link3">
+    <inertial>
+      <origin xyz="0.00985903021357649 -2.20541147838427E-05 -0.132597036671886" rpy="0 0 0" />
+      <mass value="1.06167641464671" />
+      <inertia ixx="0.00910045" ixy="-0.00000023" ixz="0.00098204" iyy="0.00925103" iyz="0.00000195" izz="0.00047148" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Arm_Link3.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.698039215686274 0.698039215686274 0.698039215686274 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Arm_Link3.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Left_Arm_Joint3" type="revolute">
+    <origin xyz="0 0.037 0" rpy="1.5708 0 0" />
+    <parent link="Left_Arm_Link2" />
+    <child link="Left_Arm_Link3" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Left_Arm_Link4">
+    <inertial>
+      <origin xyz="0.02168044136176 -5.55111512312578E-17 9.71445146547012E-17" rpy="0 0 0" />
+      <mass value="0.0476068874411416" />
+      <inertia ixx="0.00003339" ixy="0.00000000" ixz="0.00000000" iyy="0.00003565" iyz="0.00000000" izz="0.00001148" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Arm_Link4.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.698039215686274 0.698039215686274 0.698039215686274 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Arm_Link4.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Left_Arm_Joint4" type="revolute">
+    <origin xyz="0 0 -0.2264" rpy="-1.5708 1.0472 -1.5708" />
+    <parent link="Left_Arm_Link3" />
+    <child link="Left_Arm_Link4" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Left_Arm_Link5">
+    <inertial>
+      <origin xyz="0.00236431395225681 -1.8698304649345E-05 0.093776384389925" rpy="0 0 0" />
+      <mass value="0.488442136367445" />
+      <inertia ixx="0.00199913" ixy="-0.00000002" ixz="-0.00008713" iyy="0.00199979" iyz="-0.00000049" izz="0.00011648" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Arm_Link5.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.698039215686274 0.698039215686274 0.698039215686274 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Arm_Link5.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Left_Arm_Joint5" type="revolute">
+    <origin xyz="0.035 0 0" rpy="0 1.5708 0" />
+    <parent link="Left_Arm_Link4" />
+    <child link="Left_Arm_Link5" />
+    <axis xyz="0 0 1" />
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Left_Arm_Link6">
+    <inertial>
+      <origin xyz="-0.0155493828720698 5.55111512312578E-17 0" rpy="0 0 0" />
+      <mass value="0.0396502815163659" />
+      <inertia ixx="0.00001949" ixy="0.00000000" ixz="0.00000000" iyy="0.00002067" iyz="0.00000000" izz="0.00000887" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Arm_Link6.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.698039215686274 0.698039215686274 0.698039215686274 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Arm_Link6.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Left_Arm_Joint6" type="revolute">
+    <origin xyz="0 0 0.16815" rpy="0 1.5708 0" />
+    <parent link="Left_Arm_Link5" />
+    <child link="Left_Arm_Link6" />
+    <axis xyz="0 0 1" />
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Left_Arm_Link7">
+    <inertial>
+      <origin xyz="7.13855877326752E-08 3.65810851887249E-05 -0.0319902991486745" rpy="0 0 0" />
+      <mass value="0.249699435181409" />
+      <inertia ixx="0.00011222" ixy="0.00000000" ixz="0.00000000" iyy="0.00011456" iyz="0.00000009" izz="0.00006074" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Arm_Link7.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.698039215686274 0.698039215686274 0.698039215686274 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Arm_Link7.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Left_Arm_Joint7" type="revolute">
+    <origin xyz="-0.029 0 0" rpy="0 1.5708 0" />
+    <parent link="Left_Arm_Link6" />
+    <child link="Left_Arm_Link7" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+
+
+
+  <link name="Right_Arm_Link1">
+    <inertial>
+      <origin xyz="0.0214 3.908E-11 0.045727" rpy="0 0 0" />
+      <mass value="0.48911" />
+      <inertia ixx="0.00016149" ixy="0.00000000" ixz="-0.00003445" iyy="0.00014569" iyz="0.00000000" izz="0.00009383" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Arm_Link1.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.69804 0.69804 0.69804 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Arm_Link1.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Right_Arm_Joint1" type="revolute">
+    <!-- <origin xyz="0 -0.116 -0.35" rpy="1.5708 0 0" /> -->
+    <origin xyz="0 -0.106 -0.35" rpy="1.5708 0 0" />
+    <parent link="Body_Link2" />
+    <child link="Right_Arm_Link1" />
+    <axis xyz="0 0 1" />
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Right_Arm_Link2">
+    <inertial>
+      <origin xyz="-1.11022302462516E-16 0.0200924845017262 -2.77555756156289E-17" rpy="0 0 0" />
+      <mass value="0.0641160510599202" />
+      <inertia ixx="0.00005244" ixy="0.00000000" ixz="0.00000000" iyy="0.00004979" iyz="0.00000000" izz="0.00002243" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Arm_Link2.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.698039215686274 0.698039215686274 0.698039215686274 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Arm_Link2.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Right_Arm_Joint2" type="revolute">
+    <origin xyz="0 0 0.049" rpy="1.5708 1.3963 1.5708" />
+    <parent link="Right_Arm_Link1" />
+    <child link="Right_Arm_Link2" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-1.57" upper="0.34888" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Right_Arm_Link3">
+    <inertial>
+      <origin xyz="-0.00985903027362633 2.20542677700497E-05 -0.132597036494793" rpy="0 0 0" />
+      <mass value="1.06167640906384" />
+      <inertia ixx="0.00910045" ixy="-0.00000023" ixz="-0.00098204" iyy="0.00925103" iyz="-0.00000195" izz="0.00047148" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Arm_Link3.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.698039215686274 0.698039215686274 0.698039215686274 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Arm_Link3.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Right_Arm_Joint3" type="revolute">
+    <origin xyz="0 0.037 0" rpy="1.5708 0 0" />
+    <parent link="Right_Arm_Link2" />
+    <child link="Right_Arm_Link3" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Right_Arm_Link4">
+    <inertial>
+      <origin xyz="0.0216804413617601 2.77555756156289E-17 -3.33066907387547E-16" rpy="0 0 0" />
+      <mass value="0.0476068874411416" />
+      <inertia ixx="0.00003339" ixy="0.00000000" ixz="0.00000000" iyy="0.00003565" iyz="0.00000000" izz="0.00001148" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Arm_Link4.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.698039215686274 0.698039215686274 0.698039215686274 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Arm_Link4.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Right_Arm_Joint4" type="revolute">
+    <origin xyz="0 0 -0.2264" rpy="-1.5708 1.0472 -1.5708" />
+    <parent link="Right_Arm_Link3" />
+    <child link="Right_Arm_Link4" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Right_Arm_Link5">
+    <inertial>
+      <origin xyz="-0.00236431428227268 1.87001911635398E-05 0.0937763652633915" rpy="0 0 0" />
+      <mass value="0.488442240065499" />
+      <inertia ixx="0.00199913" ixy="-0.00000002" ixz="0.00008713" iyy="0.00199979" iyz="0.00000049" izz="0.00011648" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Arm_Link5.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.698039215686274 0.698039215686274 0.698039215686274 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Arm_Link5.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Right_Arm_Joint5" type="revolute">
+    <origin xyz="0.035 0 0" rpy="3.1416 1.5708 3.1416" />
+    <parent link="Right_Arm_Link4" />
+    <child link="Right_Arm_Link5" />
+    <axis xyz="0 0 1" />
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Right_Arm_Link6">
+    <inertial>
+      <origin xyz="-0.01554938287207 -5.55111512312578E-17 2.22044604925031E-16" rpy="0 0 0" />
+      <mass value="0.0396502815163659" />
+      <inertia ixx="0.00001949" ixy="0.00000000" ixz="0.00000000" iyy="0.00002067" iyz="0.00000000" izz="0.00000887" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Arm_Link6.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.698039215686274 0.698039215686274 0.698039215686274 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Arm_Link6.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Right_Arm_Joint6" type="revolute">
+    <origin xyz="0 0 0.16815" rpy="0 1.5708 0" />
+    <parent link="Right_Arm_Link5" />
+    <child link="Right_Arm_Link6" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Right_Arm_Link7">
+    <inertial>
+      <origin xyz="-6.8599E-08 3.6572E-05 -0.03199" rpy="0 0 0" />
+      <mass value="0.2497" />
+      <inertia ixx="0.00011222" ixy="0.00000000" ixz="0.00000000" iyy="0.00011456" iyz="0.00000009" izz="0.00006074" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Arm_Link7.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.69804 0.69804 0.69804 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Arm_Link7.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Right_Arm_Joint7" type="revolute">
+    <origin xyz="-0.029 0 0" rpy="0 1.5708 0" />
+    <parent link="Right_Arm_Link6" />
+    <child link="Right_Arm_Link7" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+
+
+
+
+  <link name="Left_Leg_Link1">
+    <inertial>
+      <origin xyz="0.087493 2.5915E-11 -0.037036" rpy="0 0 0" />
+      <mass value="1.72309358" />
+      <inertia ixx="0.00165564" ixy="0.00000000" ixz="-0.00016309" iyy="0.00463380" iyz="0.00000000" izz="0.00427797" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Leg_Link1.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.69804 0.69804 0.69804 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Leg_Link1.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Left_Leg_Joint1" type="revolute">
+    <origin xyz="0.00044766 0.105 0" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="Left_Leg_Link1" />
+    <axis xyz="-1 0 0" />
+    <limit lower="-0.5233" upper="0.5233" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Left_Leg_Link2">
+    <inertial>
+      <origin xyz="-0.06476 0.00011092 -0.026574" rpy="0 0 0" />
+      <mass value="0.36045788" />
+      <inertia ixx="0.00090196" ixy="0.00000061" ixz="-0.00010888" iyy="0.00073947" iyz="0.00000190" izz="0.00101821" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Leg_Link2.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.69804 0.69804 0.69804 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Leg_Link2.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Left_Leg_Joint2" type="revolute">
+    <origin xyz="0.105 0 -0.0725" rpy="0 0 0" />
+    <parent link="Left_Leg_Link1" />
+    <child link="Left_Leg_Link2" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-0.5233" upper="0.5233" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Left_Leg_Link3">
+    <inertial>
+      <origin xyz="0.0030484 0.00016779 -0.052925" rpy="0 0 0" />
+      <mass value="3.87843517" />
+      <inertia ixx="0.02894525" ixy="0.00001257" ixz="0.00142193" iyy="0.02776903" iyz="-0.00021823" izz="0.00726017" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Leg_Link3.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.69804 0.69804 0.69804 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Leg_Link3.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Left_Leg_Joint3" type="revolute">
+    <origin xyz="-0.08 0.00089533 -0.074" rpy="0 0 0" />
+    <parent link="Left_Leg_Link2" />
+    <child link="Left_Leg_Link3" />
+    <axis xyz="0 1 0" />
+    <limit lower="-1.046666" upper="1.046666" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Left_Leg_Link4">
+    <inertial>
+      <origin xyz="0.0012977 0.0018005 -0.13914" rpy="0 0 0" />
+      <mass value="3.97638524" />
+      <inertia ixx="0.08736352" ixy="0.00000925" ixz="0.00011447" iyy="0.08801411" iyz="-0.00037065" izz="0.00363296" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Leg_Link4.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.69804 0.69804 0.69804 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Leg_Link4.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Left_Leg_Joint4" type="revolute">
+    <origin xyz="0 -0.00089533 -0.26" rpy="0 0 0" />
+    <parent link="Left_Leg_Link3" />
+    <child link="Left_Leg_Link4" />
+    <axis xyz="0 -1 0" />
+    <limit lower="-1.57" upper="0.0" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Left_Leg_Link5">
+    <inertial>
+      <origin xyz="0.0012863 -3.5378E-12 -0.08214" rpy="0 0 0" />
+      <mass value="1.54295243" />
+      <inertia ixx="0.00178978" ixy="0.00000000" ixz="0.00001145" iyy="0.00160351" iyz="0.00000002" izz="0.00139637" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Leg_Link5.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.69804 0.69804 0.69804 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Leg_Link5.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Left_Leg_Joint5" type="revolute">
+    <origin xyz="0 0 -0.318" rpy="0 0 0" />
+    <parent link="Left_Leg_Link4" />
+    <child link="Left_Leg_Link5" />
+    <axis xyz="0 1 0" />
+    <limit lower="-1.046666" upper="1.046666" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Left_Leg_Link6">
+    <inertial>
+      <origin xyz="0.05835 -5.5511E-17 -0.043705" rpy="0 0 0" />
+      <mass value="0.57790869" />
+      <inertia ixx="0.00038726" ixy="0.00000000" ixz="0.00000069" iyy="0.00262667" iyz="0.00000000" izz="0.00300430" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Leg_Link6.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.69804 0.69804 0.69804 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Left_Leg_Link6.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Left_Leg_Joint6" type="revolute">
+    <origin xyz="0 0 -0.088" rpy="0 0 0" />
+    <parent link="Left_Leg_Link5" />
+    <child link="Left_Leg_Link6" />
+    <axis xyz="1 0 0" />
+    <limit lower="-1.046666" upper="1.046666" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Right_Leg_Link1">
+    <inertial>
+      <origin xyz="0.087493 2.5915E-11 -0.037036" rpy="0 0 0" />
+      <mass value="1.72309358" />
+      <inertia ixx="0.00165564" ixy="0.00000000" ixz="-0.00016309" iyy="0.00463380" iyz="0.00000000" izz="0.00427797" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Leg_Link1.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Leg_Link1.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Right_Leg_Joint1" type="revolute">
+    <origin xyz="-0.00044766 -0.105 0" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="Right_Leg_Link1" />
+    <axis xyz="-1 0 0" />
+    <limit lower="-0.5233" upper="0.5233" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Right_Leg_Link2">
+    <inertial>
+      <origin xyz="-0.06476 0.00011092 -0.026574" rpy="0 0 0" />
+      <mass value="0.36045788" />
+      <inertia ixx="0.00090196" ixy="0.00000061" ixz="-0.00010888" iyy="0.00073947" iyz="0.00000190" izz="0.00101821" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Leg_Link2.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.69804 0.69804 0.69804 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Leg_Link2.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Right_Leg_Joint2" type="revolute">
+    <origin xyz="0.1059 0 -0.0725" rpy="0 0 0" />
+    <parent link="Right_Leg_Link1" />
+    <child link="Right_Leg_Link2" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-0.5233" upper="0.5233" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Right_Leg_Link3">
+    <inertial>
+      <origin xyz="0.0030484 0.0010631 -0.052925" rpy="0 0 0" />
+      <mass value="3.87843517" />
+      <inertia ixx="0.02894525" ixy="0.00001257" ixz="0.00142193" iyy="0.02776903" iyz="-0.00021823" izz="0.00726017" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Leg_Link3.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.69804 0.69804 0.69804 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Leg_Link3.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Right_Leg_Joint3" type="revolute">
+    <origin xyz="-0.08 0 -0.074" rpy="0 0 0" />
+    <parent link="Right_Leg_Link2" />
+    <child link="Right_Leg_Link3" />
+    <axis xyz="0 1 0" />
+    <limit lower="-1.046666" upper="1.046666" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Right_Leg_Link4">
+    <inertial>
+      <origin xyz="0.0012977 0.0018005 -0.13914" rpy="0 0 0" />
+      <mass value="3.97638524" />
+      <inertia ixx="0.08736352" ixy="0.00000925" ixz="0.00011447" iyy="0.08801411" iyz="-0.00037065" izz="0.00363296" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Leg_Link4.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.69804 0.69804 0.69804 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Leg_Link4.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Right_Leg_Joint4" type="revolute">
+    <origin xyz="0 0 -0.26" rpy="0 0 0" />
+    <parent link="Right_Leg_Link3" />
+    <child link="Right_Leg_Link4" />
+    <axis xyz="0 -1 0" />
+    <limit lower="-1.57" upper="0.0" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Right_Leg_Link5">
+    <inertial>
+      <origin xyz="0.0012863 2.0739E-11 -0.08214" rpy="0 0 0" />
+      <mass value="1.54295243" />
+      <inertia ixx="0.00178978" ixy="0.00000000" ixz="0.00001145" iyy="0.00160351" iyz="0.00000002" izz="0.00139637" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Leg_Link5.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.69804 0.69804 0.69804 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Leg_Link5.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Right_Leg_Joint5" type="revolute">
+    <origin xyz="0 0 -0.318" rpy="0 0 0" />
+    <parent link="Right_Leg_Link4" />
+    <child link="Right_Leg_Link5" />
+    <axis xyz="0 1 0" />
+    <limit lower="-1.046666" upper="1.046666" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="Right_Leg_Link6">
+    <inertial>
+      <origin xyz="0.05835 0 -0.043705" rpy="0 0 0" />
+      <mass value="0.57790869" />
+      <inertia ixx="0.00038726" ixy="0.00000000" ixz="0.00000069" iyy="0.00262667" iyz="0.00000000" izz="0.00300430" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Leg_Link6.STL" />
+      </geometry>
+      <material name="">
+        <color rgba="0.69804 0.69804 0.69804 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ymbot_xiaoxue_description/meshes/Right_Leg_Link6.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Right_Leg_Joint6" type="revolute">
+    <origin xyz="0 0 -0.088" rpy="0 0 0" />
+    <parent link="Right_Leg_Link5" />
+    <child link="Right_Leg_Link6" />
+    <axis xyz="1 0 0" />
+    <limit lower="-1.046666" upper="1.046666" effort="100" velocity="1.0" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+
+
+
+</robot>

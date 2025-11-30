@@ -1,0 +1,40 @@
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import String
+import threading
+
+class MyClass:
+    def __init__(self):
+        self.node = None
+        self.publisher = None
+        self.ros_thread = None
+        self.ros_ready = False
+
+    def _ros_spin_thread(self):
+        rclpy.spin(self.node)
+
+    def init_ros(self):
+        if not rclpy.ok():
+            rclpy.init()
+
+        self.node = Node("my_hidden_ros_node")
+        self.publisher = self.node.create_publisher(String, "my_topic", 10)
+
+        # 启动一个线程来spin节点（不阻塞主线程）
+        self.ros_thread = threading.Thread(target=self._ros_spin_thread, daemon=True)
+        self.ros_thread.start()
+        self.ros_ready = True
+        print("ROS Node initialized.")
+
+    def do_something(self):
+        print("Doing something...")
+        
+        # 第一次使用时初始化 ROS
+        if not self.ros_ready:
+            self.init_ros()
+
+        # 发布消息
+        msg = String()
+        msg.data = "Hello from MyClass!"
+        self.publisher.publish(msg)
+        self.node.get_logger().info(f"Published: {msg.data}")

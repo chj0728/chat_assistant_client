@@ -1,0 +1,2 @@
+Invoking command in '/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking': /usr/bin/cmake /home/ymrobot/ros2_ws_guidance/src/aoa_tracking -DCMAKE_INSTALL_PREFIX=/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking
+Invoked command in '/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking' returned '1': /usr/bin/cmake /home/ymrobot/ros2_ws_guidance/src/aoa_tracking -DCMAKE_INSTALL_PREFIX=/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking

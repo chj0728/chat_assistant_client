@@ -1,0 +1,23 @@
+[0.012s] Invoking command in '/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/ymrobot/ros2_ws_guidance/install/play_mp3_action:/home/ymrobot/ros2_ws_guidance/install/aud_conver:/home/ymrobot/ros2_ws_guidance/install/ymbot_xiaoxue_description:/home/ymrobot/ros2_ws_guidance/install/pedestrian_detector_node:/home/ymrobot/ros2_ws_guidance/install/log_uploader_node:/opt/ros/humble /usr/bin/cmake --build /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking -- -j20 -l20
+[0.051s] [35m[1mConsolidate compiler generated dependencies of target aoa_tracking_node[0m
+[0.067s] [100%] Built target aoa_tracking_node
+[0.079s] Invoked command in '/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/ymrobot/ros2_ws_guidance/install/play_mp3_action:/home/ymrobot/ros2_ws_guidance/install/aud_conver:/home/ymrobot/ros2_ws_guidance/install/ymbot_xiaoxue_description:/home/ymrobot/ros2_ws_guidance/install/pedestrian_detector_node:/home/ymrobot/ros2_ws_guidance/install/log_uploader_node:/opt/ros/humble /usr/bin/cmake --build /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking -- -j20 -l20
+[0.085s] Invoking command in '/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/ymrobot/ros2_ws_guidance/install/play_mp3_action:/home/ymrobot/ros2_ws_guidance/install/aud_conver:/home/ymrobot/ros2_ws_guidance/install/ymbot_xiaoxue_description:/home/ymrobot/ros2_ws_guidance/install/pedestrian_detector_node:/home/ymrobot/ros2_ws_guidance/install/log_uploader_node:/opt/ros/humble /usr/bin/cmake --install /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking
+[0.095s] -- Install configuration: ""
+[0.095s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/lib/aoa_tracking/aoa_tracking_node
+[0.095s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/ament_index/resource_index/package_run_dependencies/aoa_tracking
+[0.095s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/ament_index/resource_index/parent_prefix_path/aoa_tracking
+[0.096s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/aoa_tracking/environment/ament_prefix_path.sh
+[0.096s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/aoa_tracking/environment/ament_prefix_path.dsv
+[0.096s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/aoa_tracking/environment/path.sh
+[0.096s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/aoa_tracking/environment/path.dsv
+[0.096s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/aoa_tracking/local_setup.bash
+[0.096s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/aoa_tracking/local_setup.sh
+[0.096s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/aoa_tracking/local_setup.zsh
+[0.096s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/aoa_tracking/local_setup.dsv
+[0.096s] -- Installing: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/aoa_tracking/package.dsv
+[0.096s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/ament_index/resource_index/packages/aoa_tracking
+[0.096s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/aoa_tracking/cmake/aoa_trackingConfig.cmake
+[0.096s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/aoa_tracking/cmake/aoa_trackingConfig-version.cmake
+[0.096s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/aoa_tracking/package.xml
+[0.097s] Invoked command in '/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/ymrobot/ros2_ws_guidance/install/play_mp3_action:/home/ymrobot/ros2_ws_guidance/install/aud_conver:/home/ymrobot/ros2_ws_guidance/install/ymbot_xiaoxue_description:/home/ymrobot/ros2_ws_guidance/install/pedestrian_detector_node:/home/ymrobot/ros2_ws_guidance/install/log_uploader_node:/opt/ros/humble /usr/bin/cmake --install /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking

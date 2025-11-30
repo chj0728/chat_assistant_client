@@ -1,0 +1,16 @@
+# Goal: 
+string map_name
+---
+# Result: 
+bool success false
+float32 remaining_distance
+float32 remaining_time
+---
+# Feedback: 
+float32 remaining_distance
+float32 remaining_time
+uint8 status
+uint8 STATUS_SUCCESS = 1
+uint8 STATUS_ERROR = 2
+uint8 STATUS_MOVEING = 3
+uint8 STATUS_STOP = 4

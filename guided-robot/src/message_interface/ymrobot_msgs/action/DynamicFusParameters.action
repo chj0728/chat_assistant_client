@@ -1,0 +1,10 @@
+# 融合方式
+uint8  fused_mode   # 0 ： 激光雷达为主模式。 1：轮速计为主模式
+---
+# 结果（响应）
+bool success
+string message
+---
+# 反馈
+string message
+bool status

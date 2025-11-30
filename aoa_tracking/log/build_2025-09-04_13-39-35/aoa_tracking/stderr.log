@@ -1,0 +1,21 @@
+In file included from [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:46[m[K:
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:[m[K In constructor ‘[01m[KMinimalPublisher::MinimalPublisher()[m[K’:
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:15:62:[m[K [01;31m[Kerror: [m[Kexpected ‘[01m[K{[m[K’ at end of input
+   15 |     MinimalPublisher() : Node("minimal_publisher"), count_(0)[01;31m[K;[m[K
+      |                                                              [01;31m[K^[m[K
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:[m[K At global scope:
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:47:7:[m[K [01;31m[Kerror: [m[Kredefinition of ‘[01m[Kclass MinimalPublisher[m[K’
+   47 | class [01;31m[KMinimalPublisher[m[K : public rclcpp::Node
+      |       [01;31m[K^~~~~~~~~~~~~~~~[m[K
+In file included from [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:46[m[K:
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:12:7:[m[K [01;36m[Knote: [m[Kprevious definition of ‘[01m[Kclass MinimalPublisher[m[K’
+   12 | class [01;36m[KMinimalPublisher[m[K : public rclcpp::Node
+      |       [01;36m[K^~~~~~~~~~~~~~~~[m[K
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:47:1:[m[K [01;31m[Kerror: [m[Knew types may not be defined in a return type
+   47 | [01;31m[Kclass[m[K MinimalPublisher : public rclcpp::Node
+      | [01;31m[K^~~~~[m[K
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:47:1:[m[K [01;36m[Knote: [m[K(perhaps a semicolon is missing after the definition of ‘[01m[K<type error>[m[K’)
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:47:1:[m[K [01;31m[Kerror: [m[Ktwo or more data types in declaration of ‘[01m[Kmain[m[K’
+gmake[2]: *** [CMakeFiles/aoa_tracking_node.dir/build.make:76：CMakeFiles/aoa_tracking_node.dir/src/aoa_tracking_node.cpp.o] 错误 1
+gmake[1]: *** [CMakeFiles/Makefile2:137：CMakeFiles/aoa_tracking_node.dir/all] 错误 2
+gmake: *** [Makefile:146：all] 错误 2

@@ -1,0 +1,6 @@
+audio_control_node:
+  ros__parameters:
+    modify_timbre_sub_name: "modify_timbre"
+    audio_action_server_name: "audio_control_server"
+    audio_control_action_name: "audio_control_action"
+    service_wait_over_time: 5

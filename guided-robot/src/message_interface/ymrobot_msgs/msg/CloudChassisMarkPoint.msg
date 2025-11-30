@@ -1,0 +1,11 @@
+# 云迹底盘状态信息msg
+string pose_name
+string map_name
+string location_name
+string pose_describe
+float64 x
+float64 y
+float64 z
+float64 roll
+float64 pitch
+float64 yaw

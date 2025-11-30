@@ -1,0 +1,179 @@
+# This config file is used by ros2_control
+controller_manager:
+  ros__parameters:
+    update_rate: 100  # Hz
+
+    # body_controller:
+    #   type: joint_trajectory_controller/JointTrajectoryController
+
+
+    # neck_controller:
+    #   type: joint_trajectory_controller/JointTrajectoryController
+
+
+    #left_arm_controller:
+    #  type: joint_trajectory_controller/JointTrajectoryController
+
+
+    #right_arm_controller:
+    #  type: joint_trajectory_controller/JointTrajectoryController
+
+
+    # left_body_arm_controller:
+    #   type: joint_trajectory_controller/JointTrajectoryController
+
+
+    # right_body_arm_controller:
+    #   type: joint_trajectory_controller/JointTrajectoryController
+
+
+    # body_neck_controller:
+    #   type: joint_trajectory_controller/JointTrajectoryController
+
+
+    upper_body_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+
+    # arms_controller:
+    #   type: joint_trajectory_controller/JointTrajectoryController
+
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+body_controller:
+  ros__parameters:
+    joints:
+      - Body_Joint1
+      - Body_Joint2
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      # - velocity
+    allow_nonzero_velocity_at_trajectory_end: true
+neck_controller:
+  ros__parameters:
+    joints:
+      - Neck_Joint1
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      # - velocity
+    allow_nonzero_velocity_at_trajectory_end: true
+left_arm_controller:
+  ros__parameters:
+    joints:
+      - Left_Arm_Joint1
+      - Left_Arm_Joint2
+      - Left_Arm_Joint3
+      - Left_Arm_Joint4
+      - Left_Arm_Joint5
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      # - velocity
+    allow_nonzero_velocity_at_trajectory_end: true
+right_arm_controller:
+  ros__parameters:
+    joints:
+      - Right_Arm_Joint1
+      - Right_Arm_Joint2
+      - Right_Arm_Joint3
+      - Right_Arm_Joint4
+      - Right_Arm_Joint5
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      # - velocity
+    allow_nonzero_velocity_at_trajectory_end: true
+left_body_arm_controller:
+  ros__parameters:
+    joints:
+      - Body_Joint1
+      - Body_Joint2
+      - Left_Arm_Joint1
+      - Left_Arm_Joint2
+      - Left_Arm_Joint3
+      - Left_Arm_Joint4
+      - Left_Arm_Joint5
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      # - velocity
+    allow_nonzero_velocity_at_trajectory_end: true
+right_body_arm_controller:
+  ros__parameters:
+    joints:
+      - Body_Joint1
+      - Body_Joint2
+      - Right_Arm_Joint1
+      - Right_Arm_Joint2
+      - Right_Arm_Joint3
+      - Right_Arm_Joint4
+      - Right_Arm_Joint5
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      # - velocity
+    allow_nonzero_velocity_at_trajectory_end: true
+body_neck_controller:
+  ros__parameters:
+    joints:
+      - Body_Joint1
+      - Body_Joint2
+      - Neck_Joint1
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      # - velocity
+    allow_nonzero_velocity_at_trajectory_end: true
+upper_body_controller:
+  ros__parameters:
+    joints:
+      - Neck_Joint1
+      - Neck_Joint2
+      - Body_Joint1
+      - Body_Joint2
+      - Left_Arm_Joint1
+      - Left_Arm_Joint2
+      - Left_Arm_Joint3
+      - Left_Arm_Joint4
+      - Left_Arm_Joint5
+      - Right_Arm_Joint1
+      - Right_Arm_Joint2
+      - Right_Arm_Joint3
+      - Right_Arm_Joint4
+      - Right_Arm_Joint5
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      # - velocity
+    allow_nonzero_velocity_at_trajectory_end: true
+arms_controller:
+  ros__parameters:
+    joints:
+      - Left_Arm_Joint1
+      - Left_Arm_Joint2
+      - Left_Arm_Joint3
+      - Left_Arm_Joint4
+      - Left_Arm_Joint5
+      - Right_Arm_Joint1
+      - Right_Arm_Joint2
+      - Right_Arm_Joint3
+      - Right_Arm_Joint4
+      - Right_Arm_Joint5
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      # - velocity
+    allow_nonzero_velocity_at_trajectory_end: true

@@ -1,0 +1,77 @@
+[35m[1mConsolidate compiler generated dependencies of target aoa_tracking_node[0m
+[ 50%] [32mBuilding CXX object CMakeFiles/aoa_tracking_node.dir/src/aoa_tracking_node.cpp.o[0m
+In file included from [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:5[m[K:
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:21:7:[m[K [01;31m[Kerror: [m[K‘[01m[Kfloat64[m[K’ does not name a type; did you mean ‘[01m[Kfloat_t[m[K’?
+   21 |       [01;31m[Kfloat64[m[K x = 0.0;
+      |       [01;31m[K^~~~~~~[m[K
+      |       [32m[Kfloat_t[m[K
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:22:7:[m[K [01;31m[Kerror: [m[K‘[01m[Kfloat64[m[K’ does not name a type; did you mean ‘[01m[Kfloat_t[m[K’?
+   22 |       [01;31m[Kfloat64[m[K y = 0.0;
+      |       [01;31m[K^~~~~~~[m[K
+      |       [32m[Kfloat_t[m[K
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:23:7:[m[K [01;31m[Kerror: [m[K‘[01m[Kfloat64[m[K’ does not name a type; did you mean ‘[01m[Kfloat_t[m[K’?
+   23 |       [01;31m[Kfloat64[m[K row = 0.0;
+      |       [01;31m[K^~~~~~~[m[K
+      |       [32m[Kfloat_t[m[K
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:26:15:[m[K [01;31m[Kerror: [m[K‘[01m[Kcreate_subsciption[m[K’ in namespace ‘[01m[Krclcpp[m[K’ does not name a template type; did you mean ‘[01m[Kcreate_subscription[m[K’?
+   26 |       rclcpp::[01;31m[Kcreate_subsciption[m[K<ymrobot_msgs::msg::CloudChassisStatus> chissis_status_subsctiption_;
+      |               [01;31m[K^~~~~~~~~~~~~~~~~~[m[K
+      |               [32m[Kcreate_subscription[m[K
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:[m[K In constructor ‘[01m[Kymrobot::AoaTracking::AoaTracking()[m[K’:
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:16:5:[m[K [01;31m[Kerror: [m[K‘[01m[Kchissis_status_subsctiption_[m[K’ was not declared in this scope
+   16 |     [01;31m[Kchissis_status_subsctiption_[m[K = this->create_subsciption<ymrobot_msgs::msg::CloudChassisStatus>("cloud_chassis_status_info", 2, std::bind(&AoaTracking::chissis_status_callback, this, _1));
+      |     [01;31m[K^~~~~~~~~~~~~~~~~~~~~~~~~~~~[m[K
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:16:42:[m[K [01;31m[Kerror: [m[K‘[01m[Kclass ymrobot::AoaTracking[m[K’ has no member named ‘[01m[Kcreate_subsciption[m[K’; did you mean ‘[01m[Kcreate_subscription[m[K’?
+   16 |     chissis_status_subsctiption_ = this->[01;31m[Kcreate_subsciption[m[K<ymrobot_msgs::msg::CloudChassisStatus>("cloud_chassis_status_info", 2, std::bind(&AoaTracking::chissis_status_callback, this, _1));
+      |                                          [01;31m[K^~~~~~~~~~~~~~~~~~[m[K
+      |                                          [32m[Kcreate_subscription[m[K
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:16:98:[m[K [01;31m[Kerror: [m[Kexpected primary-expression before ‘[01m[K>[m[K’ token
+   16 |     chissis_status_subsctiption_ = this->create_subsciption<ymrobot_msgs::msg::CloudChassisStatus[01;31m[K>[m[K("cloud_chassis_status_info", 2, std::bind(&AoaTracking::chissis_status_callback, this, _1));
+      |                                                                                                  [01;31m[K^[m[K
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:16:100:[m[K [01;35m[Kwarning: [m[Kleft operand of comma operator has no effect [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-value-Wunused-value]8;;[m[K]
+   16 |     chissis_status_subsctiption_ = this->create_subsciption<ymrobot_msgs::msg::CloudChassisStatus>([01;35m[K"cloud_chassis_status_info"[m[K, 2, std::bind(&AoaTracking::chissis_status_callback, this, _1));
+      |                                                                                                    [01;35m[K^~~~~~~~~~~~~~~~~~~~~~~~~~~[m[K
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:16:187:[m[K [01;31m[Kerror: [m[K‘[01m[K_1[m[K’ was not declared in this scope; did you mean ‘[01m[Kstd::placeholders::_1[m[K’?
+   16 | sg::CloudChassisStatus>("cloud_chassis_status_info", 2, std::bind(&AoaTracking::chissis_status_callback, this, [01;31m[K_1[m[K));
+      |                                                                                                                [01;31m[K^~[m[K
+      |                                                                                                                [32m[Kstd::placeholders::_1[m[K
+In file included from [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:2[m[K,
+                 from [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:5[m[K:
+[01m[K/usr/include/c++/11/functional:225:34:[m[K [01;36m[Knote: [m[K‘[01m[Kstd::placeholders::_1[m[K’ declared here
+  225 |     extern const _Placeholder<1> [01;36m[K_1[m[K;
+      |                                  [01;36m[K^~[m[K
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:[m[K In member function ‘[01m[Kvoid ymrobot::AoaTracking::chissis_status_callback(const CloudChassisStatus&)[m[K’:
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:29:10:[m[K [01;31m[Kerror: [m[Krequest for member ‘[01m[Kx[m[K’ in ‘[01m[K(ymrobot::AoaTracking*)this[m[K’, which is of pointer type ‘[01m[Kymrobot::AoaTracking*[m[K’ (maybe you meant to use ‘[01m[K->[m[K’ ?)
+   29 |     this.[01;31m[Kx[m[K = msg.x;
+      |          [01;31m[K^[m[K
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:30:10:[m[K [01;31m[Kerror: [m[Krequest for member ‘[01m[Ky[m[K’ in ‘[01m[K(ymrobot::AoaTracking*)this[m[K’, which is of pointer type ‘[01m[Kymrobot::AoaTracking*[m[K’ (maybe you meant to use ‘[01m[K->[m[K’ ?)
+   30 |     this.[01;31m[Ky[m[K = msg.y;
+      |          [01;31m[K^[m[K
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:31:10:[m[K [01;31m[Kerror: [m[Krequest for member ‘[01m[Kyaw[m[K’ in ‘[01m[K(ymrobot::AoaTracking*)this[m[K’, which is of pointer type ‘[01m[Kymrobot::AoaTracking*[m[K’ (maybe you meant to use ‘[01m[K->[m[K’ ?)
+   31 |     this.[01;31m[Kyaw[m[K = msg.yaw;
+      |          [01;31m[K^~~[m[K
+In file included from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/logging.hpp:24[m[K,
+                 from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/client.hpp:40[m[K,
+                 from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/callback_group.hpp:24[m[K,
+                 from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/any_executable.hpp:20[m[K,
+                 from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/memory_strategy.hpp:25[m[K,
+                 from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/memory_strategies.hpp:18[m[K,
+                 from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/executor_options.hpp:20[m[K,
+                 from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/executor.hpp:37[m[K,
+                 from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/executors/multi_threaded_executor.hpp:25[m[K,
+                 from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/executors.hpp:21[m[K,
+                 from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/rclcpp.hpp:155[m[K,
+                 from [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:6[m[K,
+                 from [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:5[m[K:
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:32:78:[m[K [01;31m[Kerror: [m[K‘[01m[Kx[m[K’ was not declared in this scope
+   32 |     RCLCPP_INFO(this->get_logger(), "接收到数据x: '%f', y: '%f', yaw: '%f'", [01;31m[Kx[m[K, y, yaw);
+      |                                                                              [01;31m[K^[m[K
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:32:81:[m[K [01;31m[Kerror: [m[K‘[01m[Ky[m[K’ was not declared in this scope; did you mean ‘[01m[Kyn[m[K’?
+   32 |     RCLCPP_INFO(this->get_logger(), "接收到数据x: '%f', y: '%f', yaw: '%f'", x, [01;31m[Ky[m[K, yaw);
+      |                                                                                 [01;31m[K^[m[K
+[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:32:84:[m[K [01;31m[Kerror: [m[K‘[01m[Kyaw[m[K’ was not declared in this scope
+   32 |     RCLCPP_INFO(this->get_logger(), "接收到数据x: '%f', y: '%f', yaw: '%f'", x, y, [01;31m[Kyaw[m[K);
+      |                                                                                    [01;31m[K^~~[m[K
+gmake[2]: *** [CMakeFiles/aoa_tracking_node.dir/build.make:76：CMakeFiles/aoa_tracking_node.dir/src/aoa_tracking_node.cpp.o] 错误 1
+gmake[1]: *** [CMakeFiles/Makefile2:137：CMakeFiles/aoa_tracking_node.dir/all] 错误 2
+gmake: *** [Makefile:146：all] 错误 2

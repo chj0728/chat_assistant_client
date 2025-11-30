@@ -1,0 +1,117 @@
+<root>
+    <BehaviorTree ID="BtTreeBehavior">
+        <Sequence>
+            <SaySomething message="子行为树" />
+            <Fallback>
+                <Sequence>
+                    <NeedIndex need_bt_index="{bt_tree_index}" index="1" />
+                    <SaySomething message="导览行为树" />
+                    <SaySomething message="1111" />
+                    <TraverseNavPose current_task="{current_task}" the_number_of_cycles="{the_number_of_cycles}" mark_nav_target_list="{mark_nav_target_list}" audio_list="{audio_list}" fixed_up_action_list="{fixed_up_action_list}" is_skip_list="{is_skip_list}" is_activate_the_nearby_point="{is_activate_the_nearby_point}" nearby_point_radius="{nearby_point_radius}"   task_id="{task_id}" />
+                    <GetStandbyPoint mark_points_adress="/home/ymrobot/ros2_ws_guidance/src/guided-robot/params/robot.yaml" standby_point="{standby_point}"/>
+                    <PublishTaskStateNode node_task_type="guide_explanation" node_name="" node_task_state="started" node_action_content=""  node_task_id="{task_id}"/>
+                    <Repeat num_cycles="{the_number_of_cycles}">
+                        <Sequence>
+                            <RemovePassedMarkPointsNode input_mark_nav_target_list="{mark_nav_target_list}" output_mark_nav_target_list="{mark_nav_target_list}" mark_nav_target="{mark_nav_target}" />
+                            <RemovePassedMarkAudiosNode input_mark_audio_list="{audio_list}" output_mark_audio_list="{audio_list}" mark_audio="{fixed_audio}" />
+                            <RemovePassedFixedUpActionNode input_mark_fixed_up_action_list="{fixed_up_action_list}" output_mark_fixed_up_action_list="{fixed_up_action_list}" fixed_action="{fixed_action}" />
+                            
+                            <!-- <RemovePassedIsSikpNode input_is_skip_list="{is_skip_list}" output_is_skip_list="{is_skip_list}" is_open_skip="{is_open_skip}" /> -->
+                            <HandleNearbyPoint nearby_point_radius = "nearby_point_radius" is_activate_the_nearby_point = "is_activate_the_nearby_point" nearby_point_radius_value = "nearby_point_radius_value" is_activate_the_nearby_point_value = "is_activate_the_nearby_point_value"/>    
+                            <!-- 就近点和是否开启就近点的存储是以数组形式，所以要拆分 -->
+                            <SaySomething message="解析点位成功，开始导航到点位" />
+                            <!-- <UpClimbFixedAction action_fixed_str="0" /> -->
+                            <Fallback name="navigation">
+                                <Sequence>
+                                    <PublishTaskStateNode node_task_type="guide_explanation" node_name="navigation" node_task_state="started" node_action_content="{mark_nav_target}" node_task_id="{task_id}"/>
+                                    <CloudChassisNavNameNode nav_pose_name="{mark_nav_target}" nearby_point_radius = "nearby_point_radius_value" is_activate_the_nearby_point = "is_activate_the_nearby_point_value"/>
+                                    <PublishTaskStateNode node_task_type="guide_explanation" node_name="navigation" node_task_state="successed" node_action_content="{mark_nav_target}" node_task_id="{task_id}"/>
+                                </Sequence>
+                                <Sequence>
+                                    <PublishTaskStateNode node_task_type="guide_explanation" node_name="navigation" node_task_state="failure" node_action_content="{mark_nav_target}" node_task_id="{task_id}"/>
+                                    <ConditionCheckNode is_open_skip="{is_open_skip}"/>
+                                </Sequence>
+                            </Fallback>
+                            <Parallel name="media_actions" success_threshold="1" failure_threshold="2">
+                                <Sequence name="audio_sequence">
+                                    <Fallback>
+                                        <Sequence>
+                                            <PublishTaskStateNode node_task_type="guide_explanation" node_name="play_fix_audio" node_task_state="started" node_action_content="{fixed_audio}" node_task_id="{task_id}"/>
+                                            <SaySomething message="{fixed_audio}" />
+                                            <ForceSuccess>
+                                                <PlayFixedAudioNode fixed_audio="{fixed_audio}" />
+                                            </ForceSuccess>
+                                            <PublishTaskStateNode node_task_type="guide_explanation" node_name="play_fix_audio" node_task_state="successed" node_action_content="{fixed_audio}" node_task_id="{task_id}"/>
+                                        </Sequence>
+                                        <Sequence>
+                                            <PublishTaskStateNode node_task_type="guide_explanation" node_name="play_fix_audio" node_task_state="failure" node_action_content="{fixed_audio}" node_task_id="{task_id}"/>
+                                            <ConditionCheckNode is_open_skip="{is_open_skip}"/>
+                                        </Sequence>
+                                    </Fallback>
+                                </Sequence>
+
+                                <Sequence name="action_sequence">
+                                    <Fallback>
+                                        <Sequence>
+                                            <PublishTaskStateNode node_task_type="guide_explanation" node_name="place_fixed" node_task_state="started" node_action_content="{fixed_action}" />
+                                            <ForceSuccess>
+                                                <UpClimbFixedAction action_fixed_str="{fixed_action}" />
+                                            </ForceSuccess>
+                                            <!-- <SaySomething message="{fixed_audio}" /> -->
+                                            <UpClimbFixedAction action_fixed_str="初始化(双臂归位)" />
+                                            <SaySomething message="动作归位完成" />
+                                            <PublishTaskStateNode node_task_type="guide_explanation" node_name="place_fixed" node_task_state="successed" node_action_content="{fixed_action}" />
+                                        </Sequence>
+                                        <Sequence>
+                                            <PublishTaskStateNode node_task_type="guide_explanation" node_name="place_fixed" node_task_state="failure" node_action_content="{fixed_action}" />
+                                            <ConditionCheckNode is_open_skip="{is_open_skip}"/>
+                                        </Sequence>
+                                    </Fallback>
+                                </Sequence>
+                            </Parallel>
+                        </Sequence>
+                    </Repeat>
+                    <SaySomething message="导航00000000000000000000000" />
+                    <!-- <UpClimbFixedAction action_fixed_str="0" /> -->
+                    <CloudChassisNavNameNode nav_pose_name="{standby_point}" />
+                    <PublishTaskStateNode node_task_type="guide_explanation" node_name="" node_task_state="successed" node_action_content="" node_task_id="{task_id}"/>
+                    <SaySomething message="导览完成" />
+                </Sequence>
+                <Sequence>
+                    <NeedIndex need_bt_index="{bt_tree_index}" index="2" />
+                    <SaySomething message="朗诵诗词" />
+                    <TraverseNavPose current_task="{current_task}" the_number_of_cycles="{the_number_of_cycles}" mark_nav_target_list="{mark_nav_target_list}" audio_list="{audio_list}" fixed_up_action_list="{fixed_up_action_list}" />
+                    <RemovePassedMarkAudiosNode input_mark_audio_list="{audio_list}" output_mark_audio_list="{audio_list}" mark_audio="{fixed_audio}" />
+                    <RemovePassedFixedUpActionNode input_mark_fixed_up_action_list="{fixed_up_action_list}" output_mark_fixed_up_action_list="{fixed_up_action_list}" fixed_action="{fixed_action}" />
+                    <Parallel success_threshold="2">
+                        <!-- <PlayFixedAudioNode fixed_audio="{fixed_audio}" /> -->
+                        <UpClimbFixedAction action_fixed_str="{fixed_action}" />
+                    </Parallel>
+                </Sequence>
+                <Sequence>
+                    <NeedIndex need_bt_index="{bt_tree_index}" index="3" />
+                    <SaySomething message="巡逻巡检" />
+                    <OnSiteInspectionNode current_task="{current_task}" the_number_of_cycles="{the_number_of_cycles}" mark_nav_target_list="{mark_nav_target_list}" audio_list="{audio_list}" fixed_up_action_list="{fixed_up_action_list}" image_video_message_list="{image_video_message_list}" is_audio_played_throughout_the_entire_process="{is_audio_played_throughout_the_entire_process}" full_audio_name="{full_audio_name}" is_the_entire_process_recorded="{is_the_entire_process_recorded}" is_activate_the_nearby_point="{is_activate_the_nearby_point}" nearby_point_radius="{nearby_point_radius}" />
+                    <Parallel success_threshold="2">
+                        <PlayFullAudioNode is_audio_played_throughout_the_entire_process="{is_audio_played_throughout_the_entire_process}"/>
+                        <Repeat num_cycles="{the_number_of_cycles}">
+                            <Sequence>
+                                <IncrementVariableNode input_increment_variable="{input_increment_variable}" output_increment_variable="{output_increment_variable}" />
+                                <RemovePassedMarkPointsNode input_mark_nav_target_list="{mark_nav_target_list}" output_mark_nav_target_list="{mark_nav_target_list}" mark_nav_target="{mark_nav_target}" />
+                                <RemovePassedMarkAudiosNode input_mark_audio_list="{audio_list}" output_mark_audio_list="{audio_list}" mark_audio="{fixed_audio}" />
+                                <RemovePassedFixedUpActionNode input_mark_fixed_up_action_list="{fixed_up_action_list}" output_mark_fixed_up_action_list="{fixed_up_action_list}" fixed_action="{fixed_action}" />
+                                <SaySomething message="解析点位成功，开始导航到点位" />
+                                <CloudChassisNavNameNode nav_pose_name="{mark_nav_target}" />
+                                <ReactiveSequence>
+                                    <NeedIndex need_bt_index="{the_number_of_cycles}" index="1"/>
+                                    <!-- <SendTopic topic_name="/last_cycle_complete" message="循环结束"/> -->
+                                    <SaySomething message="循环结束" />
+                                </ReactiveSequence>
+                            </Sequence>
+                        </Repeat>
+                    </Parallel>
+                </Sequence>
+            </Fallback>
+        </Sequence>
+    </BehaviorTree>
+</root>

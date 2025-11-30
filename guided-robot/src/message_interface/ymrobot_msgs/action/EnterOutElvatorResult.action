@@ -1,0 +1,9 @@
+# Goal: 
+bool success   #是否进入或者出去成功
+---
+# 结果（响应）
+bool success
+string message
+---
+# 反馈
+float32 time_elapsed

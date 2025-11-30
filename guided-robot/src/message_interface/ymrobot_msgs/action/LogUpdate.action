@@ -1,0 +1,11 @@
+# goal
+string log_file_path     # 日志文件路径
+---
+# 结果（响应）
+bool success                 # 是否成功与否
+string message               # 错误或者成功的原因
+float64 total_elapsed_time   #  总时间
+---
+# 反馈
+string message
+float64 total_elapsed_time

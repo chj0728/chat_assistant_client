@@ -1,0 +1,6 @@
+[console_scripts]
+audio_auto = aud_conver.aud_conver:main
+audio_client_node = aud_conver.aud_fix_client:main
+audio_player_node = aud_conver.aud_fix:main
+audio_server = aud_conver.conver_server:main
+

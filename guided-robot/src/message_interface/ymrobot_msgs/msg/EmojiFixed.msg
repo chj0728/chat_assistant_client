@@ -1,0 +1,33 @@
+uint8 NONE                       = 0  # 无命令
+uint8 PAUSE                      = 1  # 暂停操作
+uint8 RESUME                     = 2  # 恢复操作
+uint8 CANCLE                     = 3  # 取消任务操作
+uint8 WAIT                       = 4  # 进入休眠模式
+uint8 FINISH_WAIT                = 5  # 从休眠模式唤醒
+uint8 CHARGE                     = 6  # 回冲
+uint8 FINISH_CHARGE              = 7  # 结束回冲
+uint8 BUILD_MAP                  = 8  # 建图
+uint8 UPLOAD_MAP                 = 9  # 更新地图
+uint8 DOWNLOAD_MAP               = 10 # 下载地图
+uint8 SAVE_MAP                   = 11 # 保存地图
+uint8 RELOCALIZE                 = 12 # 重定位
+uint8 NAVIGATION                 = 13 # 导航
+uint8 MULIT_POINTS_NAVIGATION    = 14 # 多点导航
+uint8 MULIT_FLOOR_NAVIGATION     = 15 # 跨楼层导航（只适合单点）
+uint8 CLOUD_MANUAL_CONTROL_MOVE  = 16 # 云平台手动控制移动
+uint8 DOT                        = 17 # 打点
+uint8 MANUAL_CONTROL_MOVE        = 18 # 遥控控制移动
+uint8 EXE_BEHAVIOR_TREE          = 19 # 执行行为树
+uint8 PLACE_CARTESIAN            = 20 # 末端变化（笛卡尔坐标）导航
+uint8 PLACE_JOINT                = 21 # 关节变化导航
+uint8 PLACE_FIXED                = 22 # 上肢预设动作执行
+uint8 PLACE_CONTROL_MODE         = 23 # 上肢控制模式切换
+uint8 GRASP                      = 24 # 夹爪动作
+uint8 CAMERA                     = 25 # 相机
+uint8 PLAY_FIX_AUDIO             = 26 # 播放固定音频
+uint8 SPEECH_2_TXT               = 27 # 语音转文字（在线和离线都有）
+uint8 EXPRESSION_FIXED           = 28 # 表情预设执行动作
+uint8 WAKE_UP                    = 29 # 唤醒
+uint8 POWER_OFF                  = 30 # 远程关机
+
+uint8       code           # 命令代码

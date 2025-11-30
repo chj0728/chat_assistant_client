@@ -1,0 +1,75 @@
+[0.009s] Invoking command in '/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/ymrobot/ros2_ws_guidance/install/play_mp3_action:/home/ymrobot/ros2_ws_guidance/install/aud_conver:/home/ymrobot/ros2_ws_guidance/install/ymbot_xiaoxue_description:/home/ymrobot/ros2_ws_guidance/install/pedestrian_detector_node:/home/ymrobot/ros2_ws_guidance/install/log_uploader_node:/opt/ros/humble /usr/bin/cmake --build /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking -- -j20 -l20
+[0.041s] [35m[1mConsolidate compiler generated dependencies of target aoa_tracking_node[0m
+[0.053s] [ 50%] [32mBuilding CXX object CMakeFiles/aoa_tracking_node.dir/src/aoa_tracking_node.cpp.o[0m
+[1.350s] In file included from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/logging.hpp:24[m[K,
+[1.350s]                  from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/client.hpp:40[m[K,
+[1.350s]                  from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/callback_group.hpp:24[m[K,
+[1.350s]                  from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/any_executable.hpp:20[m[K,
+[1.350s]                  from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/memory_strategy.hpp:25[m[K,
+[1.350s]                  from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/memory_strategies.hpp:18[m[K,
+[1.350s]                  from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/executor_options.hpp:20[m[K,
+[1.350s]                  from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/executor.hpp:37[m[K,
+[1.350s]                  from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/executors/multi_threaded_executor.hpp:25[m[K,
+[1.350s]                  from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/executors.hpp:21[m[K,
+[1.350s]                  from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/rclcpp.hpp:155[m[K,
+[1.350s]                  from [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:7[m[K,
+[1.350s]                  from [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:5[m[K:
+[1.350s] [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:[m[K In member function ‘[01m[Kvoid ymrobot::AoaTracking::processSingleFrame(const string&)[m[K’:
+[1.350s] [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:176:41:[m[K [01;35m[Kwarning: [m[Kformat ‘[01m[K%f[m[K’ expects a matching ‘[01m[Kdouble[m[K’ argument [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wformat=-Wformat=]8;;[m[K]
+[1.350s]   176 |         RCLCPP_INFO(this->get_logger(), [01;35m[K"relative_x=%0.2f, relative_y=%0.2f"[m[K);
+[1.350s]       |                                         [01;35m[K^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[m[K
+[1.350s] [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:176:57:[m[K [01;36m[Knote: [m[Kformat string is defined here
+[1.351s]   176 |         RCLCPP_INFO(this->get_logger(), "relative_x=[01;36m[K%0.2f[m[K, relative_y=%0.2f");
+[1.351s]       |                                                     [01;36m[K~~~~^[m[K
+[1.351s]       |                                                         [01;36m[K|[m[K
+[1.351s]       |                                                         [01;36m[Kdouble[m[K
+[1.351s] In file included from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/logging.hpp:24[m[K,
+[1.351s]                  from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/client.hpp:40[m[K,
+[1.351s]                  from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/callback_group.hpp:24[m[K,
+[1.351s]                  from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/any_executable.hpp:20[m[K,
+[1.351s]                  from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/memory_strategy.hpp:25[m[K,
+[1.351s]                  from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/memory_strategies.hpp:18[m[K,
+[1.351s]                  from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/executor_options.hpp:20[m[K,
+[1.351s]                  from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/executor.hpp:37[m[K,
+[1.351s]                  from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/executors/multi_threaded_executor.hpp:25[m[K,
+[1.351s]                  from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/executors.hpp:21[m[K,
+[1.351s]                  from [01m[K/opt/ros/humble/include/rclcpp/rclcpp/rclcpp.hpp:155[m[K,
+[1.351s]                  from [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/include/aoa_tracking/aoa_tracking_node.hpp:7[m[K,
+[1.351s]                  from [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:5[m[K:
+[1.351s] [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:176:41:[m[K [01;35m[Kwarning: [m[Kformat ‘[01m[K%f[m[K’ expects a matching ‘[01m[Kdouble[m[K’ argument [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wformat=-Wformat=]8;;[m[K]
+[1.351s]   176 |         RCLCPP_INFO(this->get_logger(), [01;35m[K"relative_x=%0.2f, relative_y=%0.2f"[m[K);
+[1.351s]       |                                         [01;35m[K^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[m[K
+[1.351s] [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:176:75:[m[K [01;36m[Knote: [m[Kformat string is defined here
+[1.351s]   176 |         RCLCPP_INFO(this->get_logger(), "relative_x=%0.2f, relative_y=[01;36m[K%0.2f[m[K");
+[1.351s]       |                                                                       [01;36m[K~~~~^[m[K
+[1.351s]       |                                                                           [01;36m[K|[m[K
+[1.351s]       |                                                                           [01;36m[Kdouble[m[K
+[1.351s] [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:173:16:[m[K [01;35m[Kwarning: [m[Kunused variable ‘[01m[Krelative_x[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-variable-Wunused-variable]8;;[m[K]
+[1.351s]   173 |         double [01;35m[Krelative_x[m[K = distance * cos(elevation_rad) * cos(azimuth_rad);
+[1.351s]       |                [01;35m[K^~~~~~~~~~[m[K
+[1.351s] [01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:174:16:[m[K [01;35m[Kwarning: [m[Kunused variable ‘[01m[Krelative_y[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-variable-Wunused-variable]8;;[m[K]
+[1.351s]   174 |         double [01;35m[Krelative_y[m[K = distance * cos(elevation_rad) * sin(azimuth_rad);
+[1.351s]       |                [01;35m[K^~~~~~~~~~[m[K
+[4.651s] [100%] [32m[1mLinking CXX executable aoa_tracking_node[0m
+[4.904s] [100%] Built target aoa_tracking_node
+[4.912s] Invoked command in '/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/ymrobot/ros2_ws_guidance/install/play_mp3_action:/home/ymrobot/ros2_ws_guidance/install/aud_conver:/home/ymrobot/ros2_ws_guidance/install/ymbot_xiaoxue_description:/home/ymrobot/ros2_ws_guidance/install/pedestrian_detector_node:/home/ymrobot/ros2_ws_guidance/install/log_uploader_node:/opt/ros/humble /usr/bin/cmake --build /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking -- -j20 -l20
+[4.920s] Invoking command in '/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/ymrobot/ros2_ws_guidance/install/play_mp3_action:/home/ymrobot/ros2_ws_guidance/install/aud_conver:/home/ymrobot/ros2_ws_guidance/install/ymbot_xiaoxue_description:/home/ymrobot/ros2_ws_guidance/install/pedestrian_detector_node:/home/ymrobot/ros2_ws_guidance/install/log_uploader_node:/opt/ros/humble /usr/bin/cmake --install /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking
+[4.924s] -- Install configuration: ""
+[4.924s] -- Installing: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/lib/aoa_tracking/aoa_tracking_node
+[4.926s] -- Set runtime path of "/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/lib/aoa_tracking/aoa_tracking_node" to ""
+[4.926s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/ament_index/resource_index/package_run_dependencies/aoa_tracking
+[4.926s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/ament_index/resource_index/parent_prefix_path/aoa_tracking
+[4.926s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/aoa_tracking/environment/ament_prefix_path.sh
+[4.926s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/aoa_tracking/environment/ament_prefix_path.dsv
+[4.926s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/aoa_tracking/environment/path.sh
+[4.927s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/aoa_tracking/environment/path.dsv
+[4.927s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/aoa_tracking/local_setup.bash
+[4.927s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/aoa_tracking/local_setup.sh
+[4.927s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/aoa_tracking/local_setup.zsh
+[4.927s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/aoa_tracking/local_setup.dsv
+[4.927s] -- Installing: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/aoa_tracking/package.dsv
+[4.928s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/ament_index/resource_index/packages/aoa_tracking
+[4.928s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/aoa_tracking/cmake/aoa_trackingConfig.cmake
+[4.928s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/aoa_tracking/cmake/aoa_trackingConfig-version.cmake
+[4.928s] -- Up-to-date: /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/install/aoa_tracking/share/aoa_tracking/package.xml
+[4.929s] Invoked command in '/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/ymrobot/ros2_ws_guidance/install/play_mp3_action:/home/ymrobot/ros2_ws_guidance/install/aud_conver:/home/ymrobot/ros2_ws_guidance/install/ymbot_xiaoxue_description:/home/ymrobot/ros2_ws_guidance/install/pedestrian_detector_node:/home/ymrobot/ros2_ws_guidance/install/log_uploader_node:/opt/ros/humble /usr/bin/cmake --install /home/ymrobot/ros2_ws_guidance/src/aoa_tracking/build/aoa_tracking

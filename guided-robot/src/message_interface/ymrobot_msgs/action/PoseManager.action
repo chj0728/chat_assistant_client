@@ -1,0 +1,14 @@
+# LoadMap.action
+# 目标（请求）
+string pose_name
+string map_name
+string pose_manager_type
+string pose_describe
+---
+# 结果（响应）
+bool success
+string message
+---
+# 反馈
+string message
+bool status

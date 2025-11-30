@@ -1,0 +1,9 @@
+#goal definition
+Command command
+---
+#result definition
+uint8[] results
+builtin_interfaces/Duration total_elapsed_time
+---
+#feedback
+builtin_interfaces/Duration total_elapsed_time

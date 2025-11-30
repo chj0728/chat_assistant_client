@@ -1,0 +1,18 @@
+rosdep install --from-paths src --ignore-src -y
+colcon build
+source /path/to/colcon_ws/install/setup.bash
+
+
+可以通过命令行设置特定参数或加载参数文件，使用默认设置运行。usb_cam_node
+
+我们在目录中提供了一个 “default” params 文件来帮助您入门。您可以根据需要随意修改此文件。usb_cam/config/params.yaml
+
+此外，还提供了一个启动文件，该文件应启动可执行文件以及显示图像主题的附加节点。usb_cam_node_exe
+
+
+# run the executable while passing in parameters via a yaml file
+ros2 run usb_cam usb_cam_node_exe --ros-args --params-file /home/ymrobot/ros2_ws_guidance/src/usb_cam/config/params_1.yaml
+
+ls -l /dev/video* #查看当前相机设备
+
+ffmpeg -f v4l2 -list_formats all -i /dev/video0   #查看设备支持的分辨率

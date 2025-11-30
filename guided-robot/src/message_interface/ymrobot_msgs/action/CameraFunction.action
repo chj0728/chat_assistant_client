@@ -1,0 +1,14 @@
+# goal
+uint8                       camera_task_type     # 相机任务类型 0：拍照 1：录制视频
+uint8                       number_of_photos     # 相机拍照数量
+uint8                       photos_interval     # 拍照间隔 ms
+uint8                       video_recording_time # 录制视频时长
+---
+# 结果（响应）
+bool success                 # 是否成功与否
+string message               # 错误或者成功的原因
+float64 total_elapsed_time   #  总时间
+---
+# 反馈
+string message
+float64 total_elapsed_time

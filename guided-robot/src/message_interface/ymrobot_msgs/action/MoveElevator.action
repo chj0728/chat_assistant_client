@@ -1,0 +1,9 @@
+# ControlRobot.action
+float64 target_x  # 要直线行驶的距离（米）
+float64 target_y     # 要旋转的弧度（弧度制
+float64 target_theta   
+---
+bool success      # 是否成功完成
+string message    # 反馈信息
+---
+float64 progress  # 执行进度（0-100%）

@@ -1,0 +1,11 @@
+# LoadMap.action
+# 目标（请求）
+string map_pgm
+---
+# 结果（响应）
+bool success
+string message
+---
+# 反馈
+string message
+bool status

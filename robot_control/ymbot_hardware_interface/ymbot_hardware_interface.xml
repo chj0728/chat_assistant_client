@@ -1,0 +1,11 @@
+<library path="ymbot_hardware_interface">
+  <class name="ymbot_hardware_interface/ymbot_hardware_interface"
+         type="ymbot_hardware_interface::ymbot_hardware_interface"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>
+      The ymbot_d_hardware_interface using a system hardware interface-type. 
+      It uses position command and position state interface. 
+      The example is the starting point to implement a hardware interface for ymbot_d robots.
+    </description>
+  </class>
+</library>
