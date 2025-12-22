@@ -3,8 +3,11 @@ import wave
 
 import time
 
-# 引入 playsound3 库以支持非阻塞播放
+# 引入 playsound3 库以支持非阻塞播放 wav 文件
 from playsound3 import playsound
+
+TTS_URL = "http://192.168.50.125:50000/inference_zero_shot"
+SAMPLE_RATE = 24000
 
 
 def play_audio(file_path):
@@ -29,9 +32,9 @@ def pcm_to_wav(pcm_bytes, filename, sample_rate=24000):
 def test_post_request_raw():
     """测试 POST 请求，返回原始 PCM 数据"""
     print("\n测试 POST 请求...")
-    text = "你好呀！请问有什么可以帮到你的吗？"
+    text = "你好呀！我是千问，请问有什么可以帮到你的吗？"
 
-    url = "http://192.168.50.125:50000/inference_zero_shot"
+    url = TTS_URL
 
     response = requests.post(url, data={"tts_text": text})
     print(f"状态码: {response.status_code}")
@@ -53,7 +56,7 @@ def test_post_request_wave():
     print("\n测试 POST 请求，返回 wav 格式...")
     text = "你好呀！我是千问，阿里巴巴集团旗下的通义实验室研发的超大规模语言模型。"
 
-    url = "http://192.168.50.125:50000/inference_zero_shot"
+    url = TTS_URL
 
     response = requests.post(url, data={"tts_text": text, "data_type": "wav"})
     print(f"状态码: {response.status_code}")
@@ -88,6 +91,6 @@ if __name__ == "__main__":
     test_post_request_wave()
     play_audio("output_post.wav")
 
-    time.sleep(2)
-    test_post_request_raw()
-    play_audio("output_post.wav")
+    # time.sleep(2)
+    # test_post_request_raw()
+    # play_audio("output_post.wav")

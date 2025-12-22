@@ -14,8 +14,10 @@ conda create -n cosyvoice_client_env python=3.9 -y
 conda activate cosyvoice_client_env
 
 pip install requests playsound3 -i https://mirrors.aliyun.com/pypi/simple/
+pip install sounddevice numpy -i https://mirrors.aliyun.com/pypi/simple/
 ```
-- 运行客户端测试脚本
+
+### 客户端请求返回wav格式音频示例
 ```bash
 python3 client.py
 ```
@@ -32,16 +34,17 @@ POST 请求成功，保存到 output_post.wav
   帧数: 188160
   时长: 7.84 秒
 播放完成！
+```
 
-测试 POST 请求...
-状态码: 200
-Content-Type: audio/raw
-POST 请求成功，保存到 output_post.wav
-音频信息:
-  声道数: 1
-  采样宽度: 2 字节
-  采样率: 24000 Hz
-  帧数: 96000
-  时长: 4.00 秒
-播放完成！
+### 实时播放TTS音频示例
+- 服务端边 yield PCM → 客户端边 recv → 直接送声卡播放
+- 客户端使用 `sounddevice` 库进行实时播放
+```bash
+python3 client_stream.py
+```
+
+
+### 集成到 RealtimeTTSPlayer 示例
+```bash
+python3 ttsplay.py
 ```
