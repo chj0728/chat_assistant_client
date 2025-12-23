@@ -2,6 +2,7 @@ import threading
 import queue
 import requests
 import numpy as np
+from playsound3 import playsound
 import sounddevice as sd
 import time
 
@@ -76,6 +77,22 @@ class RealtimeTTSPlayer:
 
     # ================= TTS =================
 
+    def generate_wav(self, text, filename):
+        """
+        生成 WAV 数据（阻塞）
+        """
+        try:
+            with requests.post(
+                self.tts_url,
+                data={"tts_text": text, "data_type": "wav"},
+            ) as resp:
+                with open(filename, "wb") as f:
+                    f.write(resp.content)
+            print(f"WAV 文件已保存到 {filename}")
+        except Exception as e:
+            print("TTS 请求失败:", e)
+            return None
+
     def speak(self, text, interrupt=True):
         """
         只负责把文本放进队列
@@ -120,6 +137,15 @@ class RealtimeTTSPlayer:
             print("TTS 请求失败:", e)
 
     # ================= 控制 =================
+
+    def play_audio(self, file_path):
+        try:
+            sound = playsound(file_path, block=False)
+            while sound.is_alive():
+                time.sleep(0.1)  # 等待音频播放结束
+            print("播放完成！")
+        except Exception as e:
+            print(f"播放失败: {e}")
 
     def clear(self):
         """打断：清空文本 + 音频"""

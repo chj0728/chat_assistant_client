@@ -72,6 +72,24 @@ def test_post_request_wave():
         print(f"POST 请求失败: {response.text}")
 
 
+def generate_wav(text, filename):
+    """生成 WAV 文件"""
+    url = TTS_URL
+
+    response = requests.post(url, data={"tts_text": text, "data_type": "wav"})
+    print(f"状态码: {response.status_code}")
+    print(f"Content-Type: {response.headers.get('Content-Type')}")
+
+    if response.status_code == 200:
+        with open(filename, "wb") as f:
+            f.write(response.content)
+        print(f"POST 请求成功，保存到 {filename}")
+        # 验证音频文件
+        verify_audio(filename)
+    else:
+        print(f"POST 请求失败: {response.text}")
+
+
 def verify_audio(filename):
     """验证音频文件"""
     try:
@@ -88,9 +106,16 @@ def verify_audio(filename):
 
 if __name__ == "__main__":
 
-    test_post_request_wave()
-    play_audio("output_post.wav")
+    # test_post_request_wave()
+    # play_audio("output_post.wav")
 
     # time.sleep(2)
     # test_post_request_raw()
     # play_audio("output_post.wav")
+
+    generate_wav("你好", "hello.wav")
+    play_audio("hello.wav")
+
+    time.sleep(2)
+    generate_wav("介绍一下你自己吧！", "intro.wav")
+    play_audio("intro.wav")
