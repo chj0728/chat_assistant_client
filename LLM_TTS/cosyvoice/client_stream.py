@@ -16,9 +16,7 @@ def realtime_tts(text):
     ) as stream:
 
         with requests.post(
-            TTS_URL,
-            data={"tts_text": text},
-            stream=True,
+            TTS_URL, data={"tts_text": text, "data_type": "pcm"}, stream=True
         ) as resp:
 
             for chunk in resp.iter_content(chunk_size=4096):

@@ -58,7 +58,7 @@ class RealtimeTTSPlayer:
         )
         self.tts_thread.start()
 
-    # ================= 播放 =================
+    # ================= 私有接口 =================
 
     def _play_loop(self):
         while not self._stop_event.is_set():
@@ -66,6 +66,7 @@ class RealtimeTTSPlayer:
                 data = self.audio_queue.get(timeout=0.1)
             except queue.Empty:
                 self.is_sounding = False
+                time.sleep(0.1)
                 continue
 
             self.is_sounding = True
@@ -75,11 +76,41 @@ class RealtimeTTSPlayer:
             except Exception as e:
                 print("音频播放出错:", e)
 
-    # ================= TTS =================
+    def _tts_loop(self):
+        """
+        严格串行的 TTS worker
+        """
+        while not self._stop_event.is_set():
+            try:
+                text = self.text_queue.get(timeout=0.1)
+            except queue.Empty:
+                time.sleep(0.1)
+                continue
+
+            self._tts_request(text)
+
+    def _tts_request(self, text):
+        """
+        请求 CosyVoice，并顺序推 PCM
+        """
+        try:
+            with requests.post(
+                self.tts_url, data={"tts_text": text, "data_type": "pcm"}, stream=True
+            ) as resp:
+                for chunk in resp.iter_content(chunk_size=self.chunk_size):
+                    if self._stop_event.is_set():
+                        return
+                    if not chunk:
+                        continue
+                    self.audio_queue.put(chunk)
+        except Exception as e:
+            print("TTS 请求失败:", e)
+
+    # ================= 公共接口 =================
 
     def generate_wav(self, text, filename):
         """
-        生成 WAV 数据（阻塞）
+        根据文本生成 WAV 文件（阻塞）
         """
         try:
             with requests.post(
@@ -93,9 +124,9 @@ class RealtimeTTSPlayer:
             print("TTS 请求失败:", e)
             return None
 
-    def speak(self, text, interrupt=True):
+    def speak(self, text, interrupt=False):
         """
-        只负责把文本放进队列
+        只负责把文本放进队列，不阻塞，由后台线程处理并播放语音合成
         """
         if not text.strip():
             return
@@ -105,40 +136,16 @@ class RealtimeTTSPlayer:
 
         self.text_queue.put(text)
 
-    def _tts_loop(self):
-        """
-        严格串行的 TTS worker
-        """
-        while not self._stop_event.is_set():
-            try:
-                text = self.text_queue.get(timeout=0.1)
-            except queue.Empty:
-                continue
-
-            self._tts_request(text)
-
-    def _tts_request(self, text):
-        """
-        请求 CosyVoice，并顺序推 PCM
-        """
-        try:
-            with requests.post(
-                self.tts_url,
-                data={"tts_text": text},
-                stream=True,
-            ) as resp:
-                for chunk in resp.iter_content(chunk_size=self.chunk_size):
-                    if self._stop_event.is_set():
-                        return
-                    if not chunk:
-                        continue
-                    self.audio_queue.put(chunk)
-        except Exception as e:
-            print("TTS 请求失败:", e)
-
-    # ================= 控制 =================
+    def is_active(self):
+        """检查播放器是否正在播放音频"""
+        return (
+            self.is_sounding
+            or not self.text_queue.empty()
+            or not self.audio_queue.empty()
+        )
 
     def play_audio(self, file_path):
+        """播放本地音频文件（阻塞）"""
         try:
             sound = playsound(file_path, block=False)
             while sound.is_alive():
@@ -162,9 +169,13 @@ class RealtimeTTSPlayer:
                 break
 
     def stop(self):
+        """停止播放器"""
         self._stop_event.set()
         self.stream.stop()
         self.stream.close()
+
+        self.play_thread.join()
+        self.tts_thread.join()
 
 
 if __name__ == "__main__":
@@ -173,12 +184,36 @@ if __name__ == "__main__":
         tts_url="http://192.168.50.125:50000/inference_zero_shot"
     )
 
-    tts_player.speak("你好呀！请问有什么可以帮到你的吗？")
+    # real-time TTS with no interruption
+    tts_player.speak("我叫千问，是Qwen3模型驱动的智能助手，专注于回答各种问题。")
+    time.sleep(2)
 
-    time.sleep(5)
+    # tts_player.speak("您好！有什么可以帮助您的吗？")
+    # time.sleep(2)
 
-    tts_player.speak("这是一段新的语音，会打断上一段。")
+    # interrupt with a new sentence
+    # tts_player.speak("这是一段新的语音，会打断之前的播放。", interrupt=True)
+    # time.sleep(2)
 
-    time.sleep(5)
-    tts_player.stop()
+    # # 等待播放完成
+    # while tts_player.is_active():
+    #     time.sleep(0.5)
+    # tts_player.stop()
+
+    # # generate wav file
+    # tts_player.generate_wav(
+    #     "这是通过生成 WAV 文件的方式保存的语音合成示例。",
+    #     "example.wav",
+    # )
+    # # play local audio file
+    # tts_player.play_audio("example.wav")
+
+    # tts_player.generate_wav(
+    #     "你好，千问",
+    #     "hello_qianwen.wav",
+    # )
+    # # play local audio file
+    # tts_player.play_audio("hello_qianwen.wav")
+    # tts_player.stop()
+
     print("播放器已关闭。")
