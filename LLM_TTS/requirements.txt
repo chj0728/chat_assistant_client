@@ -1,0 +1,9 @@
+numpy
+playsound3
+pypinyin
+pyyaml
+requests
+scipy
+sounddevice
+webrtcvad
+setuptools
