@@ -10,14 +10,17 @@ class ASRClient:
 
     def __init__(
         self,
-        server_url: str = "http://127.0.0.1:2002/asr",
+        host="http://192.168.50.125",
+        port=2002,
         timeout: int = 60,
     ):
         """
-        :param server_url: ASR 服务地址
+        :param host: ASR 服务地址
+        :param port: ASR 服务端口
         :param timeout: 请求超时时间（秒）
         """
-        self.server_url = server_url
+        self.host = host
+        self.port = port
         self.timeout = timeout
 
     def recognize(self, wav_path: str) -> str:
@@ -34,7 +37,7 @@ class ASRClient:
             files = {"file": (os.path.basename(wav_path), f, "audio/wav")}
 
             response = requests.post(
-                self.server_url,
+                self.host + ":" + str(self.port) + "/asr",
                 files=files,
                 timeout=self.timeout,
             )
@@ -57,7 +60,8 @@ class ASRClient:
 # ===============================
 if __name__ == "__main__":
     client = ASRClient(
-        server_url="http://192.168.50.125:2002/asr",
+        host="http://192.168.50.125",
+        port=2002,
         timeout=30,
     )
 

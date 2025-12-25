@@ -10,43 +10,33 @@ from scipy.io.wavfile import write
 from queue import Queue
 from pypinyin import pinyin, Style
 
+# 获取当前文件所在目录
+current_dir = os.path.dirname(os.path.abspath(__file__))
+print(f"当前文件目录: {current_dir}")
+
 # -------------------- 初始化 ASR ------------------
 from asr.asrclient import ASRClient
 
 asr_client = ASRClient(
-    server_url="http://192.168.50.125:2002/asr",
+    host="http://192.168.50.125",
+    port=2002,
     timeout=30,
 )
 
 # ----------------- 初始化 LLM -------------------
 from vllm_Qwen.llmclient import LLMClient
 
-llm_url = "http://192.168.50.125:8000/v1/models"
-try:
-    response = requests.get(llm_url)
-    data = response.json()
-
-    # 获取第一个模型的ID
-    model_id = data["data"][0]["id"]
-    print(f"使用的模型ID: {model_id}")
-
-    model_root = data["data"][0]["root"]
-    print(f"模型根目录: {model_root}")
-
-except Exception as e:
-    print(f"获取模型列表失败: {e}")
-    raise e
-
 llm_client = LLMClient(
-    base_url="http://192.168.50.125:8000",
-    model=model_id,
+    host="http://192.168.50.125",
+    port=8000,
 )
 
 # ----------------- 初始化 TTS -------------------
 from cosyvoice.ttsplay import RealtimeTTSPlayer
 
 tts_client = RealtimeTTSPlayer(
-    tts_url="http://192.168.50.125:50000/inference_zero_shot"
+    host="http://192.168.50.125",
+    port=50000,
 )
 
 
@@ -54,10 +44,12 @@ tts_client = RealtimeTTSPlayer(
 AUDIO_RATE = 16000  # 44100  # 16000  # 音频采样率
 AUDIO_CHANNELS = 1  # 单声道
 CHUNK = 1024  # 音频块大小
+
 VAD_MODE = 3  # VAD 模式 (0-3, 数字越大越敏感)
 OUTPUT_DIR = "./output"  # 输出目录
-NO_SPEECH_THRESHOLD = 1  # 无效语音阈值，单位：秒
-NO_REACTIVE_KWS_THRESHOLD = 15  # 多久未检测到唤醒词，重置唤醒词状态，单位：秒
+NO_SPEECH_THRESHOLD = 0.5  # 无效语音阈值，单位：秒
+NO_REACTIVE_KWS_THRESHOLD = 30  # 多久未检测到唤醒词，重置唤醒词状态，单位：秒
+
 folder_path = "./ASR_LLM_TTS/"
 audio_file_count = 0
 audio_file_count_tmp = 0
@@ -131,11 +123,11 @@ def audio_recorder():
         audio_buffer.append(indata.copy())
         frames_collected += frames
 
-        # 每 0.5 秒检测一次 VAD
-        if frames_collected >= int(0.5 * AUDIO_RATE):
+        # 每 0.02 秒检测一次 VAD
+        if frames_collected >= int(0.02 * AUDIO_RATE):
             audio_np = np.concatenate(audio_buffer, axis=0)
 
-            # 转成 int16 bytes（保持你原来的 VAD 接口）
+            # 转成 int16 bytes（保持原来的 VAD 接口）
             audio_int16 = (audio_np * 32767).astype(np.int16).tobytes()
 
             vad_result = check_vad_activity(audio_int16)
@@ -145,7 +137,8 @@ def audio_recorder():
                 last_active_time = time.time()
                 segments_to_save.append((audio_int16, time.time()))
             else:
-                print("静音中...")
+                pass
+                # print("静音中...")
 
             audio_buffer.clear()
             frames_collected = 0
@@ -157,7 +150,7 @@ def audio_recorder():
                 save_audio_only()
                 last_active_time = time.time()
 
-        time.sleep(0.02)
+        time.sleep(0.01)
 
     with sd.InputStream(
         samplerate=AUDIO_RATE,
@@ -326,7 +319,7 @@ def Inference(audio_path):
             print("未检测到唤醒词，忽略本次输入")
             flag_KWS = 0
             failed_enable_kws_count += 1
-            if failed_enable_kws_count >= 3:
+            if failed_enable_kws_count >= 2:
                 tts_client.play_audio("./wavs/enable_kws.wav")
                 failed_enable_kws_count = 0
             return

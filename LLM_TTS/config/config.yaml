@@ -1,0 +1,32 @@
+ASR:
+  host: "http://192.168.50.125"
+  port: 2002
+
+LLM:
+  host: "http://192.168.50.125"
+  port: 8000
+  system_prompt: "你叫小白"
+
+TTS:
+  host: "http://192.168.50.125"
+  port: 50000
+
+Audio:
+  rate: 16000
+  channels: 1
+  chunk_size: 1024
+
+VAD:
+  output_dir: "output" # VAD 结果保存目录
+  mode : 3  # VAD 模式 (0-3, 数字越小越敏感)  
+  no_speech_threshold: 0.2  # 静音持续多长时间后认为一句话结束 (秒)
+  reactive_kws_threshold: 30  # 多久未检测到唤醒词，重置唤醒词状态，单位：秒
+
+  min_recording_duration: 0.40   # 最短录音时长 (秒)
+  max_recording_duration: 10  # 最大录音时长 (秒)
+
+KWS:
+  enable: true
+  wake_word: "你好小白"
+  wake_word_pinyin: "ni hao xiao bai"
+

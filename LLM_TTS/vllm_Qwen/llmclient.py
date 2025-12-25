@@ -5,17 +5,19 @@ import json
 class LLMClient:
     def __init__(
         self,
-        base_url,
-        model,
+        host,
+        port,
         temperature=0.6,
         top_p=0.95,
         top_k=20,
         max_tokens=256,
         enable_thinking=False,
-        timeout=120,
+        timeout=60,
     ):
-        self.base_url = base_url.rstrip("/")
-        self.model = model
+        self.host = host
+        self.port = port
+        self.model_id = None
+        self.model_root = None
         self.timeout = timeout
 
         self.generation_config = {
@@ -32,6 +34,22 @@ class LLMClient:
             "role": "system",
             "content": "你叫千问，是一个由Qwen3模型驱动的智能助手，擅长回答各种问题，提供有用的信息，并与用户进行自然的对话。",
         }
+
+        self.llm_url = f"{self.host}:{self.port}/v1/models"
+        try:
+            response = requests.get(self.llm_url)
+            data = response.json()
+
+            # 获取第一个模型的ID
+            self.model_id = data["data"][0]["id"]
+            print(f"使用的模型ID: {self.model_id}")
+
+            self.model_root = data["data"][0]["root"]
+            print(f"模型根目录: {self.model_root}")
+
+        except Exception as e:
+            print(f"获取模型列表失败: {e}")
+            raise e
 
     def reset(self):
         """清空上下文"""
@@ -59,13 +77,13 @@ class LLMClient:
         self.add_user_message(user_text)
 
         payload = {
-            "model": self.model,
+            "model": self.model_id,
             "messages": self.messages,
             **self.generation_config,
         }
 
         response = requests.post(
-            f"{self.base_url}/v1/chat/completions",
+            f"{self.host}:{self.port}/v1/chat/completions",
             headers={"Content-Type": "application/json"},
             data=json.dumps(payload),
             stream=True,
@@ -101,27 +119,9 @@ class LLMClient:
 
 if __name__ == "__main__":
 
-    # 获取模型id 和 模型列表
-    api_url = "http://192.168.50.125:8000/v1/models"
-
-    try:
-        response = requests.get(api_url)
-        data = response.json()
-
-        # 获取第一个模型的ID
-        model_id = data["data"][0]["id"]
-        print(f"使用的模型ID: {model_id}")
-
-        model_root = data["data"][0]["root"]
-        print(f"模型根目录: {model_root}")
-
-    except Exception as e:
-        print(f"获取模型列表失败: {e}")
-        raise e
-
     llm_client = LLMClient(
-        base_url="http://192.168.50.125:8000",
-        model=model_id,
+        host="http://192.168.50.125",
+        port=8000,
     )
     print("开始与模型对话（输入 exit 或 quit 退出）")
 

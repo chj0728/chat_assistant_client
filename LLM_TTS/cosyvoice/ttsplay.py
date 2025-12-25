@@ -18,12 +18,14 @@ import sounddevice as sd
 class RealtimeTTSPlayer:
     def __init__(
         self,
-        tts_url,
+        host,
+        port,
         sample_rate=24000,
         channels=1,
         chunk_size=4096,
     ):
-        self.tts_url = tts_url
+        self.host = host
+        self.port = port
         self.sample_rate = sample_rate
         self.channels = channels
         self.chunk_size = chunk_size
@@ -95,7 +97,9 @@ class RealtimeTTSPlayer:
         """
         try:
             with requests.post(
-                self.tts_url, data={"tts_text": text, "data_type": "pcm"}, stream=True
+                self.host + f":{self.port}/inference_zero_shot",
+                data={"tts_text": text, "data_type": "pcm"},
+                stream=True,
             ) as resp:
                 for chunk in resp.iter_content(chunk_size=self.chunk_size):
                     if self._stop_event.is_set():
@@ -114,7 +118,7 @@ class RealtimeTTSPlayer:
         """
         try:
             with requests.post(
-                self.tts_url,
+                self.host + f":{self.port}/inference_zero_shot",
                 data={"tts_text": text, "data_type": "wav"},
             ) as resp:
                 with open(filename, "wb") as f:
@@ -181,7 +185,8 @@ class RealtimeTTSPlayer:
 if __name__ == "__main__":
 
     tts_player = RealtimeTTSPlayer(
-        tts_url="http://192.168.50.125:50000/inference_zero_shot"
+        host="http://192.168.50.125",
+        port=50000,
     )
 
     # real-time TTS with no interruption
@@ -195,18 +200,18 @@ if __name__ == "__main__":
     # tts_player.speak("这是一段新的语音，会打断之前的播放。", interrupt=True)
     # time.sleep(2)
 
-    # # 等待播放完成
-    # while tts_player.is_active():
-    #     time.sleep(0.5)
+    # 等待播放完成
+    while tts_player.is_active():
+        time.sleep(0.5)
     # tts_player.stop()
 
-    # # generate wav file
-    # tts_player.generate_wav(
-    #     "这是通过生成 WAV 文件的方式保存的语音合成示例。",
-    #     "example.wav",
-    # )
-    # # play local audio file
-    # tts_player.play_audio("example.wav")
+    # generate wav file
+    tts_player.generate_wav(
+        "这是通过生成 WAV 文件的方式保存的语音合成示例。",
+        "example.wav",
+    )
+    # play local audio file
+    tts_player.play_audio("example.wav")
 
     # tts_player.generate_wav(
     #     "你好，千问",
