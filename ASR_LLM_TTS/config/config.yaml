@@ -27,6 +27,6 @@ VAD:
 
 KWS:
   enable: true
-  wake_word: "你好小白"
-  wake_word_pinyin: "ni hao xiao bai"
+  # wake_word: "你好小白"
+  wake_word_pinyin: "hi xiao bai"
 

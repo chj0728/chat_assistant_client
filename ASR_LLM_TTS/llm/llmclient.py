@@ -1,7 +1,15 @@
 import requests
 import json
 
-from .tools.functions import get_shanghai_time
+import sys
+import os
+
+# 获取当前文件所在目录
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# 将当前目录添加到Python路径（如果是相对导入）
+sys.path.append(current_dir)
+
+from tools.functions import get_shanghai_time, get_current_location
 
 TOOLS = [
     {
@@ -15,11 +23,24 @@ TOOLS = [
                 "required": [],
             },
         },
-    }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_current_location",
+            "description": "获取当前位置信息",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+    },
 ]
 
 TOOL_FUNCTIONS = {
     "get_shanghai_time": get_shanghai_time,
+    "get_current_location": get_current_location,
 }
 
 
@@ -57,8 +78,8 @@ class LLMClient:
         self.system_prompt = {
             "role": "system",
             "content": (
-                "你叫千问，是一个由Qwen3模型驱动的智能助手。"
-                "只要用户提出的问题需要使用工具（例如查询时间），你就应该调用相应的工具，"
+                "你是一个由Qwen3模型驱动的智能助手,请将回答控制在100字以内。"
+                "只要用户提出的问题需要使用工具（例如查询时间或位置信息），你就应该调用相应的工具，"
                 "然后将工具返回的信息整合到你的回答中。"
             ),
         }
@@ -150,7 +171,7 @@ class LLMClient:
                 # print("收到新token:", delta["content"])
                 yield delta["content"]
 
-            # ========= 工具调用（关键修正） =========
+            # ========= 工具调用 =========
             if "tool_calls" in delta:
                 # print("收到工具调用数据:", delta["tool_calls"])
                 for call in delta["tool_calls"]:

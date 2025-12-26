@@ -73,9 +73,9 @@ class ChatAssistant:
         )
         self.vad = webrtcvad.Vad(self.vad_mode)
 
-        self.set_kws = self.configs.get("KWS", {}).get("wake_word", "你好小白")
+        # self.set_kws = self.configs.get("KWS", {}).get("wake_word", "你好小白")
         self.set_kws_pinyin = self.configs.get("KWS", {}).get(
-            "wake_word_pinyin", "ni hao xiao bai"
+            "wake_word_pinyin", "hi xiao bai"
         )
         self.flag_kws_used = self.configs.get("KWS", {}).get("enable", True)
         self.flag_kws = 0  # 唤醒词检测标志
