@@ -24,7 +24,7 @@ asr_client = ASRClient(
 )
 
 # ----------------- 初始化 LLM -------------------
-from vllm_Qwen.llmclient import LLMClient
+from llm.llmclient import LLMClient
 
 llm_client = LLMClient(
     host="http://192.168.50.125",
@@ -32,7 +32,7 @@ llm_client = LLMClient(
 )
 
 # ----------------- 初始化 TTS -------------------
-from cosyvoice.ttsplay import RealtimeTTSPlayer
+from tts.ttsplay import RealtimeTTSPlayer
 
 tts_client = RealtimeTTSPlayer(
     host="http://192.168.50.125",

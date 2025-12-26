@@ -4,8 +4,8 @@ import numpy as np
 
 from scipy.io.wavfile import write
 
-from cosyvoice.ttsplay import RealtimeTTSPlayer
-from vllm_Qwen.llmclient import LLMClient
+from tts.ttsplay import RealtimeTTSPlayer
+from llm.llmclient import LLMClient
 from asr.asrclient import ASRClient
 
 
@@ -37,15 +37,16 @@ if __name__ == "__main__":
 
     # ----- 初始化 ASR -----
     asr_client = ASRClient(
-        server_url="http://192.168.50.125:2002/asr",
+        host="http://192.168.50.125",
+        port=2002,
         timeout=30,
     )
 
     # ----- 初始化 TTS -----
     tts_player = RealtimeTTSPlayer(
-        tts_url="http://192.168.50.125:50000/inference_zero_shot"
+        host="http://192.168.50.125",
+        port=50000,
     )
-
     # tts_player.generate_wav("你好呀！请问有什么可以帮到你的吗？", "welcome.wav")
     # tts_player.play_audio("welcome.wav")
 
@@ -68,8 +69,8 @@ if __name__ == "__main__":
         raise e
 
     llm_client = LLMClient(
-        base_url="http://192.168.50.125:8000",
-        model=model_id,
+        host="http://192.168.50.125",
+        port=8000,
     )
 
     print("开始与模型对话（输入 exit 或 quit 退出）")

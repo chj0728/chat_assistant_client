@@ -12,8 +12,8 @@ from queue import Queue
 from pypinyin import pinyin, Style
 
 from asr.asrclient import ASRClient
-from vllm_Qwen.llmclient import LLMClient
-from cosyvoice.ttsplay import RealtimeTTSPlayer
+from llm.llmclient import LLMClient
+from tts.ttsplay import RealtimeTTSPlayer
 
 # 获取当前文件所在目录
 current_dir = os.path.dirname(os.path.abspath(__file__))
