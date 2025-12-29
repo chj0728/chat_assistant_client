@@ -32,7 +32,7 @@ def pcm_to_wav(pcm_bytes, filename, sample_rate=24000):
 def test_post_request_raw():
     """测试 POST 请求，返回原始 PCM 数据"""
     print("\n测试 POST 请求...")
-    text = "你好呀！我是千问，请问有什么可以帮到你的吗？"
+    text = "你好呀！我是千问，阿里巴巴集团旗下的通义实验室研发的超大规模语言模型。请问有什么可以帮到你的吗？"
 
     url = TTS_URL
 
@@ -106,16 +106,16 @@ def verify_audio(filename):
 
 if __name__ == "__main__":
 
-    # test_post_request_wave()
-    # play_audio("output_post.wav")
-
-    # time.sleep(2)
-    # test_post_request_raw()
-    # play_audio("output_post.wav")
-
-    generate_wav("你好", "hello.wav")
-    play_audio("hello.wav")
+    test_post_request_wave()
+    play_audio("output_post.wav")
 
     time.sleep(2)
-    generate_wav("介绍一下你自己吧！", "intro.wav")
-    play_audio("intro.wav")
+    test_post_request_raw()
+    play_audio("output_post.wav")
+
+    # generate_wav("你好", "hello.wav")
+    # play_audio("hello.wav")
+
+    # time.sleep(2)
+    # generate_wav("介绍一下你自己吧！", "intro.wav")
+    # play_audio("intro.wav")

@@ -17,7 +17,13 @@ if __name__ == "__main__":
     llm_client = LLMClient(
         host="http://192.168.50.125",
         port=8000,
+        temperature=0.6,  # 设置较低的温度以获得更确定性的回答
+        top_p=0.9,  # 使用 nucleus 采样
+        top_k=50,  # 使用 top-k 采样
+        max_tokens=256,
     )
+
+    llm_client.add_system_prompt("你叫小白")
 
     print("开始与模型对话（输入 exit 或 quit 退出）")
 
@@ -30,6 +36,10 @@ if __name__ == "__main__":
 
         buffer = ""
 
+        if tts_player.is_active():
+            print("\n⚠️ 上一次的语音还没播完，请稍等片刻...\n")
+            continue
+
         for token in llm_client.stream_chat(user_input):
             print(token, end="", flush=True)
             buffer += token
@@ -40,7 +50,7 @@ if __name__ == "__main__":
             #     and len(buffer) >= 15
             #     and not buffer.rstrip().endswith(("*", "#", '"', "”"))
             # ):
-        tts_player.speak(buffer.strip(), interrupt=False)
+        tts_player.speak(buffer.strip(), interrupt=True)
         # buffer = ""
 
         # 循环结束后，把剩余的也说出来

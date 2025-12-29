@@ -5,6 +5,7 @@ import numpy as np
 from playsound3 import playsound
 import sounddevice as sd
 import time
+import wave
 
 
 import queue
@@ -34,8 +35,10 @@ class RealtimeTTSPlayer:
         self.text_queue = queue.Queue()
         self.audio_queue = queue.Queue()
 
+        self.sound = None
         self.is_sounding = False
         self._stop_event = threading.Event()
+        self._interrupt_event = threading.Event()
 
         # 音频输出流
         self.stream = sd.OutputStream(
@@ -64,8 +67,13 @@ class RealtimeTTSPlayer:
 
     def _play_loop(self):
         while not self._stop_event.is_set():
+
+            if self._interrupt_event.is_set():
+                self.is_sounding = False
+                time.sleep(0.1)
+                continue
             try:
-                data = self.audio_queue.get(timeout=0.1)
+                data = self.audio_queue.get(timeout=0.5)
             except queue.Empty:
                 self.is_sounding = False
                 time.sleep(0.1)
@@ -84,7 +92,7 @@ class RealtimeTTSPlayer:
         """
         while not self._stop_event.is_set():
             try:
-                text = self.text_queue.get(timeout=0.1)
+                text = self.text_queue.get(timeout=0.5)
             except queue.Empty:
                 time.sleep(0.1)
                 continue
@@ -132,11 +140,14 @@ class RealtimeTTSPlayer:
         """
         只负责把文本放进队列，不阻塞，由后台线程处理并播放语音合成
         """
+        # 清除打断标志
+        self._interrupt_event.clear()
+
         if not text.strip():
             return
 
         if interrupt:
-            self.clear()
+            self.interrupt()
 
         self.text_queue.put(text)
 
@@ -144,22 +155,41 @@ class RealtimeTTSPlayer:
         """检查播放器是否正在播放音频"""
         return (
             self.is_sounding
-            or not self.text_queue.empty()
-            or not self.audio_queue.empty()
+            # or not self.text_queue.empty()
+            # or not self.audio_queue.empty()
+            # or not self.stream.stopped
+            # not self.stream.stopped
+            # self.stream.active
+            # self.sound is not None
+            # and self.sound.is_alive()
         )
 
-    def play_audio(self, file_path):
+    def play_audio(self, file_path, block=False):
         """播放本地音频文件（阻塞）"""
         try:
-            sound = playsound(file_path, block=False)
-            while sound.is_alive():
+            self.sound = playsound(file_path, block=block)
+            currunt_time = time.time()
+            while self.sound.is_alive():
                 time.sleep(0.1)  # 等待音频播放结束
+                if time.time() - currunt_time > 30:
+                    print("播放超时，强制结束")
+                    break
             print("播放完成！")
         except Exception as e:
             print(f"播放失败: {e}")
 
-    def clear(self):
+    def play_audio_from_pcm(self, pcm_bytes):
+        """从 PCM 字节数据播放音频（阻塞）"""
+        with wave.open("temp.wav", "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(self.sample_rate)
+            wf.writeframes(pcm_bytes)
+        self.play_audio("temp.wav")
+
+    def interrupt(self):
         """打断：清空文本 + 音频"""
+        self._interrupt_event.set()
         while not self.text_queue.empty():
             try:
                 self.text_queue.get_nowait()
@@ -171,6 +201,7 @@ class RealtimeTTSPlayer:
                 self.audio_queue.get_nowait()
             except queue.Empty:
                 break
+        self._interrupt_event.clear()
 
     def stop(self):
         """停止播放器"""
@@ -191,7 +222,7 @@ if __name__ == "__main__":
 
     # real-time TTS with no interruption
     tts_player.speak("我叫千问，是Qwen3模型驱动的智能助手，专注于回答各种问题。")
-    time.sleep(2)
+    time.sleep(1)
 
     # tts_player.speak("您好！有什么可以帮助您的吗？")
     # time.sleep(2)
@@ -202,6 +233,7 @@ if __name__ == "__main__":
 
     # 等待播放完成
     while tts_player.is_active():
+        print("正在播放...")
         time.sleep(0.5)
     # tts_player.stop()
 

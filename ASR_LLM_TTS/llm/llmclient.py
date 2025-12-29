@@ -78,9 +78,11 @@ class LLMClient:
         self.system_prompt = {
             "role": "system",
             "content": (
-                "你是一个由Qwen3模型驱动的智能助手,请将回答控制在100字以内。"
-                "只要用户提出的问题需要使用工具（例如查询时间或位置信息），你就应该调用相应的工具，"
-                "然后将工具返回的信息整合到你的回答中。"
+                "1. 你是一个由Qwen3模型驱动的智能语音助手，"
+                "2. 你需要简洁且有礼貌地回答用户的问题，请保持回答简短且有条理，控制在100字以内。"
+                "3. 当用户提出问题时，如果需要调用工具来获取信息，请根据需要选择合适的工具进行调用。"
+                "4. 如果你不确定答案，可以礼貌地告诉用户你不知道，而不是编造答案。"
+                "5. 在回答中尽量避免使用标点符号结尾，以便更自然地进行语音合成。"
             ),
         }
 
@@ -113,11 +115,16 @@ class LLMClient:
         self.messages.clear()
         self.messages = [self.system_prompt, {"role": "user", "content": text}]
 
-        # 限制回答长度
-        self.messages.append({"role": "system", "content": "请将回答控制在100字以内。"})
+        # # 限制回答长度
+        # self.messages.append({"role": "system", "content": "请将回答控制在100字以内。"})
 
     def add_assistant_message(self, text: str):
         self.messages.append({"role": "assistant", "content": text})
+
+    def add_system_prompt(self, text: str):
+        # append system prompt
+        self.system_prompt["content"] += "\n" + text
+        print("新增系统提示词:", text)
 
     def stream_chat(self, user_text: str):
         """
@@ -250,7 +257,10 @@ class LLMClient:
 
 if __name__ == "__main__":
 
-    llm_client = LLMClient(host="http://192.168.50.125", port=8000, temperature=0.1)
+    llm_client = LLMClient(host="http://192.168.50.125", port=8000, temperature=0.6)
+
+    llm_client.add_system_prompt("你叫小白")
+
     print("开始与模型对话（输入 exit 或 quit 退出）")
 
     while True:

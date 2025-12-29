@@ -10,6 +10,8 @@ import webrtcvad
 from scipy.io.wavfile import write
 from queue import Queue
 from pypinyin import pinyin, Style
+from enum import Enum
+
 
 from asr.asrclient import ASRClient
 from llm.llmclient import LLMClient
@@ -22,12 +24,19 @@ config_yaml_path = os.path.join(current_dir, "config", "config.yaml")
 print(f"配置文件路径: {config_yaml_path}")
 
 
+class AssistantState(Enum):
+    IDLE = 0  # 空闲 / 待唤醒
+    LISTENING = 1  # 正在录音（等用户说话）
+    THINKING = 2  #  ASR / LLM 推理中
+    SPEAKING = 3  # TTS 播放中
+
+
 class ChatAssistant:
     def __init__(self, config_yaml: str):
 
         self.configs = None
 
-        # 读取配置文件
+        # ----------- 读取配置文件 -----------
         try:
             with open(config_yaml, "r", encoding="utf-8") as f:
                 self.configs = yaml.safe_load(f)
@@ -36,6 +45,7 @@ class ChatAssistant:
             print(f"读取配置文件失败: {e}")
             raise e
 
+        # ----------- 初始化ASR、LLM、TTS客户端 -----------
         self.asr_client = ASRClient(
             host=self.configs.get("ASR", {}).get("host", "http://192.168.50.125"),
             port=self.configs.get("ASR", {}).get("port", 2002),
@@ -55,6 +65,7 @@ class ChatAssistant:
             port=self.configs.get("TTS", {}).get("port", 50000),
         )
 
+        # ----------- 初始化音频录制和VAD参数 -----------
         self.audio_rate = self.configs.get("Audio", {}).get("rate", 16000)
         self.audio_channels = self.configs.get("Audio", {}).get("channels", 1)
         self.chunk_size = self.configs.get("Audio", {}).get("chunk_size", 1024)
@@ -78,7 +89,6 @@ class ChatAssistant:
         )
         self.vad = webrtcvad.Vad(self.vad_mode)
 
-        # self.set_kws = self.configs.get("KWS", {}).get("wake_word", "你好小白")
         self.set_kws_pinyin = self.configs.get("KWS", {}).get(
             "wake_word_pinyin", "hi xiao bai"
         )
@@ -93,6 +103,12 @@ class ChatAssistant:
         self.last_vad_end_time = 0  # 上次保存的 VAD 有效段结束时间
         self.last_llm_time = time.time()  # 上次与 LLM 交互的时间
         self.audio_file_count = 0
+
+        self.state = AssistantState.IDLE
+        self.state_lock = threading.Lock()
+
+        # 是否允许 ASR
+        self.enable_asr = True
 
     def extract_chinese_and_convert_to_pinyin(self, input_string):
         """
@@ -136,6 +152,11 @@ class ChatAssistant:
         只负责把 segments_to_save 中的音频保存为 wav 文件
         """
         if not self.segments_to_save:
+            return None
+
+        if self.tts_client.is_active():
+            print("TTS 播放中，跳过保存音频")
+            self.segments_to_save.clear()
             return None
 
         # ===============================
@@ -185,8 +206,8 @@ class ChatAssistant:
             wf.setsampwidth(2)  # int16
             wf.setframerate(self.audio_rate)
             wf.writeframes(b"".join(audio_frames))
-
-        print(f"音频已保存: {audio_output_path}")
+        print(f"检测到有效语音，已保存音频文件: {audio_output_path}")
+        # print(f"音频已保存: {audio_output_path}")
 
         # ===============================
         # 5. 更新状态
@@ -197,14 +218,15 @@ class ChatAssistant:
         self.segments_to_save.clear()
 
         # 使用线程执行推理
-        threading.Thread(target=self.Inference, args=(audio_output_path,)).start()
+        # temp_audio_output_path = "/home/xuyao/chj/ws/ymbot/ASR_LLM_TTS/tts/intro.wav"
+        # threading.Thread(target=self.Inference, args=(audio_output_path,)).start()
+        # 直接调用函数
+        self.Inference(audio_output_path)
 
         return audio_output_path
 
     # 音频录制线程
     def audio_recorder_thread(self):
-        global audio_queue, recording_active
-        global last_active_time, segments_to_save, last_vad_end_time
 
         audio_buffer = []
         frames_collected = 0
@@ -212,7 +234,6 @@ class ChatAssistant:
 
         def audio_callback(indata, frames, time_info, status):
             nonlocal audio_buffer, frames_collected
-            global last_active_time, segments_to_save, last_vad_end_time
 
             if status:
                 print("Audio status:", status)
@@ -234,7 +255,7 @@ class ChatAssistant:
                 vad_result = self.check_vad_activity(audio_int16)
 
                 if vad_result:
-                    print("检测到语音活动")
+                    print("检测到语音活动...")
                     self.last_active_time = time.time()
                     self.segments_to_save.append((audio_int16, time.time()))
                 else:
@@ -267,25 +288,53 @@ class ChatAssistant:
 
         print("音频录制已停止")
 
-    def Inference(self, audio_path):
+    def asr_infer(self, audio_path):
         """
-        负责调用 ASR、LLM、TTS 完成一次完整的交互
+        负责调用 ASR 完成语音识别
         """
-        print(f"开始处理音频: {audio_path}")
-
-        # ----- ASR -----
+        print(f"开始 ASR 识别: {audio_path}")
         try:
             asr_text = self.asr_client.recognize(audio_path).strip()
+            print(f"ASR 识别结果: {asr_text}")
+            return asr_text
         except Exception as e:
             print(f"ASR 识别失败: {e}")
-            return
+            return ""
 
-        if not asr_text:
-            print("ASR 未识别到有效文本")
-            return
-        print(f"ASR 识别结果: {asr_text}")
+    def llm_infer(self, asr_text):
+        """
+        负责调用 LLM 完成对话
+        """
+        print("开始与模型对话...")
+        llm_response = ""
+        try:
+            for token in self.llm_client.stream_chat(asr_text):
+                print(token, end="", flush=True)
+                llm_response += token
+            print("\n")
+            return llm_response
+        except Exception as e:
+            print(f"LLM 对话失败: {e}")
+            return ""
 
-        # ----- 唤醒词检测 -----
+    def tts_infer(self, llm_response):
+        """
+        负责调用 TTS 完成语音合成和播放
+        """
+        print("开始 TTS 播放...")
+        try:
+            self.tts_client.speak(llm_response.strip())
+            return True
+        except Exception as e:
+            print(f"TTS 播放失败: {e}")
+            return False
+
+    def kws_infer(self, asr_text):
+        """
+        负责唤醒词检测
+        """
+
+        # 判断是否需要重置唤醒词状态
         if time.time() - self.last_llm_time > self.reactive_kws_threshold:
             print("长时间未与 LLM 交互，重置唤醒词状态")
             self.flag_kws = 0
@@ -305,36 +354,39 @@ class ChatAssistant:
                 self.flag_kws = 0
                 self.failed_enable_kws_count += 1
                 if self.failed_enable_kws_count >= 2:
-                    self.tts_client.play_audio(current_dir + "/wavs/enable_kws.wav")
+                    self.tts_client.play_audio(
+                        current_dir + "/wavs/enable_kws.wav", block=True
+                    )
                     self.failed_enable_kws_count = 0
-                return
+                return False
+        return True
 
-        # ----- LLM -----
-        print("开始与模型对话...")
-        llm_response = ""
-        try:
-            for token in self.llm_client.stream_chat(asr_text):
-                print(token, end="", flush=True)
-                llm_response += token
-            print("\n")
-        except Exception as e:
-            print(f"LLM 对话失败: {e}")
+    def Inference(self, audio_path):
+        """
+        负责调用 ASR、LLM、TTS 完成一次完整的交互
+        """
+
+        # asr 识别
+        asr_text = self.asr_infer(audio_path)
+        if not asr_text:
+            print("ASR 未识别到有效文本")
             return
 
+        # 唤醒词检测
+        if not self.kws_infer(asr_text):
+            return
+
+        # llm 对话
+        llm_response = self.llm_infer(asr_text)
         if not llm_response:
-            print("LLM 未生成有效响应")
-            return
-
-        # ----- TTS -----
-        try:
-            self.tts_client.speak(llm_response.strip())
-
-            # 更新最近与 LLM 交互时间
             self.last_llm_time = time.time()
-
-        except Exception as e:
-            print(f"TTS 播放失败: {e}")
             return
+
+        # tts 播放
+        self.tts_infer(llm_response)
+        self.last_llm_time = time.time()
+
+        print("本次交互完成，等待下一次录音...")
 
 
 if __name__ == "__main__":
