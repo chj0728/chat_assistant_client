@@ -328,10 +328,8 @@ def Inference(audio_path):
     print("开始与模型对话...")
     llm_response = ""
     try:
-        for token in llm_client.stream_chat(asr_text):
-            print(token, end="", flush=True)
-            llm_response += token
-        print("\n")
+        llm_response = llm_client.chat_response(asr_text)
+        print(f"LLM 回复: {llm_response}")
     except Exception as e:
         print(f"LLM 对话失败: {e}")
         return

@@ -32,25 +32,25 @@ if __name__ == "__main__":
         if user_input.lower() in ["exit", "quit"]:
             break
 
-        print("助手：", end="", flush=True)
-
-        buffer = ""
+        llm_response = ""
 
         if tts_player.is_active():
             print("\n⚠️ 上一次的语音还没播完，请稍等片刻...\n")
             continue
 
-        for token in llm_client.stream_chat(user_input):
-            print(token, end="", flush=True)
-            buffer += token
+        # for token in llm_client.stream_chat(user_input):
+        #     print(token, end="", flush=True)
+        #     buffer += token
+        llm_response = llm_client.chat_response(user_input)
+        print(f"助手：{llm_response}")
 
-            # # ===== 更稳健的断句条件 =====
-            # if (
-            #     token in ["。", "！", "？"]
-            #     and len(buffer) >= 15
-            #     and not buffer.rstrip().endswith(("*", "#", '"', "”"))
-            # ):
-        tts_player.speak(buffer.strip(), interrupt=True)
+        # # ===== 更稳健的断句条件 =====
+        # if (
+        #     token in ["。", "！", "？"]
+        #     and len(buffer) >= 15
+        #     and not buffer.rstrip().endswith(("*", "#", '"', "”"))
+        # ):
+        tts_player.speak(llm_response.strip(), interrupt=True)
         # buffer = ""
 
         # 循环结束后，把剩余的也说出来

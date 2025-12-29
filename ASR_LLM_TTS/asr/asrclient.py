@@ -65,6 +65,6 @@ if __name__ == "__main__":
         timeout=30,
     )
 
-    wav = "/home/xuyao/chj/ws/ymbot/LLM_TTS/asr/welcome.wav"
+    wav = "/home/xuyao/chj/ws/ymbot/ASR_LLM_TTS/asr/welcome.wav"
     text = client.recognize(wav)
     print("ASR Result:", text)
