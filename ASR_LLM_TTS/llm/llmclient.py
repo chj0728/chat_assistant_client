@@ -4,6 +4,8 @@ import json
 import sys
 import os
 
+from logger import logger
+
 MAX_CHARS = 500  # 上下文最大字符数限制
 
 # 获取当前文件所在目录
@@ -106,13 +108,16 @@ class LLMClient:
 
             # 获取第一个模型的ID
             self.model_id = data["data"][0]["id"]
-            print(f"使用的模型ID: {self.model_id}")
+            # print(f"使用的模型ID: {self.model_id}")
+            logger.info(f"使用的模型ID: {self.model_id}")
 
             self.model_root = data["data"][0]["root"]
-            print(f"模型根目录: {self.model_root}")
+            # print(f"模型根目录: {self.model_root}")
+            logger.info(f"模型根目录: {self.model_root}")
 
         except Exception as e:
-            print(f"获取模型列表失败: {e}")
+            # print(f"获取模型列表失败: {e}")
+            logger.error(f"获取模型列表失败: {e}")
             raise e
 
     def reset_history(self):
@@ -136,13 +141,15 @@ class LLMClient:
     def add_system_prompt(self, text: str):
         # append system prompt
         self.system_prompt["content"] += "\n" + text
-        print("新增系统提示词:", text)
+        # print("新增系统提示词:", text)
+        logger.info("新增系统提示词: %s", text)
 
     def _trim_history(self):
         total = sum(len(m.get("content", "")) for m in self.history)
 
         while total > MAX_CHARS and len(self.history) > 2:
-            print("修剪历史记录，当前字符数:", total)
+            # print("修剪历史记录，当前字符数:", total)
+            logger.info("修剪历史记录，当前字符数: %d", total)
             removed = self.history.pop(0)
             total -= len(removed.get("content", ""))
 
@@ -243,7 +250,8 @@ class LLMClient:
             func_name = call["name"]
             arguments_str = call["arguments"]
 
-            print(f"\n调用工具: {func_name}，参数: {arguments_str}")
+            # print(f"\n调用工具: {func_name}，参数: {arguments_str}")
+            logger.info(f"调用工具: {func_name}，参数: {arguments_str}")
 
             # 解析参数（假设是 JSON 格式）
             try:
@@ -315,7 +323,8 @@ if __name__ == "__main__":
 
     llm_client.add_system_prompt("你叫小白")
 
-    print("开始与模型对话（输入 exit 或 quit 退出）")
+    # print("开始与模型对话（输入 exit 或 quit 退出）")
+    logger.info("开始与模型对话（输入 exit 或 quit 退出）")
 
     while True:
         user_input = input("你：").strip()
@@ -336,6 +345,8 @@ if __name__ == "__main__":
 
         assistant_reply = llm_client.chat_response(user_input)
         print(assistant_reply)
-        print("\n")
+        # print("\n")
+        llm_client.history.append({"role": "user", "content": user_input})
 
-    print("对话结束")
+    # print("对话结束")
+    logger.info("对话结束")

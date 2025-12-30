@@ -17,6 +17,8 @@ from asr.asrclient import ASRClient
 from llm.llmclient import LLMClient
 from tts.ttsplay import RealtimeTTSPlayer
 
+from logger import logger
+
 # 获取当前文件所在目录
 current_dir = os.path.dirname(os.path.abspath(__file__))
 print(f"当前文件目录: {current_dir}")
@@ -40,9 +42,11 @@ class ChatAssistant:
         try:
             with open(config_yaml, "r", encoding="utf-8") as f:
                 self.configs = yaml.safe_load(f)
-                print(f"配置文件内容:\n{self.configs}")
+                # print(f"配置文件内容:\n{self.configs}")
+                logger.info(f"配置文件内容:\n{self.configs}")
         except Exception as e:
-            print(f"读取配置文件失败: {e}")
+            # print(f"读取配置文件失败: {e}")
+            logger.error(f"读取配置文件失败: {e}")
             raise e
 
         # ----------- 初始化ASR、LLM、TTS客户端 -----------
@@ -87,6 +91,7 @@ class ChatAssistant:
         self.max_recording_duration = self.configs.get("VAD", {}).get(
             "max_recording_duration", 10.0
         )
+        self.pause_duration = self.configs.get("VAD", {}).get("pause_duration", 1.5)
         self.vad = webrtcvad.Vad(self.vad_mode)
 
         self.set_kws_pinyin = self.configs.get("KWS", {}).get(
@@ -154,8 +159,21 @@ class ChatAssistant:
         if not self.segments_to_save:
             return None
 
+        # ===============================
+        # TTS 播放中，跳过保存
+        # ===============================
         if self.tts_client.is_active():
-            print("TTS 播放中，跳过保存音频")
+            # print("TTS 播放中，跳过保存音频")
+            logger.warning("TTS 播放中，跳过保存音频")
+            self.segments_to_save.clear()
+            self.last_llm_time = time.time()
+            return None
+        # ===============================
+        # 缓冲时间判断
+        # ===============================
+        current_time = time.time()
+        if current_time - self.last_llm_time < self.pause_duration:
+            logger.warning("缓冲时间内，跳过保存音频")
             self.segments_to_save.clear()
             return None
 
@@ -167,26 +185,31 @@ class ChatAssistant:
 
         # 检查是否与之前的片段重叠
         if self.saved_intervals and self.saved_intervals[-1][1] >= start_time:
-            print("当前片段与之前片段重叠，跳过保存")
+            # print("当前片段与之前片段重叠，跳过保存")
+            logger.warning("当前片段与之前片段重叠，跳过保存")
             self.segments_to_save.clear()
             return None
 
         # 检查录音时长是否满足要求
         recording_duration = end_time - start_time
-        print(f"录音时长: {recording_duration:.2f} 秒")
+        # print(f"录音时长: {recording_duration:.2f} 秒")
+        logger.info(f"录音时长: {recording_duration:.2f} 秒")
         if recording_duration < self.min_recording_duration:
-            print("录音时长过短，跳过保存")
+            # print("录音时长过短，跳过保存")
+            logger.warning("录音时长过短，跳过保存")
             self.segments_to_save.clear()
             return None
         if recording_duration > self.max_recording_duration:
-            print("录音时长过长，跳过保存")
+            # print("录音时长过长，跳过保存")
+            logger.warning("录音时长过长，跳过保存")
             self.segments_to_save.clear()
             return None
 
         # ===============================
         # 1. 生成输出路径
         # ===============================
-        self.audio_file_count += 1
+        # self.audio_file_count += 1
+        self.audio_file_count = 1
         audio_output_path = os.path.join(
             self.output_dir, f"audio_{self.audio_file_count}.wav"
         )
@@ -206,7 +229,8 @@ class ChatAssistant:
             wf.setsampwidth(2)  # int16
             wf.setframerate(self.audio_rate)
             wf.writeframes(b"".join(audio_frames))
-        print(f"检测到有效语音，已保存音频文件: {audio_output_path}")
+        # print(f"检测到有效语音，已保存音频文件: {audio_output_path}")
+        logger.info(f"检测到有效语音，已保存音频文件: {audio_output_path}")
         # print(f"音频已保存: {audio_output_path}")
 
         # ===============================
@@ -230,7 +254,8 @@ class ChatAssistant:
 
         audio_buffer = []
         frames_collected = 0
-        print("音频录制已开始（sounddevice）")
+        # print("音频录制已开始（sounddevice）")
+        logger.info("音频录制已开始（sounddevice）")
 
         def audio_callback(indata, frames, time_info, status):
             nonlocal audio_buffer, frames_collected
@@ -245,8 +270,8 @@ class ChatAssistant:
             audio_buffer.append(indata.copy())
             frames_collected += frames
 
-            # 每 0.02 秒检测一次 VAD
-            if frames_collected >= int(0.02 * self.audio_rate):
+            # 每 0.05 秒检测一次 VAD
+            if frames_collected >= int(0.05 * self.audio_rate):
                 audio_np = np.concatenate(audio_buffer, axis=0)
 
                 # 转成 int16 bytes（保持原来的 VAD 接口）
@@ -255,7 +280,8 @@ class ChatAssistant:
                 vad_result = self.check_vad_activity(audio_int16)
 
                 if vad_result:
-                    print("检测到语音活动...")
+                    # print("检测到语音活动...")
+                    logger.info("检测到语音活动...")
                     self.last_active_time = time.time()
                     self.segments_to_save.append((audio_int16, time.time()))
                 else:
@@ -286,7 +312,8 @@ class ChatAssistant:
             while self.recording_active:
                 time.sleep(0.1)
 
-        print("音频录制已停止")
+        # print("音频录制已停止")
+        logger.info("音频录制已停止")
 
     def asr_infer(self, audio_path):
         """
@@ -295,10 +322,12 @@ class ChatAssistant:
         print(f"开始 ASR 识别: {audio_path}")
         try:
             asr_text = self.asr_client.recognize(audio_path).strip()
-            print(f"ASR 识别结果: {asr_text}")
+            # print(f"ASR 识别结果: {asr_text}")
+            logger.info(f"ASR 识别结果: {asr_text}")
             return asr_text
         except Exception as e:
-            print(f"ASR 识别失败: {e}")
+            # print(f"ASR 识别失败: {e}")
+            logger.error(f"ASR 识别失败: {e}")
             return ""
 
     def llm_infer(self, asr_text):
@@ -309,22 +338,26 @@ class ChatAssistant:
         llm_response = ""
         try:
             llm_response = self.llm_client.chat_response(asr_text)
-            print(f"LLM 回复: {llm_response}")
+            # print(f"LLM 回复: {llm_response}")
+            logger.info(f"LLM 回复: {llm_response}")
             return llm_response
         except Exception as e:
-            print(f"LLM 对话失败: {e}")
+            # print(f"LLM 对话失败: {e}")
+            logger.error(f"LLM 对话失败: {e}")
             return ""
 
     def tts_infer(self, llm_response):
         """
         负责调用 TTS 完成语音合成和播放
         """
-        print("开始 TTS 播放...")
+        # print("开始 TTS 播放...")
+        logger.info("开始 TTS 播放...")
         try:
             self.tts_client.speak(llm_response.strip())
             return True
         except Exception as e:
-            print(f"TTS 播放失败: {e}")
+            # print(f"TTS 播放失败: {e}")
+            logger.error(f"TTS 播放失败: {e}")
             return False
 
     def kws_infer(self, asr_text):
@@ -334,21 +367,25 @@ class ChatAssistant:
 
         # 判断是否需要重置唤醒词状态
         if time.time() - self.last_llm_time > self.reactive_kws_threshold:
-            print("长时间未与 LLM 交互，重置唤醒词状态")
+            # print("长时间未与 LLM 交互，重置唤醒词状态")
+            logger.info("长时间未与 LLM 交互，重置唤醒词状态")
             self.flag_kws = 0
 
         # 判断是否启用唤醒词检测
         if self.flag_kws_used and self.flag_kws == 0:
             pinyin_text = self.extract_chinese_and_convert_to_pinyin(asr_text)
-            print(f"转换为拼音: {pinyin_text}")
+            # print(f"转换为拼音: {pinyin_text}")
+            logger.info(f"转换为拼音: {pinyin_text}")
 
             if self.set_kws_pinyin in pinyin_text:
-                print("检测到唤醒词，开始与模型对话")
+                # print("检测到唤醒词，开始与模型对话")
+                logger.info("检测到唤醒词，开始与模型对话")
                 self.flag_kws = 1
                 self.last_llm_time = time.time()
                 self.failed_enable_kws_count = 0
             else:
-                print("未检测到唤醒词，忽略本次输入")
+                # print("未检测到唤醒词，忽略本次输入")
+                logger.info("未检测到唤醒词，忽略本次输入")
                 self.flag_kws = 0
                 self.failed_enable_kws_count += 1
                 if self.failed_enable_kws_count >= 2:
@@ -367,7 +404,8 @@ class ChatAssistant:
         # asr 识别
         asr_text = self.asr_infer(audio_path)
         if not asr_text:
-            print("ASR 未识别到有效文本")
+            # print("ASR 未识别到有效文本")
+            logger.warning("ASR 未识别到有效文本")
             return
 
         # 唤醒词检测
@@ -384,7 +422,8 @@ class ChatAssistant:
         self.tts_infer(llm_response)
         self.last_llm_time = time.time()
 
-        print("本次交互完成，等待下一次录音...")
+        # print("本次交互完成，等待下一次录音...")
+        logger.info("本次交互完成，等待下一次录音...")
 
 
 if __name__ == "__main__":
@@ -393,7 +432,8 @@ if __name__ == "__main__":
         config_yaml=config_yaml_path,
     )
 
-    print("ChatAssistant 初始化完成")
+    # print("ChatAssistant 初始化完成")
+    logger.info("ChatAssistant 初始化完成")
 
     try:
         # 启动音频录制线程
@@ -407,7 +447,9 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print("停止录音...")
+        # print("停止录音...")
+        logger.info("停止录音...")
         assistant.recording_active = False
         recorder_thread.join()
-        print("程序已退出")
+        # print("程序已退出")
+        logger.info("程序已退出")

@@ -2,6 +2,8 @@ from tts.ttsplay import RealtimeTTSPlayer
 
 from llm.llmclient import LLMClient
 
+from logger import logger
+
 import requests
 
 if __name__ == "__main__":
@@ -25,7 +27,8 @@ if __name__ == "__main__":
 
     llm_client.add_system_prompt("你叫小白")
 
-    print("开始与模型对话（输入 exit 或 quit 退出）")
+    # print("开始与模型对话（输入 exit 或 quit 退出）")
+    logger.info("开始与模型对话（输入 exit 或 quit 退出）")
 
     while True:
         user_input = input("你：").strip()
@@ -35,7 +38,8 @@ if __name__ == "__main__":
         llm_response = ""
 
         if tts_player.is_active():
-            print("\n⚠️ 上一次的语音还没播完，请稍等片刻...\n")
+            # print("\n⚠️ 上一次的语音还没播完，请稍等片刻...\n")
+            logger.warning("⚠️ 上一次的语音还没播完，请稍等片刻...")
             continue
 
         # for token in llm_client.stream_chat(user_input):
@@ -59,4 +63,5 @@ if __name__ == "__main__":
 
         print("\n")
 
-    print("对话结束")
+    # print("对话结束")
+    logger.info("对话结束")

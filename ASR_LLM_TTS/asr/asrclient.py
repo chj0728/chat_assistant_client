@@ -2,6 +2,8 @@ import os
 import requests
 from typing import Optional
 
+from logger import logger
+
 
 class ASRClient:
     """
@@ -43,6 +45,8 @@ class ASRClient:
             )
 
         if response.status_code != 200:
+
+            logger.error(f"ASR server error [{response.status_code}]: {response.text}")
             raise RuntimeError(
                 f"ASR server error [{response.status_code}]: {response.text}"
             )
@@ -50,6 +54,7 @@ class ASRClient:
         result = response.json()
 
         if result.get("code") != 0:
+            logger.error(f"ASR failed: {result.get('msg')}")
             raise RuntimeError(f"ASR failed: {result.get('msg')}")
 
         return result.get("text", "")
@@ -67,4 +72,5 @@ if __name__ == "__main__":
 
     wav = "/home/xuyao/chj/ws/ymbot/ASR_LLM_TTS/asr/welcome.wav"
     text = client.recognize(wav)
-    print("ASR Result:", text)
+    # print("ASR Result:", text)
+    logger.info(f"ASR Result: {text}")

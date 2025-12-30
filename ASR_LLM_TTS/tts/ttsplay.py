@@ -15,6 +15,8 @@ import requests
 import numpy as np
 import sounddevice as sd
 
+from logger import logger
+
 
 class RealtimeTTSPlayer:
     def __init__(
@@ -84,7 +86,8 @@ class RealtimeTTSPlayer:
                 pcm = np.frombuffer(data, dtype=np.int16)
                 self.stream.write(pcm)
             except Exception as e:
-                print("音频播放出错:", e)
+                # print("音频播放出错:", e)
+                logger.error(f"音频播放出错: {e}")
 
     def _tts_loop(self):
         """
@@ -116,7 +119,8 @@ class RealtimeTTSPlayer:
                         continue
                     self.audio_queue.put(chunk)
         except Exception as e:
-            print("TTS 请求失败:", e)
+            # print("TTS 请求失败:", e)
+            logger.error(f"TTS 请求失败: {e}")
 
     # ================= 公共接口 =================
 
@@ -131,9 +135,12 @@ class RealtimeTTSPlayer:
             ) as resp:
                 with open(filename, "wb") as f:
                     f.write(resp.content)
-            print(f"WAV 文件已保存到 {filename}")
+            # print(f"WAV 文件已保存到 {filename}")
+            logger.info(f"WAV 文件已保存到 {filename}")
+            return filename
         except Exception as e:
-            print("TTS 请求失败:", e)
+            # print("TTS 请求失败:", e)
+            logger.error(f"TTS 请求失败: {e}")
             return None
 
     def speak(self, text, interrupt=False):
@@ -174,9 +181,11 @@ class RealtimeTTSPlayer:
                 if time.time() - currunt_time > 30:
                     print("播放超时，强制结束")
                     break
-            print("播放完成！")
+            # print("播放完成！")
+            logger.info(f"播放{file_path}完成！")
         except Exception as e:
-            print(f"播放失败: {e}")
+            # print(f"播放失败: {e}")
+            logger.error(f"播放{file_path}失败: {e}")
 
     def play_audio_from_pcm(self, pcm_bytes):
         """从 PCM 字节数据播放音频（阻塞）"""
@@ -233,7 +242,8 @@ if __name__ == "__main__":
 
     # 等待播放完成
     while tts_player.is_active():
-        print("正在播放...")
+        # print("正在播放...")
+        logger.info("正在播放...")
         time.sleep(0.5)
     # tts_player.stop()
 
@@ -253,4 +263,5 @@ if __name__ == "__main__":
     # tts_player.play_audio("hello_qianwen.wav")
     # tts_player.stop()
 
-    print("播放器已关闭。")
+    # print("播放器已关闭。")
+    logger.info("播放器已关闭。")
