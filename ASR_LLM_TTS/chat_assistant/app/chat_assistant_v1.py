@@ -42,6 +42,11 @@ class ChatAssistant:
         self.config_yaml = config_path
         self.configs = None
 
+        self.asr_text = ""
+        self.asr_text_queue = Queue()
+        self.llm_response = ""
+        self.llm_response_queue = Queue()
+
         self.load_config_and_initialize()
 
         # 启动音频录制线程
@@ -355,6 +360,17 @@ class ChatAssistant:
         except Exception as e:
             return False
 
+    def play_audio(self, audio_path):
+        """
+        负责调用 TTS 播放音频文件
+        """
+        print(f"开始播放音频文件: {audio_path}")
+        try:
+            self.tts_client.play_audio(audio_path, block=True)
+            return True
+        except Exception as e:
+            return False
+
     def asr_infer(self, audio_path):
         """
         负责调用 ASR 完成语音识别
@@ -442,28 +458,37 @@ class ChatAssistant:
         """
 
         # asr 识别
-        asr_text = self.asr_infer(audio_path)
-        if not asr_text:
-            # print("ASR 未识别到有效文本")
+        self.asr_text = self.asr_infer(audio_path)
+        if not self.asr_text:
             logger.warning("ASR 未识别到有效文本")
             return
+        ## 更新asr_text队列
+        self.asr_text_queue.put(self.asr_text)
 
         # 唤醒词检测
-        if not self.kws_infer(asr_text):
+        if not self.kws_infer(self.asr_text):
             return
 
         # llm 对话
-        llm_response = self.llm_infer(asr_text)
-        if not llm_response:
+        self.llm_response = self.llm_infer(self.asr_text)
+        if not self.llm_response:
             self.last_llm_time = time.time()
             return
+        ## 更新llm_response队列
+        self.llm_response_queue.put(self.llm_response)
 
         # tts 播放
-        self.tts_infer(llm_response)
+        self.tts_infer(self.llm_response)
         self.last_llm_time = time.time()
 
         # print("本次交互完成，等待下一次录音...")
         logger.info("本次交互完成，等待下一次录音...")
+
+        # 控制队列大小，最多保留最新的10条记录
+        while self.asr_text_queue.qsize() > 10:
+            self.asr_text_queue.get(timeout=0.01)
+        while self.llm_response_queue.qsize() > 10:
+            self.llm_response_queue.get(timeout=0.01)
 
 
 if __name__ == "__main__":

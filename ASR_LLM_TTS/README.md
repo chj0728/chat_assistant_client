@@ -78,6 +78,21 @@ cd  ASR_LLM_TTS
 ./run.sh
 ```
 
+## Avilable topics
+- `/asr_result` (std_msgs/msg/String)：发布识别到的文本
+- `/llm_result` (std_msgs/msg/String)：发布大语言模型生成的文本
+
+```bash
+# 订阅示例
+ros2 topic echo /asr_result 
+data: 你好，小白。
+---
+data: 介绍一下自己。
+---
+data: 查询当前时间。
+---
+```
+
 ## Available services
 
 
@@ -86,13 +101,34 @@ cd  ASR_LLM_TTS
 ros2 service call /reload_config std_srvs/srv/Trigger
 ```
 
-### 激活
+### 激活对话助手
 ```bash 
 ros2 service call /activate_assistant std_srvs/srv/Trigger
 ```
-### 停止
+### 停止对话助手
 ```bash 
 ros2 service call /idle_assistant std_srvs/srv/Trigger
+```
+
+### 播放音频文件（传入音频文件路径，播放该音频文件）
+- 服务名称：`/play_audio_file`
+- 服务类型：`chat_assistant_interfaces/srv/GetString`
+- 请求参数
+  - `string input`：音频文件的完整路径
+  - 返回参数
+    - `bool success`：表示服务调用是否成功
+    - `string message`：播放结果描述 or 错误信息  
+- 请求示例
+```bash 
+ros2 service call /play_audio_file chat_assistant_interfaces/srv/GetString "{input: '/home/xuyao/chj/ws/ymbot/ASR_LLM_TTS/chat_assistant/wavs/enable_kws.wav'}"
+```
+  - 响应示例
+```bash
+waiting for service to become available...
+requester: making request: chat_assistant_interfaces.srv.GetString_Request(input='/home/xuyao/chj/ws/ymbot/ASR_LLM_TTS/chat_assistant/wavs/enable_kws.wav')
+
+response:
+chat_assistant_interfaces.srv.GetString_Response(success=True, message='音频播放成功')
 ```
 
 ### 单独调用语音识别服务（传入音频文件路径，返回识别文本）

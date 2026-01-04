@@ -1,8 +1,10 @@
 import os
+import time
 
 import rclpy
 from rclpy.node import Node
 
+from std_msgs.msg import String
 from std_srvs.srv import Trigger
 from chat_assistant_interfaces.srv import GetString, GenerateWav
 
@@ -19,6 +21,13 @@ class ChatAssistantNode(Node):
 
         self.init_params()
 
+        # 创建话题发布者
+        ## 发布asr识别结果话题
+        self.asr_publisher = self.create_publisher(String, "asr_result", 10)
+
+        ## 发布 llm 生成结果话题
+        self.llm_publisher = self.create_publisher(String, "llm_result", 10)
+
         # 创建服务
         ## 重新加载配置文件参数
         self.create_service(Trigger, "reload_config", self.handle_reload_config)
@@ -29,6 +38,9 @@ class ChatAssistantNode(Node):
         )
         ## 将聊天助手置于空闲状态服务
         self.create_service(Trigger, "idle_assistant", self.handle_idle_assistant)
+
+        ## 接收audio_path，直接播放音频服务
+        self.create_service(GetString, "play_audio_file", self.handle_play_audio)
 
         ## 接收audio_path，只调用 ASR 完成语音识别，返回文本结果服务
         self.create_service(GetString, "asr_infer", self.handle_asr_infer)
@@ -43,6 +55,34 @@ class ChatAssistantNode(Node):
         self.create_service(
             GenerateWav, "tts_generate_wav", self.handle_tts_generate_wav
         )
+
+    def handle_play_audio(self, request, response):
+        """
+        接收audio_path，直接播放音频服务
+        """
+        audio_path = request.input
+
+        # 检查 audio_path 是否有效存在
+        if os.path.exists(audio_path) is False:
+            response.success = False
+            response.message = f"音频路径无效: {audio_path}"
+            logger.error(response.message)
+            return response
+
+        logger.info(f"收到播放音频请求，音频路径: {audio_path}")
+        play_result = self.chat_assistant.play_audio(audio_path)
+
+        # 检查播放结果是否有效
+        if play_result is False:
+            response.success = False
+            response.message = "音频未能成功播放"
+            logger.error(response.message)
+            return response
+
+        response.success = True
+        response.message = "音频播放成功"
+        logger.info("音频播放成功")
+        return response
 
     def handle_tts_generate_wav(self, request, response):
         """
@@ -185,7 +225,33 @@ def main(args=None):
     chat_assistant_node = ChatAssistantNode()
 
     try:
-        rclpy.spin(chat_assistant_node)
+        while rclpy.ok():
+
+            if chat_assistant_node.chat_assistant.asr_text_queue.empty() is False:
+                asr_text = chat_assistant_node.chat_assistant.asr_text_queue.get(
+                    timeout=0.05
+                )
+
+                # 发布 asr_text 到话题
+                msg = String()
+                msg.data = asr_text
+                chat_assistant_node.asr_publisher.publish(msg)
+                logger.info(f"发布 ASR 识别结果到话题: {asr_text}")
+
+            if chat_assistant_node.chat_assistant.llm_response_queue.empty() is False:
+                llm_response = (
+                    chat_assistant_node.chat_assistant.llm_response_queue.get(
+                        timeout=0.05
+                    )
+                )
+
+                # 发布 llm_response 到话题
+                msg = String()
+                msg.data = llm_response
+                chat_assistant_node.llm_publisher.publish(msg)
+                logger.info(f"发布 LLM 生成结果到话题: {llm_response}")
+
+            rclpy.spin_once(chat_assistant_node, timeout_sec=0.05)
 
     except KeyboardInterrupt:
         if rclpy.ok():  # 检查上下文是否仍然有效
