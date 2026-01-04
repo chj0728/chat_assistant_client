@@ -21,26 +21,40 @@ from logger import logger
 
 # 获取当前文件所在目录
 current_dir = os.path.dirname(os.path.abspath(__file__))
-print(f"当前文件目录: {current_dir}")
-config_yaml_path = os.path.join(current_dir, "config", "config.yaml")
-print(f"配置文件路径: {config_yaml_path}")
+# print(f"当前文件目录: {current_dir}")
+logger.info(f"当前文件目录: {current_dir}")
+config_yaml_path = os.path.join(current_dir, "../config/config.yaml")
+# print(f"配置文件路径: {config_yaml_path}")
+logger.info(f"配置文件路径: {config_yaml_path}")
 
 
 class AssistantState(Enum):
     IDLE = 0  # 空闲 / 待唤醒
-    LISTENING = 1  # 正在录音（等用户说话）
-    THINKING = 2  #  ASR / LLM 推理中
-    SPEAKING = 3  # TTS 播放中
+    ACTIVE = 1  # 激活状态
+    LISTENING = 2  # 正在录音（等用户说话）
+    THINKING = 3  #  ASR / LLM 推理中
+    SPEAKING = 4  # TTS 播放中
 
 
 class ChatAssistant:
-    def __init__(self, config_yaml: str):
+    def __init__(self, config_path: str):
 
+        self.config_yaml = config_path
         self.configs = None
+
+        self.load_config_and_initialize()
+
+        # 启动音频录制线程
+        self.recorder_thread = threading.Thread(
+            target=self.audio_recorder_thread, daemon=True
+        )
+        self.recorder_thread.start()
+
+    def load_config_and_initialize(self):
 
         # ----------- 读取配置文件 -----------
         try:
-            with open(config_yaml, "r", encoding="utf-8") as f:
+            with open(self.config_yaml, "r", encoding="utf-8") as f:
                 self.configs = yaml.safe_load(f)
                 # print(f"配置文件内容:\n{self.configs}")
                 logger.info(f"配置文件内容:\n{self.configs}")
@@ -254,14 +268,15 @@ class ChatAssistant:
 
         audio_buffer = []
         frames_collected = 0
-        # print("音频录制已开始（sounddevice）")
         logger.info("音频录制已开始（sounddevice）")
 
         def audio_callback(indata, frames, time_info, status):
             nonlocal audio_buffer, frames_collected
 
-            if status:
-                print("Audio status:", status)
+            if self.state == AssistantState.IDLE:
+                logger.info("当前状态为空闲，停止录音")
+                time.sleep(1.0)
+                return
 
             if not self.recording_active:
                 raise sd.CallbackStop()
@@ -270,8 +285,8 @@ class ChatAssistant:
             audio_buffer.append(indata.copy())
             frames_collected += frames
 
-            # 每 0.05 秒检测一次 VAD
-            if frames_collected >= int(0.05 * self.audio_rate):
+            # 每 0.10 秒检测一次 VAD
+            if frames_collected >= int(0.10 * self.audio_rate):
                 audio_np = np.concatenate(audio_buffer, axis=0)
 
                 # 转成 int16 bytes（保持原来的 VAD 接口）
@@ -310,10 +325,35 @@ class ChatAssistant:
             callback=audio_callback,
         ):
             while self.recording_active:
-                time.sleep(0.1)
+                time.sleep(1)
 
         # print("音频录制已停止")
         logger.info("音频录制已停止")
+
+    def activate(self):
+        """
+        激活助手，进入 ACTIVE 状态
+        """
+        with self.state_lock:
+            self.state = AssistantState.ACTIVE
+
+    def idle(self):
+        """
+        进入空闲状态
+        """
+        with self.state_lock:
+            self.state = AssistantState.IDLE
+
+    def generate_wav(self, text, output_path):
+        """
+        负责调用 TTS 完成文本转语音，保存音频文件
+        """
+        print(f"开始 TTS 生成 WAV 文件: {output_path}")
+        try:
+            tts_result = self.tts_client.generate_wav(text, output_path)
+            return tts_result
+        except Exception as e:
+            return False
 
     def asr_infer(self, audio_path):
         """
@@ -428,28 +468,24 @@ class ChatAssistant:
 
 if __name__ == "__main__":
 
-    assistant = ChatAssistant(
-        config_yaml=config_yaml_path,
-    )
+    assistant = ChatAssistant(config_path=config_yaml_path)
 
     # print("ChatAssistant 初始化完成")
     logger.info("ChatAssistant 初始化完成")
 
     try:
-        # 启动音频录制线程
-        recorder_thread = threading.Thread(
-            target=assistant.audio_recorder_thread, daemon=True
-        )
-        recorder_thread.start()
+        # # 启动音频录制线程
+        # recorder_thread = threading.Thread(
+        #     target=assistant.audio_recorder_thread, daemon=True
+        # )
+        # recorder_thread.start()
 
         print("按 Ctrl+C 停止程序")
 
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        # print("停止录音...")
         logger.info("停止录音...")
         assistant.recording_active = False
-        recorder_thread.join()
-        # print("程序已退出")
+        assistant.recorder_thread.join()
         logger.info("程序已退出")

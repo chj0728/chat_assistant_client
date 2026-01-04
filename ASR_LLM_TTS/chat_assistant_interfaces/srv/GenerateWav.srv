@@ -1,0 +1,5 @@
+string input_text  # input string to be processed
+string input_filename  # input wav filename to be saved
+---
+bool success          # indicate successful run of triggered service
+string message        # informational, e.g. for error messages
