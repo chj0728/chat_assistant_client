@@ -1,5 +1,5 @@
 #!/bin/bash
-sleep 1
+sleep 10
 # ===================== 配置区 =====================
 ENABLE_SCRIPT=true
 CURRENT_USER=$(id -un 2>/dev/null || echo "unknown_user") #POSIX标准

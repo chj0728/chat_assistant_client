@@ -132,6 +132,9 @@ class ChatAssistant:
         self.reactive_kws_threshold = self.configs.get("VAD", {}).get(
             "reactive_kws_threshold", 30
         )
+        self.decibel_threshold = self.configs.get("VAD", {}).get(
+            "decibel_threshold", -40
+        )
         self.min_recording_duration = self.configs.get("VAD", {}).get(
             "min_recording_duration", 1.0
         )
@@ -322,19 +325,33 @@ class ChatAssistant:
             if frames_collected >= int(0.10 * self.audio_rate):
                 audio_np = np.concatenate(audio_buffer, axis=0)
 
+                # ------------ 分贝阈值判断 ------------
+                # decibel_threshold = -40  # 设定分贝阈值，可以根据需要调整
+                rms = np.sqrt(np.mean(audio_np**2))
+                db = 20 * np.log10(rms + 1e-10)  # 避免 log(0)
+                # logger.info(f"当前音频分贝: {db:.2f} dB")
+
+                if db < self.decibel_threshold:
+                    # logger.info(
+                    #     "音频低于分贝阈值{:.2f} dB，认为是静音".format(
+                    #         self.decibel_threshold
+                    #     )
+                    # )
+                    audio_buffer.clear()
+                    frames_collected = 0
+                    return
+
                 # 转成 int16 bytes（保持原来的 VAD 接口）
                 audio_int16 = (audio_np * 32767).astype(np.int16).tobytes()
 
                 vad_result = self.check_vad_activity(audio_int16)
 
                 if vad_result:
-                    # print("检测到语音活动...")
                     logger.info("检测到语音活动...")
                     self.last_active_time = time.time()
                     self.segments_to_save.append((audio_int16, time.time()))
                 else:
                     pass
-                    # print("静音中...")
 
                 audio_buffer.clear()
                 frames_collected = 0
@@ -348,7 +365,6 @@ class ChatAssistant:
                     # save_audio_video()
                     self.save_audio_only()
                     self.last_active_time = time.time()
-            time.sleep(0.01)
 
         with sd.InputStream(
             samplerate=self.audio_rate,
