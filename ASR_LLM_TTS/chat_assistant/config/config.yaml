@@ -5,7 +5,7 @@ ASR:
 LLM:
   host: "http://192.168.50.125"
   port: 8000
-  system_prompt: "你叫小白"
+  system_prompt: "你叫小特"
 
 TTS:
   host: "http://192.168.50.125"
@@ -21,14 +21,14 @@ VAD:
   mode : 3  # VAD 模式 (0-3, 数字越小越敏感)  
   no_speech_threshold: 0.4  # 静音持续多长时间后认为一句话结束 (秒)
   reactive_kws_threshold: 30  # 多久未检测到唤醒词，重置唤醒词状态，单位：秒
-  decibel_threshold: -38  # 分贝阈值，低于此值认为是静音 (dB)
+  decibel_threshold: -40  # 分贝阈值，低于此值认为是静音 (dB)
 
-  min_recording_duration: 0.40   # 最短有效录音时长 (秒)
+  min_recording_duration: 0.30   # 最短有效录音时长 (秒)
   max_recording_duration: 10  # 最大有效录音时长 (秒)
   
   pause_duration: 2.0  # 距离上次语音播放结束多长时间后，允许录音 (秒)
 
 KWS:
   enable: true
-  wake_word_pinyin: "ni hao xiao bai"
+  wake_word_pinyin: "ni hao xiao te"
 

@@ -309,10 +309,10 @@ class ChatAssistant:
         def audio_callback(indata, frames, time_info, status):
             nonlocal audio_buffer, frames_collected
 
-            if self.state == AssistantState.IDLE:
-                logger.info("当前状态为空闲，停止录音")
-                time.sleep(1.0)
-                return
+            # if self.state == AssistantState.IDLE:
+            #     logger.info("当前状态为空闲，停止录音")
+            #     time.sleep(1.0)
+            #     return
 
             if not self.recording_active:
                 raise sd.CallbackStop()
@@ -347,7 +347,7 @@ class ChatAssistant:
                 vad_result = self.check_vad_activity(audio_int16)
 
                 if vad_result:
-                    logger.info("检测到语音活动...")
+                    logger.info("检测到语音活动，分贝: {:.2f} dB".format(db))
                     self.last_active_time = time.time()
                     self.segments_to_save.append((audio_int16, time.time()))
                 else:
@@ -492,9 +492,9 @@ class ChatAssistant:
                 logger.info("未检测到唤醒词，忽略本次输入")
                 self.flag_kws = 0
                 self.failed_enable_kws_count += 1
-                if self.failed_enable_kws_count >= 2:
+                if self.failed_enable_kws_count >= 1:
                     self.tts_client.play_audio(
-                        current_dir + "/wavs/enable_kws.wav", block=True
+                        current_dir + "/../wavs/enable_kws.wav", block=True
                     )
                     self.failed_enable_kws_count = 0
                 return False
@@ -513,6 +513,13 @@ class ChatAssistant:
         ## 更新asr_text队列
         self.asr_text_queue.put(self.asr_text)
 
+        # 状态判断
+        ## 为空闲状态，停止交互
+        if self.state == AssistantState.IDLE:
+            logger.info("当前状态为空闲，停止本次交互")
+            time.sleep(1.0)
+            return
+
         # 唤醒词检测
         if not self.kws_infer(self.asr_text):
             return
@@ -529,7 +536,6 @@ class ChatAssistant:
         self.tts_infer(self.llm_response)
         self.last_llm_time = time.time()
 
-        # print("本次交互完成，等待下一次录音...")
         logger.info("本次交互完成，等待下一次录音...")
 
         # 控制队列大小，最多保留最新的10条记录
