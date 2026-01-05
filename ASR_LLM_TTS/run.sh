@@ -1,5 +1,5 @@
 #!/bin/bash
-sleep 10
+sleep 1
 # ===================== 配置区 =====================
 ENABLE_SCRIPT=true
 CURRENT_USER=$(id -un 2>/dev/null || echo "unknown_user") #POSIX标准
@@ -18,7 +18,8 @@ fi
 cleanup() {
     echo "Stopping all processes..."
     #使用 kill 停止所有后台进程
-    kill $(jobs -p)
+    # kill $(jobs -p)
+    kill -SIGINT $(jobs -p)
     wait
     echo "All processes stopped."
     exit 0

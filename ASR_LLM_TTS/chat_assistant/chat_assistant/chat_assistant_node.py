@@ -3,6 +3,7 @@ import time
 
 import rclpy
 from rclpy.node import Node
+from rclpy.executors import ExternalShutdownException
 
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
@@ -223,6 +224,7 @@ class ChatAssistantNode(Node):
 def main(args=None):
     rclpy.init(args=args)
     chat_assistant_node = ChatAssistantNode()
+    chat_assistant_node.chat_assistant.start_recording()
 
     try:
         while rclpy.ok():
@@ -253,11 +255,16 @@ def main(args=None):
 
             rclpy.spin_once(chat_assistant_node, timeout_sec=0.05)
 
-    except KeyboardInterrupt:
-        if rclpy.ok():  # 检查上下文是否仍然有效
-            logger.info("KeyboardInterrupt detected, shutting down...")
-        else:
-            logger.info("rclpy context is no longer valid, shutting down...")
+    # except KeyboardInterrupt:
+    #     if rclpy.ok():  # 检查上下文是否仍然有效
+    #         logger.info("KeyboardInterrupt detected, shutting down...")
+    #     else:
+    #         logger.info("rclpy context is no longer valid, shutting down...")
+
+    except (KeyboardInterrupt, ExternalShutdownException):
+        chat_assistant_node.chat_assistant.stop_recording()
+        logger.info("Shutdown signal received, exiting main loop...")
+
     finally:
         if rclpy.ok():
             chat_assistant_node.destroy_node()

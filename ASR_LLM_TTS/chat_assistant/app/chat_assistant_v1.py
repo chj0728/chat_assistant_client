@@ -49,11 +49,39 @@ class ChatAssistant:
 
         self.load_config_and_initialize()
 
+        # # 启动录音
+        # self.start_recording()
+
+    # 析构函数
+    def __del__(self):
+        """
+        析构函数，释放资源
+        """
+        logger.info("ChatAssistant 正在释放资源...")
+        self.recording_active = False
+        if hasattr(self, "recorder_thread") and self.recorder_thread.is_alive():
+            self.recorder_thread.join()
+        logger.info("ChatAssistant 资源已释放.")
+
+    def start_recording(self):
+        """
+        开始录音
+        """
+        self.recording_active = True
+
         # 启动音频录制线程
         self.recorder_thread = threading.Thread(
             target=self.audio_recorder_thread, daemon=True
         )
         self.recorder_thread.start()
+
+    def stop_recording(self):
+        """
+        停止录音
+        """
+        self.recording_active = False
+
+        self.recorder_thread.join()
 
     def load_config_and_initialize(self):
 
@@ -353,7 +381,8 @@ class ChatAssistant:
         """
         负责调用 TTS 完成文本转语音，保存音频文件
         """
-        print(f"开始 TTS 生成 WAV 文件: {output_path}")
+        # print(f"开始 TTS 生成 WAV 文件: {output_path}")
+        logger.info(f"开始 TTS 生成 WAV 文件: {output_path}")
         try:
             tts_result = self.tts_client.generate_wav(text, output_path)
             return tts_result
@@ -364,7 +393,8 @@ class ChatAssistant:
         """
         负责调用 TTS 播放音频文件
         """
-        print(f"开始播放音频文件: {audio_path}")
+        # print(f"开始播放音频文件: {audio_path}")
+        logger.info(f"开始播放音频文件: {audio_path}")
         try:
             self.tts_client.play_audio(audio_path, block=True)
             return True
@@ -375,7 +405,8 @@ class ChatAssistant:
         """
         负责调用 ASR 完成语音识别
         """
-        print(f"开始 ASR 识别: {audio_path}")
+        # print(f"开始 ASR 识别: {audio_path}")
+        logger.info(f"开始 ASR 识别: {audio_path}")
         try:
             asr_text = self.asr_client.recognize(audio_path).strip()
             # print(f"ASR 识别结果: {asr_text}")
@@ -390,7 +421,8 @@ class ChatAssistant:
         """
         负责调用 LLM 完成对话
         """
-        print("开始与模型对话...")
+        # print("开始与模型对话...")
+        logger.info("开始与模型对话...")
         llm_response = ""
         try:
             llm_response = self.llm_client.chat_response(asr_text)
@@ -495,6 +527,8 @@ if __name__ == "__main__":
 
     assistant = ChatAssistant(config_path=config_yaml_path)
 
+    assistant.start_recording()
+
     # print("ChatAssistant 初始化完成")
     logger.info("ChatAssistant 初始化完成")
 
@@ -505,12 +539,11 @@ if __name__ == "__main__":
         # )
         # recorder_thread.start()
 
-        print("按 Ctrl+C 停止程序")
+        logger.info("按 Ctrl+C 停止程序")
 
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        logger.info("停止录音...")
-        assistant.recording_active = False
-        assistant.recorder_thread.join()
-        logger.info("程序已退出")
+        logger.info("停止程序中...")
+        assistant.stop_recording()
+        logger.info("程序已停止")
