@@ -321,7 +321,7 @@ if __name__ == "__main__":
 
     llm_client = LLMClient(host="http://192.168.50.125", port=8000, temperature=0.6)
 
-    llm_client.add_system_prompt("你叫小白")
+    # llm_client.add_system_prompt("你叫小白")
 
     # print("开始与模型对话（输入 exit 或 quit 退出）")
     logger.info("开始与模型对话（输入 exit 或 quit 退出）")
