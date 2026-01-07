@@ -17,6 +17,7 @@ find_package(rosidl_default_generators REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/GetString.srv"
   "srv/GenerateWav.srv"
+  "msg/Response.msg"
   DEPENDENCIES geometry_msgs
 )
 

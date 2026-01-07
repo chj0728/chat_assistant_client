@@ -8,6 +8,7 @@ from rclpy.executors import ExternalShutdownException
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
 from chat_assistant_interfaces.srv import GetString, GenerateWav
+from chat_assistant_interfaces.msg import Response
 
 from app.chat_assistant_v1 import ChatAssistant as ChatAssistantV1
 from app.chat_assistant_v2 import ChatAssistant as ChatAssistantV2
@@ -29,6 +30,11 @@ class ChatAssistantNode(Node):
 
         ## 发布 llm 生成结果话题
         self.llm_publisher = self.create_publisher(String, "llm_result", 10)
+
+        ## 发布综合响应结果话题
+        self.response_publisher = self.create_publisher(
+            Response, "assistant_response", 10
+        )
 
         # 创建服务
         ## 重新加载配置文件参数
@@ -253,6 +259,20 @@ def main(args=None):
                 msg.data = llm_response
                 chat_assistant_node.llm_publisher.publish(msg)
                 logger.info(f"发布 LLM 生成结果到话题: {llm_response}")
+
+            if chat_assistant_node.chat_assistant.response_queue.empty() is False:
+                response_json = chat_assistant_node.chat_assistant.response_queue.get(
+                    timeout=0.05
+                )
+
+                # 发布 综合响应结果 到话题
+                response_msg = Response()
+                response_msg.asr_text = response_json["asr_text"]
+                response_msg.llm_text = response_json["llm_text"]
+                chat_assistant_node.response_publisher.publish(response_msg)
+                logger.info(
+                    f"发布 综合响应结果 到话题: ASR Text: {response_json['asr_text']}, LLM Text: {response_json['llm_text']}"
+                )
 
             rclpy.spin_once(chat_assistant_node, timeout_sec=0.05)
 

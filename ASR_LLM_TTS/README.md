@@ -81,6 +81,19 @@ cd  ASR_LLM_TTS
 ## Avilable topics
 - `/asr_result` (std_msgs/msg/String)：发布识别到的文本
 - `/llm_result` (std_msgs/msg/String)：发布大语言模型生成的文本
+- `/assistant_response` (chat_assistant_interfaces/msg/Response)：发布包含识别文本和生成文本的综合响应
+
+```bash
+# 订阅示例
+ros2 topic echo /assistant_response
+
+asr_text: 喂喂喂，你好。
+llm_text: 您好，我是导购小特，请问有什么可以帮助您的吗？
+---
+asr_text: 就是但是就是有个新的话题，然后。
+llm_text: 好的，请告诉我你想讨论的新话题是什么。
+---
+``` 
 
 ```bash
 # 订阅示例

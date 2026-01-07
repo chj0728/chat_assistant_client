@@ -49,12 +49,15 @@ class ChatAssistant:
         self.asr_text_queue = Queue(maxsize=MAX_QUEUE_SIZE)
         self.llm_response_queue = Queue(maxsize=MAX_QUEUE_SIZE)
 
+        # 同时保存 jason 形式的响应文本，包括 asr_text 和 llm_text
+        self.response_queue = Queue(maxsize=MAX_QUEUE_SIZE)
+
         self.recorder_thread = None
         self.recording_active = False
 
         self.load_config_and_initialize()
 
-    def _push_queue(self, data_queue: Queue, value: str) -> None:
+    def _push_queue(self, data_queue: Queue, value) -> None:
         """将最新文本加入有限队列，保持队列容量受控。"""
         try:
             data_queue.put_nowait(value)
@@ -529,8 +532,13 @@ class ChatAssistant:
         负责调用 ASR、LLM、TTS 完成一次完整的交互
         """
 
+        # jason 形式的响应文本，包括 asr_text 和 llm_text
+        response_json = {}
+
         # asr 识别
         self.asr_text = self.asr_infer(audio_path)
+        ## response_json 更新 asr_text
+        response_json["asr_text"] = self.asr_text
         if not self.asr_text:
             logger.warning("ASR 未识别到有效文本")
             self.last_llm_time = time.time()
@@ -543,12 +551,17 @@ class ChatAssistant:
 
         # llm 对话
         self.llm_response = self.llm_infer(self.asr_text)
+        ## response_json 更新 llm_text
+        response_json["llm_text"] = self.llm_response
         if not self.llm_response:
             self.last_llm_time = time.time()
             # self._set_state(AssistantState.LISTENING)
             return
         ## 更新llm_response队列
         self._push_queue(self.llm_response_queue, self.llm_response)
+
+        # 更新 response_queue 队列
+        self._push_queue(self.response_queue, response_json)
 
         # 检查当前状态是否为空闲
         if self.get_state() == AssistantState.IDLE:
