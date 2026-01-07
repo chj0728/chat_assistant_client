@@ -513,10 +513,6 @@ class ChatAssistant:
         ## 更新asr_text队列
         self.asr_text_queue.put(self.asr_text)
 
-        # 唤醒词检测
-        if not self.kws_infer(self.asr_text):
-            return
-
         # llm 对话
         self.llm_response = self.llm_infer(self.asr_text)
         if not self.llm_response:
@@ -530,6 +526,10 @@ class ChatAssistant:
         if self.state == AssistantState.IDLE:
             logger.info("当前状态为空闲，停止本次交互")
             time.sleep(1.0)
+            return
+
+        # 唤醒词检测
+        if not self.kws_infer(self.asr_text):
             return
 
         # tts 播放

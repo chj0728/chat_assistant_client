@@ -541,11 +541,6 @@ class ChatAssistant:
 
         # self._set_state(AssistantState.THINKING)
 
-        # 唤醒词检测
-        if not self.kws_infer(self.asr_text):
-            # self._set_state(AssistantState.LISTENING)
-            return
-
         # llm 对话
         self.llm_response = self.llm_infer(self.asr_text)
         if not self.llm_response:
@@ -559,6 +554,11 @@ class ChatAssistant:
         if self.get_state() == AssistantState.IDLE:
             logger.info("当前状态为空闲，停止本次交互")
             time.sleep(1.0)
+            return
+
+        # 唤醒词检测
+        if not self.kws_infer(self.asr_text):
+            # self._set_state(AssistantState.LISTENING)
             return
 
         # tts 播放
