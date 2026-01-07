@@ -9,7 +9,8 @@ from std_msgs.msg import String
 from std_srvs.srv import Trigger
 from chat_assistant_interfaces.srv import GetString, GenerateWav
 
-from app.chat_assistant_v1 import ChatAssistant as ChatAssistant
+from app.chat_assistant_v1 import ChatAssistant as ChatAssistantV1
+from app.chat_assistant_v2 import ChatAssistant as ChatAssistantV2
 
 from logger import logger
 
@@ -218,7 +219,7 @@ class ChatAssistantNode(Node):
         )
         logger.info(f"配置文件路径: {self.config_path}")
 
-        self.chat_assistant = ChatAssistant(config_path=self.config_path)
+        self.chat_assistant = ChatAssistantV2(config_path=self.config_path)
 
 
 def main(args=None):

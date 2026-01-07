@@ -513,13 +513,6 @@ class ChatAssistant:
         ## 更新asr_text队列
         self.asr_text_queue.put(self.asr_text)
 
-        # 状态判断
-        ## 为空闲状态，停止交互
-        if self.state == AssistantState.IDLE:
-            logger.info("当前状态为空闲，停止本次交互")
-            time.sleep(1.0)
-            return
-
         # 唤醒词检测
         if not self.kws_infer(self.asr_text):
             return
@@ -531,6 +524,13 @@ class ChatAssistant:
             return
         ## 更新llm_response队列
         self.llm_response_queue.put(self.llm_response)
+
+        # 状态判断
+        ## 为空闲状态，停止交互
+        if self.state == AssistantState.IDLE:
+            logger.info("当前状态为空闲，停止本次交互")
+            time.sleep(1.0)
+            return
 
         # tts 播放
         self.tts_infer(self.llm_response)

@@ -539,12 +539,6 @@ class ChatAssistant:
         ## 更新asr_text队列
         self._push_queue(self.asr_text_queue, self.asr_text)
 
-        # 检查当前状态是否为空闲
-        if self.get_state() == AssistantState.IDLE:
-            logger.info("当前状态为空闲，停止本次交互")
-            time.sleep(1.0)
-            return
-
         # self._set_state(AssistantState.THINKING)
 
         # 唤醒词检测
@@ -560,6 +554,12 @@ class ChatAssistant:
             return
         ## 更新llm_response队列
         self._push_queue(self.llm_response_queue, self.llm_response)
+
+        # 检查当前状态是否为空闲
+        if self.get_state() == AssistantState.IDLE:
+            logger.info("当前状态为空闲，停止本次交互")
+            time.sleep(1.0)
+            return
 
         # tts 播放
         # self._set_state(AssistantState.SPEAKING)
