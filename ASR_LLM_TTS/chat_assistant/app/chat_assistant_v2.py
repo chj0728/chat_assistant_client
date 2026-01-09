@@ -31,6 +31,7 @@ logger.info(f"配置文件路径: {config_yaml_path}")
 
 SPECIAL_WORD_MAP = {
     "智己": [
+        "自己",
         "智几",
         "治己",
         "之际",
