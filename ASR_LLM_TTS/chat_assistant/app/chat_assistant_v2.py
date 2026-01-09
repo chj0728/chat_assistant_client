@@ -530,6 +530,10 @@ class ChatAssistant:
                 logger.info("未检测到唤醒词，忽略本次输入")
                 self.flag_kws = 0
                 self.failed_enable_kws_count += 1
+
+                self._push_queue(self.llm_response_queue, "")
+                self.response_json["llm_text"] = ""
+
                 if self.failed_enable_kws_count >= 2:
                     # self.tts_client.play_audio(
                     #     str((current_dir / "../wavs/enable_kws.wav").resolve()),
@@ -606,7 +610,7 @@ class ChatAssistant:
             logger.info("当前状态为空闲，停止本次交互")
             time.sleep(1.0)
             return
-        
+
         # tts 播放
         # self._set_state(AssistantState.SPEAKING)
         self.tts_infer(self.llm_response)
