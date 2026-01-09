@@ -51,6 +51,7 @@ class ChatAssistant:
 
         # 同时保存 jason 形式的响应文本，包括 asr_text 和 llm_text
         self.response_queue = Queue(maxsize=MAX_QUEUE_SIZE)
+        self.response_json = {}
 
         self.recorder_thread = None
         self.recording_active = False
@@ -214,6 +215,17 @@ class ChatAssistant:
         pinyin_text = " ".join([item[0] for item in pinyin_result])
 
         return pinyin_text
+
+    # 统计字符串中的汉字数量
+    def count_chinese_characters(self, input_string):
+        """
+        统计字符串中的汉字数量。
+
+        :param input_string: 原始字符串
+        :return: 汉字数量
+        """
+        chinese_characters = re.findall(r"[\u4e00-\u9fa5]", input_string)
+        return len(chinese_characters)
 
     def check_vad_activity(self, audio_bytes: bytes) -> bool:
         """
@@ -518,11 +530,17 @@ class ChatAssistant:
                 logger.info("未检测到唤醒词，忽略本次输入")
                 self.flag_kws = 0
                 self.failed_enable_kws_count += 1
-                if self.failed_enable_kws_count >= 1:
-                    self.tts_client.play_audio(
-                        str((current_dir / "../wavs/enable_kws.wav").resolve()),
-                        block=True,
+                if self.failed_enable_kws_count >= 2:
+                    # self.tts_client.play_audio(
+                    #     str((current_dir / "../wavs/enable_kws.wav").resolve()),
+                    #     block=True,
+                    # )
+
+                    self._push_queue(
+                        self.llm_response_queue, "请说出正确的唤醒词后再进行对话。"
                     )
+                    self.response_json["llm_text"] = "请说出正确的唤醒词后再进行对话。"
+
                     self.failed_enable_kws_count = 0
                 return False
         return True
@@ -533,26 +551,44 @@ class ChatAssistant:
         """
 
         # jason 形式的响应文本，包括 asr_text 和 llm_text
-        response_json = {}
+        self.response_json = {}
 
         # asr 识别
         self.asr_text = self.asr_infer(audio_path)
-        ## response_json 更新 asr_text
-        response_json["asr_text"] = self.asr_text
+        # ## response_json 更新 asr_text
+        # response_json["asr_text"] = self.asr_text
         if not self.asr_text:
             logger.warning("ASR 未识别到有效文本")
             self.last_llm_time = time.time()
             # self._set_state(AssistantState.LISTENING)
             return
+
+        # 判断asr_text中汉字数量，过少则忽略
+        chinese_char_count = self.count_chinese_characters(self.asr_text)
+        if chinese_char_count < 4:
+            logger.warning("ASR 识别文本中汉字数量过少，忽略本次输入")
+            self.last_llm_time = time.time()
+            return
+
         ## 更新asr_text队列
         self._push_queue(self.asr_text_queue, self.asr_text)
+        ## response_json 更新 asr_text
+        self.response_json["asr_text"] = self.asr_text
+
+        # 唤醒词检测
+        if not self.kws_infer(self.asr_text):
+            # self._set_state(AssistantState.LISTENING)
+            # 更新 response_queue 队列
+            self._push_queue(self.response_queue, self.response_json)
+            self.last_llm_time = time.time()
+            return
 
         # self._set_state(AssistantState.THINKING)
 
         # llm 对话
         self.llm_response = self.llm_infer(self.asr_text)
-        ## response_json 更新 llm_text
-        response_json["llm_text"] = self.llm_response
+        # ## response_json 更新 llm_text
+        # response_json["llm_text"] = self.llm_response
         if not self.llm_response:
             self.last_llm_time = time.time()
             # self._set_state(AssistantState.LISTENING)
@@ -560,20 +596,17 @@ class ChatAssistant:
         ## 更新llm_response队列
         self._push_queue(self.llm_response_queue, self.llm_response)
 
-        # 更新 response_queue 队列
-        self._push_queue(self.response_queue, response_json)
+        ## response_json 更新 llm_text
+        self.response_json["llm_text"] = self.llm_response
+        ## 更新 response_queue 队列
+        self._push_queue(self.response_queue, self.response_json)
 
         # 检查当前状态是否为空闲
         if self.get_state() == AssistantState.IDLE:
             logger.info("当前状态为空闲，停止本次交互")
             time.sleep(1.0)
             return
-
-        # 唤醒词检测
-        if not self.kws_infer(self.asr_text):
-            # self._set_state(AssistantState.LISTENING)
-            return
-
+        
         # tts 播放
         # self._set_state(AssistantState.SPEAKING)
         self.tts_infer(self.llm_response)
