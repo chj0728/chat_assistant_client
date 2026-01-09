@@ -531,8 +531,8 @@ class ChatAssistant:
                 self.flag_kws = 0
                 self.failed_enable_kws_count += 1
 
-                self._push_queue(self.llm_response_queue, "")
-                self.response_json["llm_text"] = ""
+                # self._push_queue(self.llm_response_queue, "")
+                # self.response_json["llm_text"] = ""
 
                 if self.failed_enable_kws_count >= 2:
                     # self.tts_client.play_audio(
@@ -546,6 +546,10 @@ class ChatAssistant:
                     self.response_json["llm_text"] = "请说出正确的唤醒词后再进行对话。"
 
                     self.failed_enable_kws_count = 0
+                else:
+                    self._push_queue(self.llm_response_queue, "")
+                    self.response_json["llm_text"] = ""
+
                 return False
         return True
 
