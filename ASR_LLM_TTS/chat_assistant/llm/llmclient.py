@@ -314,7 +314,7 @@ class LLMClient:
         """
         stream_response = self.request_stream_response(user_text)
         response_text = "".join([token for token in stream_response])
-        # self.history.append({"role": "assistant", "content": response_text})
+        self.history.append({"role": "assistant", "content": response_text})
         return response_text
 
 
