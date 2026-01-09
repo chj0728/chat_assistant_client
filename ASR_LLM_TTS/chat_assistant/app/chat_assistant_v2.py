@@ -29,6 +29,37 @@ config_yaml_path = (current_dir / "../config/config.yaml").resolve()
 logger.info(f"配置文件路径: {config_yaml_path}")
 
 
+SPECIAL_WORD_MAP = {
+    "智己": [
+        "智几",
+        "治己",
+        "之际",
+        "知己",
+        "只记",
+        "只几",
+        "只机",
+        "只及",
+        "之几",
+        "之机",
+        "之及",
+        "治几",
+        "治机",
+        "治及",
+        "直几",
+        "直机",
+        "直及",
+        "植机",
+        "植及",
+        "执机",
+        "执及",
+        "职机",
+        "职及",
+        "置机",
+        "置及",
+    ],
+}
+
+
 class AssistantState(Enum):
     IDLE = 0  # 空闲 / 待唤醒
     ACTIVE = 1  # 激活状态
@@ -191,6 +222,8 @@ class ChatAssistant:
         self.last_llm_time = time.time()  # 上次与 LLM 交互的时间
         self.audio_file_count = 0
 
+        self.word_map = SPECIAL_WORD_MAP
+
         self.state = AssistantState.IDLE
         self.state_lock = threading.Lock()
 
@@ -226,6 +259,23 @@ class ChatAssistant:
         """
         chinese_characters = re.findall(r"[\u4e00-\u9fa5]", input_string)
         return len(chinese_characters)
+
+    # 替换字符串中的特殊字符为智己
+    def replace_special_characters(self, input_string):
+        """
+        替换字符串中的特殊字符如为智己。
+
+        :param input_string: 原始字符串
+        :return: 替换后的字符串
+        """
+        if not input_string:
+            return input_string
+
+        for correct_word, variants in self.word_map.items():
+            for variant in variants:
+                input_string = input_string.replace(variant, correct_word)
+
+        return input_string
 
     def check_vad_activity(self, audio_bytes: bytes) -> bool:
         """
@@ -578,6 +628,11 @@ class ChatAssistant:
             self.last_llm_time = time.time()
             return
 
+        # 替换特殊词汇
+        logger.info(f"替换前 ASR 文本: {self.asr_text}")
+        self.asr_text = self.replace_special_characters(self.asr_text)
+        logger.info(f"替换后 ASR 文本: {self.asr_text}")
+
         ## 更新asr_text队列
         self._push_queue(self.asr_text_queue, self.asr_text)
         ## response_json 更新 asr_text
@@ -612,6 +667,7 @@ class ChatAssistant:
         # 检查当前状态是否为空闲
         if self.get_state() == AssistantState.IDLE:
             logger.info("当前状态为空闲，停止本次交互")
+            self.last_llm_time = time.time()
             time.sleep(1.0)
             return
 
