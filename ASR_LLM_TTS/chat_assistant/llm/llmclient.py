@@ -109,17 +109,15 @@ class LLMClient:
 
             # 获取第一个模型的ID
             self.model_id = data["data"][0]["id"]
-            # print(f"使用的模型ID: {self.model_id}")
             logger.info(f"使用的模型ID: {self.model_id}")
 
             self.model_root = data["data"][0]["root"]
-            # print(f"模型根目录: {self.model_root}")
             logger.info(f"模型根目录: {self.model_root}")
 
         except Exception as e:
-            # print(f"获取模型列表失败: {e}")
             logger.error(f"获取模型列表失败: {e}")
-            raise e
+            # 使用默认模型ID
+            self.model_id = "Qwen/Qwen3"
 
     def reset_history(self):
         """清空历史记录"""
@@ -142,7 +140,6 @@ class LLMClient:
     def add_system_prompt(self, text: str):
         # append system prompt
         self.system_prompt["content"] += "\n" + text
-        # print("新增系统提示词:", text)
         logger.info("新增系统提示词: %s", text)
 
     def _trim_history(self):

@@ -40,8 +40,9 @@ timed_handler = logging.handlers.TimedRotatingFileHandler(
     atTime=time(0, 0, 0),  # 滚动时间点（每天零点）
 )
 # 设置日志文件后缀格式为年-月-日_时-分
-# timed_handler.suffix = "%Y-%m-%d_%H-%M"
-timed_handler.suffix = "%Y-%m-%d_%H-%M-%S.log"
+# timed_handler.suffix = "%Y-%m-%d_%H-%M-%S"  # 精确到秒
+# timed_handler.suffix = "%Y-%m-%d_%H-%M"  #  精确到分钟即可
+timed_handler.suffix = "%Y-%m-%d_%H"  #  精确到小时即可
 
 # 配置Formatter：日志格式包含时间、模块名、级别、内容
 timed_handler.setFormatter(formatter)

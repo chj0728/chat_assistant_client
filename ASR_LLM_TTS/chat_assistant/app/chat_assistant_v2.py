@@ -159,12 +159,10 @@ class ChatAssistant:
         try:
             with open(self.config_yaml, "r", encoding="utf-8") as f:
                 self.configs = yaml.safe_load(f)
-                # print(f"配置文件内容:\n{self.configs}")
                 logger.info(f"配置文件内容:\n{self.configs}")
         except Exception as e:
-            # print(f"读取配置文件失败: {e}")
             logger.error(f"读取配置文件失败: {e}")
-            raise e
+            # raise e
 
         # ----------- 初始化ASR、LLM、TTS客户端 -----------
         asr_cfg = self.configs.get("ASR", {})

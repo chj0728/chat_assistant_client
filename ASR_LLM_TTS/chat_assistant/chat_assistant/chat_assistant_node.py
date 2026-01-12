@@ -306,6 +306,7 @@ def main(args=None):
 
             # rclpy.spin_once(chat_assistant_node, timeout_sec=0.05)
             executor.spin_once(timeout_sec=0.05)
+            # logger.debug("Main loop heartbeat...")
 
     # except KeyboardInterrupt:
     #     if rclpy.ok():  # 检查上下文是否仍然有效
