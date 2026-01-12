@@ -168,23 +168,33 @@ class RealtimeTTSPlayer:
             # not self.stream.stopped
             # self.stream.active
             # self.sound is not None
-            # and self.sound.is_alive()
+            or (self.sound is not None and self.sound.is_alive())
         )
 
     def play_audio(self, file_path, block=False):
-        """播放本地音频文件（阻塞）"""
+        """播放本地音频文件（阻塞/非阻塞）"""
         try:
+            # 如果有正在播放的音频，先停止它
+            if self.sound is not None and self.sound.is_alive():
+                self.sound.stop()
+                time.sleep(0.1)  # 等待音频停止
+
             self.sound = playsound(file_path, block=block)
-            currunt_time = time.time()
-            while self.sound.is_alive():
-                time.sleep(0.1)  # 等待音频播放结束
-                if time.time() - currunt_time > 30:
-                    print("播放超时，强制结束")
-                    break
-            # print("播放完成！")
-            logger.info(f"播放{file_path}完成！")
+
+            # currunt_time = time.time()
+            # while self.sound.is_alive():
+            #     if time.time() - currunt_time > 30:
+            #         print("播放超时，强制结束")
+            #         break
+            #     if self._interrupt_event.is_set():
+            #         logger.info("播放被打断，停止播放音频")
+            #         break
+            #     time.sleep(0.1)  # 等待音频播放结束
+            # # print("播放完成！")
+
+            logger.info(f"开始播放音频文件: {file_path}")
         except Exception as e:
-            # print(f"播放失败: {e}")
+
             logger.error(f"播放{file_path}失败: {e}")
 
     def play_audio_from_pcm(self, pcm_bytes):
@@ -199,6 +209,10 @@ class RealtimeTTSPlayer:
     def interrupt(self):
         """打断：清空文本 + 音频"""
         self._interrupt_event.set()
+
+        if not self.text_queue.empty() or not self.audio_queue.empty():
+            logger.info("正在清空播放队列...")
+
         while not self.text_queue.empty():
             try:
                 self.text_queue.get_nowait()
@@ -210,6 +224,12 @@ class RealtimeTTSPlayer:
                 self.audio_queue.get_nowait()
             except queue.Empty:
                 break
+
+        if self.sound is not None and self.sound.is_alive():
+            self.sound.stop()
+            time.sleep(0.1)
+            logger.info("正在停止当前播放的音频...")
+
         self._interrupt_event.clear()
 
     def stop(self):

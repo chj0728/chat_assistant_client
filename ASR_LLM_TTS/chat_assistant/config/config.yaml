@@ -19,14 +19,14 @@ Audio:
 VAD:
   output_dir: "output" # VAD 结果保存目录
   mode : 3  # VAD 模式 (0-3, 数字越小越敏感)  
-  no_speech_threshold: 0.4  # 静音持续多长时间后认为一句话结束 (秒)
+  no_speech_threshold: 0.45  # 静音持续多长时间后认为一句话结束 (秒)
   reactive_kws_threshold: 45  # 多久未检测到唤醒词，重置唤醒词状态，单位：秒
   decibel_threshold: -40  # 分贝阈值，低于此值认为是静音 (dB)
 
   min_recording_duration: 0.30   # 最短有效录音时长 (秒)
   max_recording_duration: 10  # 最大有效录音时长 (秒)
   
-  pause_duration: 2.0  # 距离上次语音播放结束多长时间后，允许录音 (秒)
+  pause_duration: 1.5  # 距离上次语音播放结束多长时间后，允许录音 (秒)
 
 KWS:
   enable: true
