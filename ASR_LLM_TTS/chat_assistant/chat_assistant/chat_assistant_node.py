@@ -3,7 +3,8 @@ import time
 
 import rclpy
 from rclpy.node import Node
-from rclpy.executors import ExternalShutdownException
+from rclpy.executors import ExternalShutdownException, MultiThreadedExecutor
+from rclpy.callback_groups import ReentrantCallbackGroup
 
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
@@ -23,6 +24,9 @@ class ChatAssistantNode(Node):
         self.declare_parameter("config_path", "config/config.yaml")
 
         self.init_params()
+
+        self.audio_cb_group = ReentrantCallbackGroup()
+        self.interrupt_cb_group = ReentrantCallbackGroup()
 
         # 创建话题发布者
         ## 发布asr识别结果话题
@@ -47,9 +51,6 @@ class ChatAssistantNode(Node):
         ## 将聊天助手置于空闲状态服务
         self.create_service(Trigger, "idle_assistant", self.handle_idle_assistant)
 
-        ## 接收audio_path，直接播放音频服务
-        self.create_service(GetString, "play_audio_file", self.handle_play_audio)
-
         ## 接收audio_path，只调用 ASR 完成语音识别，返回文本结果服务
         self.create_service(GetString, "asr_infer", self.handle_asr_infer)
 
@@ -59,10 +60,36 @@ class ChatAssistantNode(Node):
         ## 接收文本输入，只调用 TTS 完成文本转语音，并在线播放音频服务
         self.create_service(GetString, "tts_infer", self.handle_tts_infer)
 
+        ## 接收audio_path，直接播放音频服务
+        self.create_service(
+            GetString,
+            "play_audio_file",
+            self.handle_play_audio,
+            callback_group=self.audio_cb_group,
+        )
+
+        ## 打断当前播放音频服务
+        self.create_service(
+            Trigger,
+            "interrupt_audio",
+            self.handle_interrupt_audio,
+            callback_group=self.interrupt_cb_group,
+        )
+
         ## 接收文本输入和音频保存路径，调用 TTS 完成文本转语音，保存音频文件服务
         self.create_service(
             GenerateWav, "tts_generate_wav", self.handle_tts_generate_wav
         )
+
+    def handle_interrupt_audio(self, request, response):
+        """
+        打断当前播放音频服务
+        """
+        logger.info("收到打断当前播放音频请求")
+        self.chat_assistant.interrupt()
+        response.success = True
+        response.message = "已打断当前播放音频"
+        return response
 
     def handle_play_audio(self, request, response):
         """
@@ -233,6 +260,9 @@ def main(args=None):
     chat_assistant_node = ChatAssistantNode()
     chat_assistant_node.chat_assistant.start_recording()
 
+    executor = MultiThreadedExecutor(num_threads=4)
+    executor.add_node(chat_assistant_node)
+
     try:
         while rclpy.ok():
 
@@ -274,7 +304,8 @@ def main(args=None):
                     f"发布 综合响应结果 到话题: ASR Text: {response_json['asr_text']}, LLM Text: {response_json['llm_text']}"
                 )
 
-            rclpy.spin_once(chat_assistant_node, timeout_sec=0.05)
+            # rclpy.spin_once(chat_assistant_node, timeout_sec=0.05)
+            executor.spin_once(timeout_sec=0.05)
 
     # except KeyboardInterrupt:
     #     if rclpy.ok():  # 检查上下文是否仍然有效

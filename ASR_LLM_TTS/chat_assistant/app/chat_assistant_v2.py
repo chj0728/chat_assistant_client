@@ -324,15 +324,16 @@ class ChatAssistant:
         if not self.segments_to_save:
             return None
 
-        # ===============================
-        # TTS 播放中，跳过保存
-        # ===============================
-        if self.tts_client.is_active():
-            # print("TTS 播放中，跳过保存音频")
-            logger.warning("TTS 播放中，跳过保存音频")
-            self.segments_to_save.clear()
-            self.last_llm_time = time.time()
-            return None
+        # # ===============================
+        # # TTS 播放中，跳过保存
+        # # ===============================
+        # if self.tts_client.is_active():
+        #     # print("TTS 播放中，跳过保存音频")
+        #     logger.warning("TTS 播放中，跳过保存音频")
+        #     self.segments_to_save.clear()
+        #     self.last_llm_time = time.time()
+        #     return None
+
         # ===============================
         # 缓冲时间判断
         # ===============================
@@ -501,7 +502,20 @@ class ChatAssistant:
         # print(f"开始播放音频文件: {audio_path}")
         logger.info(f"开始播放音频文件: {audio_path}")
         try:
-            self.tts_client.play_audio(audio_path, block=True)
+            self.tts_client.play_audio(audio_path, block=False)
+            return True
+        except Exception as e:
+            return False
+
+    def interrupt(self):
+        """
+        负责中断当前 TTS 播放
+        """
+        # print("中断当前 TTS 播放")
+        logger.info("开始中断后台播放...")
+        try:
+            self.tts_client.interrupt()
+            logger.info("后台播放已中断")
             return True
         except Exception as e:
             return False
@@ -558,6 +572,22 @@ class ChatAssistant:
         负责唤醒词检测
         """
 
+        # 提取汉字并转换为拼音
+        pinyin_text = self.extract_chinese_and_convert_to_pinyin(asr_text)
+        logger.info(f"转换为拼音: {pinyin_text}")
+
+        if self.set_kws_pinyin in pinyin_text and self.tts_client.is_active():
+            logger.warning("检测到唤醒词， TTS 播放中，打断播放以避免语音叠加")
+
+            self.flag_kws = 1
+
+            self.tts_client.interrupt()
+
+            time.sleep(0.5)
+
+            self.last_llm_time = time.time()
+            return True
+
         # 判断是否需要重置唤醒词状态
         if time.time() - self.last_llm_time > self.reactive_kws_threshold:
             # print("长时间未与 LLM 交互，重置唤醒词状态")
@@ -566,30 +596,27 @@ class ChatAssistant:
 
         # 判断是否启用唤醒词检测
         if self.flag_kws_used and self.flag_kws == 0:
-            pinyin_text = self.extract_chinese_and_convert_to_pinyin(asr_text)
-            # print(f"转换为拼音: {pinyin_text}")
-            logger.info(f"转换为拼音: {pinyin_text}")
+
+            logger.info("需要唤醒词检测")
 
             if self.set_kws_pinyin in pinyin_text:
-                # print("检测到唤醒词，开始与模型对话")
                 logger.info("检测到唤醒词，开始与模型对话")
+
                 self.flag_kws = 1
-                self.last_llm_time = time.time()
                 self.failed_enable_kws_count = 0
+
+                self.last_llm_time = time.time()
+                return True
             else:
-                # print("未检测到唤醒词，忽略本次输入")
-                logger.info("未检测到唤醒词，忽略本次输入")
+
                 self.flag_kws = 0
                 self.failed_enable_kws_count += 1
 
-                # self._push_queue(self.llm_response_queue, "")
-                # self.response_json["llm_text"] = ""
+                logger.info(
+                    "未检测到唤醒词，失败次数: {}".format(self.failed_enable_kws_count)
+                )
 
                 if self.failed_enable_kws_count >= 2:
-                    # self.tts_client.play_audio(
-                    #     str((current_dir / "../wavs/enable_kws.wav").resolve()),
-                    #     block=True,
-                    # )
 
                     self._push_queue(
                         self.llm_response_queue, "请说出正确的唤醒词后再进行对话。"
@@ -601,8 +628,12 @@ class ChatAssistant:
                     self._push_queue(self.llm_response_queue, "")
                     self.response_json["llm_text"] = ""
 
+                self.last_llm_time = time.time()
                 return False
-        return True
+
+        else:
+            logger.info("不需要唤醒词检测")
+            return True
 
     def Inference(self, audio_path):
         """
@@ -612,24 +643,24 @@ class ChatAssistant:
         # jason 形式的响应文本，包括 asr_text 和 llm_text
         self.response_json = {}
 
-        # asr 识别
+        # -------- asr 识别 -----------
         self.asr_text = self.asr_infer(audio_path)
         # ## response_json 更新 asr_text
         # response_json["asr_text"] = self.asr_text
         if not self.asr_text:
-            logger.warning("ASR 未识别到有效文本")
+            logger.warning("ASR 未识别到有效文本，跳过本次交互")
             self.last_llm_time = time.time()
             # self._set_state(AssistantState.LISTENING)
             return
 
-        # 判断asr_text中汉字数量，过少则忽略
+        # -------- 判断asr_text中汉字数量，过少则忽略 ----------
         chinese_char_count = self.count_chinese_characters(self.asr_text)
         if chinese_char_count < 4:
-            logger.warning("ASR 识别文本中汉字数量过少，忽略本次输入")
+            logger.warning("ASR 识别文本中汉字数量过少，跳过本次交互")
             self.last_llm_time = time.time()
             return
 
-        # 替换特殊词汇
+        # ------- 替换特殊词汇 -------
         logger.info(f"替换前 ASR 文本: {self.asr_text}")
         self.asr_text = self.replace_special_characters(self.asr_text)
         logger.info(f"替换后 ASR 文本: {self.asr_text}")
@@ -639,7 +670,7 @@ class ChatAssistant:
         ## response_json 更新 asr_text
         self.response_json["asr_text"] = self.asr_text
 
-        # 唤醒词检测
+        # ----------- 唤醒词检测 -----------
         if not self.kws_infer(self.asr_text):
             # self._set_state(AssistantState.LISTENING)
             # 更新 response_queue 队列
@@ -649,13 +680,18 @@ class ChatAssistant:
 
         # self._set_state(AssistantState.THINKING)
 
-        # llm 对话
+        # -------- 检查 TTS 播放状态 ----------
+        if self.tts_client.is_active():
+            logger.warning("语音播放中，跳过本次交互")
+            self.last_llm_time = time.time()
+            return
+
+        # -------- llm 对话 -----------
         self.llm_response = self.llm_infer(self.asr_text)
-        # ## response_json 更新 llm_text
-        # response_json["llm_text"] = self.llm_response
         if not self.llm_response:
             self.last_llm_time = time.time()
             # self._set_state(AssistantState.LISTENING)
+            logger.warning("LLM 未生成有效回复，跳过本次交互")
             return
         ## 更新llm_response队列
         self._push_queue(self.llm_response_queue, self.llm_response)
@@ -665,14 +701,14 @@ class ChatAssistant:
         ## 更新 response_queue 队列
         self._push_queue(self.response_queue, self.response_json)
 
-        # 检查当前状态是否为空闲
+        # -------- 检查当前状态是否为空闲 ----------
         if self.get_state() == AssistantState.IDLE:
-            logger.info("当前状态为空闲，停止本次交互")
+            logger.warning("语音助手未激活，跳过本次交互")
             self.last_llm_time = time.time()
             time.sleep(1.0)
             return
 
-        # tts 播放
+        # -------- tts 播放 -----------
         # self._set_state(AssistantState.SPEAKING)
         self.tts_infer(self.llm_response)
         self.last_llm_time = time.time()
