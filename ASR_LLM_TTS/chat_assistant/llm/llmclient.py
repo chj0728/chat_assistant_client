@@ -13,7 +13,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 # 将当前目录添加到Python路径（如果是相对导入）
 sys.path.append(current_dir)
 
-from tools.functions import get_shanghai_time, get_current_location
+from tools.functions import get_shanghai_time, get_current_location, get_weather_info
 
 TOOLS = [
     {
@@ -40,11 +40,24 @@ TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_weather_info",
+            "description": "获取当前天气预报信息",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+    },
 ]
 
 TOOL_FUNCTIONS = {
     "get_shanghai_time": get_shanghai_time,
     "get_current_location": get_current_location,
+    "get_weather_info": get_weather_info,
 }
 
 
