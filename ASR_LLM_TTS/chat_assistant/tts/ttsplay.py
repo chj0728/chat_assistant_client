@@ -113,7 +113,10 @@ class RealtimeTTSPlayer:
                 stream=True,
             ) as resp:
                 for chunk in resp.iter_content(chunk_size=self.chunk_size):
+                    # 检查停止或打断标志
                     if self._stop_event.is_set():
+                        return
+                    if self._interrupt_event.is_set():
                         return
                     if not chunk:
                         continue
@@ -131,6 +134,82 @@ class RealtimeTTSPlayer:
         try:
             with requests.post(
                 self.host + f":{self.port}/inference_zero_shot",
+                data={"tts_text": text, "data_type": "wav"},
+            ) as resp:
+                with open(filename, "wb") as f:
+                    f.write(resp.content)
+            # print(f"WAV 文件已保存到 {filename}")
+            logger.info(f"WAV 文件已保存到 {filename}")
+            return filename
+        except Exception as e:
+            # print("TTS 请求失败:", e)
+            logger.error(f"TTS 请求失败: {e}")
+            return None
+
+    def generate_wav_zh(self, text, filename):
+        """
+        根据文本生成 WAV 文件（阻塞）
+        """
+        try:
+            with requests.post(
+                self.host + f":{self.port}/inference_zero_shot_zh",
+                data={"tts_text": text, "data_type": "wav"},
+            ) as resp:
+                with open(filename, "wb") as f:
+                    f.write(resp.content)
+            # print(f"WAV 文件已保存到 {filename}")
+            logger.info(f"WAV 文件已保存到 {filename}")
+            return filename
+        except Exception as e:
+            # print("TTS 请求失败:", e)
+            logger.error(f"TTS 请求失败: {e}")
+            return None
+
+    def generate_wav_hard_zh(self, text, filename):
+        """
+        根据文本生成 WAV 文件（阻塞）
+        """
+        try:
+            with requests.post(
+                self.host + f":{self.port}/inference_zero_shot_hard_zh",
+                data={"tts_text": text, "data_type": "wav"},
+            ) as resp:
+                with open(filename, "wb") as f:
+                    f.write(resp.content)
+            # print(f"WAV 文件已保存到 {filename}")
+            logger.info(f"WAV 文件已保存到 {filename}")
+            return filename
+        except Exception as e:
+            # print("TTS 请求失败:", e)
+            logger.error(f"TTS 请求失败: {e}")
+            return None
+
+    def generate_wav_longshu_zh(self, text, filename):
+        """
+        根据文本生成 WAV 文件（阻塞）
+        """
+        try:
+            with requests.post(
+                self.host + f":{self.port}/inference_zero_shot_longshu_zh",
+                data={"tts_text": text, "data_type": "wav"},
+            ) as resp:
+                with open(filename, "wb") as f:
+                    f.write(resp.content)
+            # print(f"WAV 文件已保存到 {filename}")
+            logger.info(f"WAV 文件已保存到 {filename}")
+            return filename
+        except Exception as e:
+            # print("TTS 请求失败:", e)
+            logger.error(f"TTS 请求失败: {e}")
+            return None
+
+    def generate_wav_longwan_zh(self, text, filename):
+        """
+        根据文本生成 WAV 文件（阻塞）
+        """
+        try:
+            with requests.post(
+                self.host + f":{self.port}/inference_zero_shot_longwan_zh",
                 data={"tts_text": text, "data_type": "wav"},
             ) as resp:
                 with open(filename, "wb") as f:
@@ -267,13 +346,36 @@ if __name__ == "__main__":
         time.sleep(0.5)
     # tts_player.stop()
 
-    # generate wav file
-    tts_player.generate_wav(
-        "这是通过生成 WAV 文件的方式保存的语音合成示例。",
-        "example.wav",
-    )
-    # play local audio file
-    tts_player.play_audio("example.wav")
+    # # generate wav file
+    # tts_player.generate_wav(
+    #     "这是通过生成 WAV 文件的方式保存的语音合成示例。",
+    #     "example.wav",
+    # )
+    # tts_player.play_audio("example.wav", block=True)
+
+    # tts_player.generate_wav_zh(
+    #     "这是通过生成 WAV 文件的方式保存的语音合成示例。",
+    #     "example_zh.wav",
+    # )
+    # tts_player.play_audio("example_zh.wav", block=True)
+
+    # tts_player.generate_wav_hard_zh(
+    #     "这是通过生成 WAV 文件的方式保存的语音合成示例。",
+    #     "example_hard_zh.wav",
+    # )
+    # tts_player.play_audio("example_hard_zh.wav", block=True)
+
+    # tts_player.generate_wav_longshu_zh(
+    #     "这是通过生成 WAV 文件的方式保存的语音合成示例。",
+    #     "example_longshu_zh.wav",
+    # )
+    # tts_player.play_audio("example_longshu_zh.wav", block=True)
+
+    # tts_player.generate_wav_longwan_zh(
+    #     "这是通过生成 WAV 文件的方式保存的语音合成示例。",
+    #     "example_longwan_zh.wav",
+    # )
+    # tts_player.play_audio("example_longwan_zh.wav", block=True)
 
     # tts_player.generate_wav(
     #     "你好，千问",

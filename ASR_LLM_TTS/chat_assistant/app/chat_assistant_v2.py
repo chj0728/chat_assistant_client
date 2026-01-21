@@ -221,6 +221,9 @@ class ChatAssistant:
         self.last_llm_time = time.time()  # 上次与 LLM 交互的时间
         self.audio_file_count = 0
 
+        self.enable_replace_special_characters = self.configs.get(
+            "enable_replace_special_characters", False
+        )
         self.word_map = SPECIAL_WORD_MAP
 
         self.state = AssistantState.IDLE
@@ -485,7 +488,6 @@ class ChatAssistant:
         """
         负责调用 TTS 完成文本转语音，保存音频文件
         """
-        # print(f"开始 TTS 生成 WAV 文件: {output_path}")
         logger.info(f"开始 TTS 生成 WAV 文件: {output_path}")
         try:
             tts_result = self.tts_client.generate_wav(text, output_path)
@@ -497,7 +499,6 @@ class ChatAssistant:
         """
         负责调用 TTS 播放音频文件
         """
-        # print(f"开始播放音频文件: {audio_path}")
         logger.info(f"开始播放音频文件: {audio_path}")
         try:
             self.tts_client.play_audio(audio_path, block=False)
@@ -522,15 +523,12 @@ class ChatAssistant:
         """
         负责调用 ASR 完成语音识别
         """
-        # print(f"开始 ASR 识别: {audio_path}")
         logger.info(f"开始 ASR 识别: {audio_path}")
         try:
             asr_text = self.asr_client.recognize(audio_path).strip()
-            # print(f"ASR 识别结果: {asr_text}")
             logger.info(f"ASR 识别结果: {asr_text}")
             return asr_text
         except Exception as e:
-            # print(f"ASR 识别失败: {e}")
             logger.error(f"ASR 识别失败: {e}")
             return ""
 
@@ -538,16 +536,13 @@ class ChatAssistant:
         """
         负责调用 LLM 完成对话
         """
-        # print("开始与模型对话...")
         logger.info("开始与模型对话...")
         llm_response = ""
         try:
             llm_response = self.llm_client.chat_response(asr_text)
-            # print(f"LLM 回复: {llm_response}")
             logger.info(f"LLM 回复: {llm_response}")
             return llm_response
         except Exception as e:
-            # print(f"LLM 对话失败: {e}")
             logger.error(f"LLM 对话失败: {e}")
             return ""
 
@@ -555,13 +550,11 @@ class ChatAssistant:
         """
         负责调用 TTS 完成语音合成和播放
         """
-        # print("开始 TTS 播放...")
         logger.info("开始 TTS 播放...")
         try:
             self.tts_client.speak(llm_response.strip())
             return True
         except Exception as e:
-            # print(f"TTS 播放失败: {e}")
             logger.error(f"TTS 播放失败: {e}")
             return False
 
@@ -659,9 +652,12 @@ class ChatAssistant:
             return
 
         # ------- 替换特殊词汇 -------
-        logger.info(f"替换前 ASR 文本: {self.asr_text}")
-        self.asr_text = self.replace_special_characters(self.asr_text)
-        logger.info(f"替换后 ASR 文本: {self.asr_text}")
+        if self.enable_replace_special_characters:
+            logger.info(f"替换前 ASR 文本: {self.asr_text}")
+            self.asr_text = self.replace_special_characters(self.asr_text)
+            logger.info(f"替换后 ASR 文本: {self.asr_text}")
+        else:
+            logger.info("未启用特殊词汇替换功能")
 
         ## 更新asr_text队列
         self._push_queue(self.asr_text_queue, self.asr_text)

@@ -32,3 +32,4 @@ KWS:
   enable: true
   wake_word_pinyin: "ni hao xiao te"
 
+enable_replace_special_characters: false
