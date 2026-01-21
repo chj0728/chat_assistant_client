@@ -10,6 +10,7 @@ LLM:
 TTS:
   host: "http://192.168.50.125"
   port: 50000
+  voice_type: "default" # 可选值: "default"(女性活泼), "zh"(男性非标准) , "hard_zh"(男性业余), "longshu_zh"(男性专业), "longwan_zh"（女性专业）
 
 Audio:
   rate: 16000

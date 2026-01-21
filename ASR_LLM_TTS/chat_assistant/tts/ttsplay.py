@@ -33,6 +33,8 @@ class RealtimeTTSPlayer:
         self.channels = channels
         self.chunk_size = chunk_size
 
+        self.preset = "default"  # "default"(女性活泼), "zh"(男性非标准) , "hard_zh"(男性业余), "longshu_zh"(男性专业), "longwan_zh"（女性专业）
+
         # 文本队列 + 音频队列
         self.text_queue = queue.Queue()
         self.audio_queue = queue.Queue()
@@ -109,7 +111,7 @@ class RealtimeTTSPlayer:
         try:
             with requests.post(
                 self.host + f":{self.port}/inference_zero_shot",
-                data={"tts_text": text, "data_type": "pcm"},
+                data={"tts_text": text, "data_type": "pcm", "preset": self.preset},
                 stream=True,
             ) as resp:
                 for chunk in resp.iter_content(chunk_size=self.chunk_size):
@@ -127,14 +129,17 @@ class RealtimeTTSPlayer:
 
     # ================= 公共接口 =================
 
-    def generate_wav(self, text, filename):
+    def generate_wav(self, text, filename, preset="default"):
         """
         根据文本生成 WAV 文件（阻塞）
+
+        preset 可选值: "default"(女性活泼), "zh"(男性非标准) , "hard_zh"(男性业余), "longshu_zh"(男性专业), "longwan_zh"（女性专业）
+        依据 preset 选择不同的接口
         """
         try:
             with requests.post(
                 self.host + f":{self.port}/inference_zero_shot",
-                data={"tts_text": text, "data_type": "wav"},
+                data={"tts_text": text, "data_type": "wav", "preset": preset},
             ) as resp:
                 with open(filename, "wb") as f:
                     f.write(resp.content)
@@ -221,6 +226,14 @@ class RealtimeTTSPlayer:
             # print("TTS 请求失败:", e)
             logger.error(f"TTS 请求失败: {e}")
             return None
+
+    def change_preset(self, preset):
+        """
+        更改 TTS 预设
+        preset 可选值: "default"(女性活泼), "zh"(男性非标准) , "hard_zh"(男性业余), "longshu_zh"(男性专业), "longwan_zh"（女性专业）
+        """
+        self.preset = preset
+        logger.info(f"TTS 预设已更改为: {preset}")
 
     def speak(self, text, interrupt=False):
         """

@@ -187,6 +187,9 @@ class ChatAssistant:
             host=tts_cfg.get("host", "http://192.168.50.125"),
             port=tts_cfg.get("port", 50000),
         )
+        self.tts_client.change_preset(
+            tts_cfg.get("voice_type", "default")
+        )  # "default"(女性活泼), "zh"(男性非标准) , "hard_zh"(男性业余), "longshu_zh"(男性专业), "longwan_zh"（女性专业）
 
         # ----------- 初始化音频录制和VAD参数 -----------
         audio_cfg = self.configs.get("Audio", {})
