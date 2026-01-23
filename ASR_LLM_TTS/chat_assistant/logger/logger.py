@@ -26,7 +26,9 @@ formatter = logging.Formatter(
 
 # 控制台处理器
 console_handler = logging.StreamHandler()  # 默认输出到sys.stderr（控制台）
-console_handler.setLevel(logging.INFO)  # 控制台输出INFO及以上级别日志（可根据需要调整）
+console_handler.setLevel(
+    logging.DEBUG
+)  # 控制台输出INFO及以上级别日志（可根据需要调整）
 console_handler.setFormatter(formatter)
 
 
@@ -46,6 +48,7 @@ timed_handler.suffix = "%Y-%m-%d_%H"  #  精确到小时即可
 
 # 配置Formatter：日志格式包含时间、模块名、级别、内容
 timed_handler.setFormatter(formatter)
+timed_handler.setLevel(logging.INFO)  # 文件输出INFO及以上级别日志
 
 # 为根日志添加处理器
 logger.addHandler(timed_handler)

@@ -12,6 +12,9 @@ if __name__ == "__main__":
         host="http://192.168.50.125",
         port=50000,
     )
+    tts_player.change_preset(
+        "longshu_zh"
+    )  # 可选值: "default"(女性活泼), "zh"(男性非标准) , "hard_zh"(男性业余), "longshu_zh"(男性专业), "longwan_zh"（女性专业）
 
     # tts_player.generate_wav("你好呀！请问有什么可以帮到你的吗？", "welcome.wav")
     # tts_player.play_audio("welcome.wav")
@@ -25,7 +28,7 @@ if __name__ == "__main__":
         max_tokens=256,
     )
 
-    llm_client.add_system_prompt("你叫小白")
+    # llm_client.add_system_prompt("你叫小白")
 
     # print("开始与模型对话（输入 exit 或 quit 退出）")
     logger.info("开始与模型对话（输入 exit 或 quit 退出）")
@@ -60,8 +63,6 @@ if __name__ == "__main__":
         # 循环结束后，把剩余的也说出来
         # if buffer.strip():
         #     tts_player.speak(buffer.strip(), interrupt=False)
-
-        print("\n")
 
     # print("对话结束")
     logger.info("对话结束")
