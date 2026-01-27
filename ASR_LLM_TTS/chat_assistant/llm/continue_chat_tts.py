@@ -8,7 +8,7 @@ from playsound3 import playsound
 # 配置
 # ======================
 VLLM_URL = "http://192.168.50.125:8000/v1/chat/completions"
-MODEL_NAME = "Qwen/Qwen3-8B"
+MODEL_NAME = "Qwen/Qwen3"
 
 TTS_URL = "http://192.168.50.125:50000/inference_zero_shot"
 SAMPLE_RATE = 24000

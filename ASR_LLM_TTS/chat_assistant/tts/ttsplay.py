@@ -110,7 +110,7 @@ class RealtimeTTSPlayer:
         """
         try:
             with requests.post(
-                self.host + f":{self.port}/inference_zero_shot",
+                "http://" + self.host + f":{self.port}/inference_zero_shot",
                 data={"tts_text": text, "data_type": "pcm", "preset": self.preset},
                 stream=True,
             ) as resp:
@@ -138,7 +138,7 @@ class RealtimeTTSPlayer:
         """
         try:
             with requests.post(
-                self.host + f":{self.port}/inference_zero_shot",
+                "http://" + self.host + f":{self.port}/inference_zero_shot",
                 data={"tts_text": text, "data_type": "wav", "preset": preset},
             ) as resp:
                 with open(filename, "wb") as f:
@@ -157,7 +157,7 @@ class RealtimeTTSPlayer:
         """
         try:
             with requests.post(
-                self.host + f":{self.port}/inference_zero_shot_zh",
+                "http://" + self.host + f":{self.port}/inference_zero_shot_zh",
                 data={"tts_text": text, "data_type": "wav"},
             ) as resp:
                 with open(filename, "wb") as f:
@@ -176,7 +176,7 @@ class RealtimeTTSPlayer:
         """
         try:
             with requests.post(
-                self.host + f":{self.port}/inference_zero_shot_hard_zh",
+                "http://" + self.host + f":{self.port}/inference_zero_shot_hard_zh",
                 data={"tts_text": text, "data_type": "wav"},
             ) as resp:
                 with open(filename, "wb") as f:
@@ -195,7 +195,7 @@ class RealtimeTTSPlayer:
         """
         try:
             with requests.post(
-                self.host + f":{self.port}/inference_zero_shot_longshu_zh",
+                "http://" + self.host + f":{self.port}/inference_zero_shot_longshu_zh",
                 data={"tts_text": text, "data_type": "wav"},
             ) as resp:
                 with open(filename, "wb") as f:
@@ -214,7 +214,7 @@ class RealtimeTTSPlayer:
         """
         try:
             with requests.post(
-                self.host + f":{self.port}/inference_zero_shot_longwan_zh",
+                "http://" + self.host + f":{self.port}/inference_zero_shot_longwan_zh",
                 data={"tts_text": text, "data_type": "wav"},
             ) as resp:
                 with open(filename, "wb") as f:
@@ -337,7 +337,7 @@ class RealtimeTTSPlayer:
 if __name__ == "__main__":
 
     tts_player = RealtimeTTSPlayer(
-        host="http://192.168.50.125",
+        host="192.168.50.125",
         port=50000,
     )
 

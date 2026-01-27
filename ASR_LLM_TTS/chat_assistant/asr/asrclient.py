@@ -12,7 +12,7 @@ class ASRClient:
 
     def __init__(
         self,
-        host="http://192.168.50.125",
+        host="192.168.50.125",
         port=2002,
         timeout: int = 60,
     ):
@@ -39,7 +39,7 @@ class ASRClient:
             files = {"file": (os.path.basename(wav_path), f, "audio/wav")}
 
             response = requests.post(
-                self.host + ":" + str(self.port) + "/asr",
+                "http://" + self.host + ":" + str(self.port) + "/asr",
                 files=files,
                 timeout=self.timeout,
             )
@@ -65,12 +65,12 @@ class ASRClient:
 # ===============================
 if __name__ == "__main__":
     client = ASRClient(
-        host="http://192.168.50.125",
+        host="192.168.50.125",
         port=2002,
         timeout=30,
     )
 
-    wav = "/home/xuyao/chj/ws/ymbot/ASR_LLM_TTS/asr/welcome.wav"
+    wav = "/home/xuyao/chj/ws/ymbot/ASR_LLM_TTS/chat_assistant/example.wav"
     text = client.recognize(wav)
     # print("ASR Result:", text)
     logger.info(f"ASR Result: {text}")

@@ -1,6 +1,6 @@
 from tts.ttsplay import RealtimeTTSPlayer
 
-from llm.llmclient import LLMClient
+from llm import LLMClient, LLMAgent
 
 from logger import logger
 
@@ -9,7 +9,7 @@ import requests
 if __name__ == "__main__":
 
     tts_player = RealtimeTTSPlayer(
-        host="http://192.168.50.125",
+        host="192.168.50.125",
         port=50000,
     )
     tts_player.change_preset(
@@ -19,8 +19,8 @@ if __name__ == "__main__":
     # tts_player.generate_wav("你好呀！请问有什么可以帮到你的吗？", "welcome.wav")
     # tts_player.play_audio("welcome.wav")
 
-    llm_client = LLMClient(
-        host="http://192.168.50.125",
+    llm_client = LLMAgent(
+        host="192.168.50.125",
         port=8000,
         temperature=0.6,  # 设置较低的温度以获得更确定性的回答
         top_p=0.9,  # 使用 nucleus 采样
@@ -57,7 +57,8 @@ if __name__ == "__main__":
         #     and len(buffer) >= 15
         #     and not buffer.rstrip().endswith(("*", "#", '"', "”"))
         # ):
-        tts_player.speak(llm_response.strip(), interrupt=True)
+        if llm_response:
+            tts_player.speak(llm_response.strip(), interrupt=True)
         # buffer = ""
 
         # 循环结束后，把剩余的也说出来

@@ -1,14 +1,14 @@
 ASR:
-  host: "http://192.168.50.125"
+  host: "192.168.50.125"
   port: 2002
 
 LLM:
-  host: "http://192.168.50.125"
+  host: "192.168.50.125"
   port: 8000
   system_prompt: ""
 
 TTS:
-  host: "http://192.168.50.125"
+  host: "192.168.50.125"
   port: 50000
   voice_type: "default" # 可选值: "default"(女性活泼), "zh"(男性非标准) , "hard_zh"(男性业余), "longshu_zh"(男性专业), "longwan_zh"（女性专业）
 
@@ -21,12 +21,12 @@ Audio:
 VAD:
   output_dir: "output" # VAD 结果保存目录
   mode : 3  # 0：最宽松，允许更多非语音通过  1：平衡模式 2：较严格，减少非语音通过  3：最严格，过滤更多非语音
-  no_speech_threshold: 0.50  # 静音持续多长时间后认为一句话结束 (秒)
+  no_speech_threshold: 0.60  # 静音持续多长时间后认为一句话结束 (秒)
   reactive_kws_threshold: 45  # 多久未检测到唤醒词，重置唤醒词状态，单位：秒
   decibel_threshold: -40  # 分贝阈值，低于此值认为是静音 (dB)
 
-  min_recording_duration: 0.50   # 最短有效录音时长 (秒)
-  max_recording_duration: 15  # 最大有效录音时长 (秒)
+  min_recording_duration: 1.0   # 最短有效录音时长 (秒)
+  max_recording_duration: 10  # 最大有效录音时长 (秒)
   
   pause_duration: 1.5  # 距离上次语音播放结束多长时间后，允许录音 (秒)
 

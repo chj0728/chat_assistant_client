@@ -20,7 +20,7 @@ source venv/bin/activate
 pip3 install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
 ```
 
-## Run the demos
+## Run the demos to test each module individually
 
 ```bash
 source venv/bin/activate
@@ -35,7 +35,11 @@ python3 -m asr.asrclient
 
 - LLM Demo(大语言模型)
 ```bash
-python3 -m llm.llmclient
+# 原始版本
+#python3 -m llm.llmclient
+
+# 基于Langchain的智能体版本
+python3 -m llm.llmagent
 ```
 
 - TTS Demo(文本转语音)
@@ -49,10 +53,10 @@ python3 -m app.llm_tts_stream
 ```
 - Chat Assistant Demo(集成语音识别、大语言模型、文本转语音)
 ```bash
-python3 -m app.chat_assistant_v1
+python3 -m app.chat_assistant_v3
 ```
 
-## Ros services
+## Run as a ROS2 Node
 - build the interfaces and package
 ```bash
 cd ASR_LLM_TTS
@@ -78,7 +82,7 @@ cd  ASR_LLM_TTS
 ./run.sh
 ```
 
-## Avilable topics
+### Avilable topics
 - `/asr_result` (std_msgs/msg/String)：发布识别到的文本
 - `/llm_result` (std_msgs/msg/String)：发布大语言模型生成的文本
 - `/assistant_response` (chat_assistant_interfaces/msg/Response)：发布包含识别文本和生成文本的综合响应
@@ -106,28 +110,28 @@ data: 查询当前时间。
 ---
 ```
 
-## Available services
+### Available services
 
 
-### 重新加载配置文件
+#### 重新加载配置文件
 ```bash
 ros2 service call /reload_config std_srvs/srv/Trigger
 ```
 
-### 激活对话助手
+#### 激活对话助手
 ```bash 
 ros2 service call /activate_assistant std_srvs/srv/Trigger
 ```
-### 停止对话助手
+#### 停止对话助手
 ```bash 
 ros2 service call /idle_assistant std_srvs/srv/Trigger
 ```
-### 打断语音播放
+#### 打断语音播放
 ```bash
 ros2 service call /interrupt_audio std_srvs/srv/Trigger
 ```
 
-### 播放音频文件（传入音频文件路径，播放该音频文件）
+#### 播放音频文件（传入音频文件路径，播放该音频文件）
 - 服务名称：`/play_audio_file`
 - 服务类型：`chat_assistant_interfaces/srv/GetString`
 - 请求参数
@@ -148,7 +152,7 @@ response:
 chat_assistant_interfaces.srv.GetString_Response(success=True, message='音频播放成功')
 ```
 
-### 单独调用语音识别服务（传入音频文件路径，返回识别文本）
+#### 单独调用语音识别服务（传入音频文件路径，返回识别文本）
 - 服务名称：`/asr_infer`
 - 服务类型：`chat_assistant_interfaces/srv/GetString`
 - 请求参数
@@ -170,7 +174,7 @@ response:
 chat_assistant_interfaces.srv.GetString_Response(success=True, message='请说出正确的唤醒词号，再进行对话。😊')
 ```
 
-### 单独调用大语言模型服务（传入文本，返回生成文本）
+#### 单独调用大语言模型服务（传入文本，返回生成文本）
 - 服务名称：`/llm_infer`
 - 服务类型：`chat_assistant_interfaces/srv/GetString`
 - 请求参数
@@ -191,7 +195,7 @@ response:
 chat_assistant_interfaces.srv.GetString_Response(success=True, message='今天天气晴朗，适合外出。')
 ```
 
-### 单独调用文本转语音服务（传入文本，合成语音并播放）
+#### 单独调用文本转语音服务（传入文本，合成语音并播放）
 - 服务名称：`/tts_infer`
 - 服务类型：`chat_assistant_interfaces/srv/GetString`
 - 请求参数
@@ -212,7 +216,7 @@ response:
 chat_assistant_interfaces.srv.GetString_Response(success=True, message='TTS 合成并播放音频成功')
 ``` 
 
-### 单独调用文本转语音服务（传入文本，保存为 WAV 文件）
+#### 单独调用文本转语音服务（传入文本，保存为 WAV 文件）
 - 服务名称：`/tts_generate_wav`
 - 服务类型：`chat_assistant_interfaces/srv/GenerateWav`
 - 请求参数

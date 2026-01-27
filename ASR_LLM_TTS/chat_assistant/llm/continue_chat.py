@@ -2,7 +2,7 @@ import requests
 import json
 
 VLLM_URL = "http://192.168.50.125:8000/v1/chat/completions"
-MODEL_NAME = "Qwen/Qwen3-8B"
+MODEL_NAME = "Qwen/Qwen3"
 
 messages = []
 

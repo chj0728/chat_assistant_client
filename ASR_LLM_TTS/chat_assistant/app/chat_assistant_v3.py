@@ -13,10 +13,9 @@ from queue import Queue, Full, Empty
 from pypinyin import pinyin, Style
 from enum import Enum
 
-
-from asr.asrclient import ASRClient
-from llm.llmclient import LLMClient
-from tts.ttsplay import RealtimeTTSPlayer
+from asr import ASRClient
+from llm import LLMAgent, LLMClient
+from tts import RealtimeTTSPlayer
 
 from logger import logger
 
@@ -170,13 +169,13 @@ class ChatAssistant:
         tts_cfg = self.configs.get("TTS", {})
 
         self.asr_client = ASRClient(
-            host=asr_cfg.get("host", "http://192.168.50.125"),
+            host=asr_cfg.get("host", "192.168.50.125"),
             port=asr_cfg.get("port", 2002),
             timeout=asr_cfg.get("timeout", 30),
         )
 
-        self.llm_client = LLMClient(
-            host=llm_cfg.get("host", "http://192.168.50.125"),
+        self.llm_client = LLMAgent(
+            host=llm_cfg.get("host", "192.168.50.125"),
             port=llm_cfg.get("port", 8000),
         )
         system_prompt = llm_cfg.get("system_prompt", "")
@@ -184,7 +183,7 @@ class ChatAssistant:
             self.llm_client.add_system_prompt(system_prompt)
 
         self.tts_client = RealtimeTTSPlayer(
-            host=tts_cfg.get("host", "http://192.168.50.125"),
+            host=tts_cfg.get("host", "192.168.50.125"),
             port=tts_cfg.get("port", 50000),
         )
         self.tts_client.change_preset(
@@ -480,8 +479,10 @@ class ChatAssistant:
 
                 # 计算分贝
                 decibel = self._calculate_decibel(audio_np)
+
                 ## 如果分贝低于阈值
                 if decibel < self.decibel_threshold:
+
                     ### 静音时间超过 no_speech_threshold and 有待保存音频段 则保存音频段
                     if (
                         now - self.last_active_time > self.no_speech_threshold
@@ -492,6 +493,12 @@ class ChatAssistant:
                         self.segments_to_save.append((audio_bytes, now))
                         self._finalize_pending_segments(now)
 
+                    ### 否则，继续等待, 保存静音段，防止断句不准确
+                    else:
+                        if self.segments_to_save:
+                            logger.info("静音时间未超过阈值，继续等待，保存静音段")
+                            self.segments_to_save.append((audio_bytes, now))
+
                 ## 分贝高于阈值，继续处理
                 else:
                     ### 如果 检测 VAD 活动，则保存音频段
@@ -500,16 +507,16 @@ class ChatAssistant:
                         self.last_active_time = now
                         self.segments_to_save.append((audio_bytes, now))
 
-                    ### 如果处于录音段内（已有数据） and 录音时长超过最大值，则保存音频段
-                    if self.segments_to_save and (
-                        self.segments_to_save[-1][1] - self.segments_to_save[0][1]
-                        > (self.max_recording_duration - 0.5)
-                    ):
-                        logger.info(
-                            f"录音时长超过最大值{self.max_recording_duration}秒，保存音频段"
-                        )
-                        self.segments_to_save.append((audio_bytes, now))
-                        self._finalize_pending_segments(now)
+                ## 如果处于录音段内（已有数据） and 录音时长超过最大值，则保存音频段
+                if self.segments_to_save and (
+                    self.segments_to_save[-1][1] - self.segments_to_save[0][1]
+                    > (self.max_recording_duration - 0.2)
+                ):
+                    logger.info(
+                        f"录音时长超过最大值{self.max_recording_duration}秒，保存音频段"
+                    )
+                    # self.segments_to_save.append((audio_bytes, now))
+                    self._finalize_pending_segments(now)
 
         with sd.InputStream(
             samplerate=self.audio_rate,

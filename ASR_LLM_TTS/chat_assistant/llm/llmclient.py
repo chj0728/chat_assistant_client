@@ -115,7 +115,7 @@ class LLMClient:
 
         self.history = []  # 只放 user / assistant / tool
 
-        self.llm_url = f"{self.host}:{self.port}/v1/models"
+        self.llm_url = f"http://{self.host}:{self.port}/v1/models"
         try:
             response = requests.get(self.llm_url)
             data = response.json()
@@ -206,7 +206,7 @@ class LLMClient:
             payload["tool_choice"] = "auto"
 
         response = requests.post(
-            f"{self.host}:{self.port}/v1/chat/completions",
+            f"http://{self.host}:{self.port}/v1/chat/completions",
             headers={"Content-Type": "application/json"},
             data=json.dumps(payload),
             stream=True,
@@ -291,7 +291,7 @@ class LLMClient:
                 }
 
                 followup_response = requests.post(
-                    f"{self.host}:{self.port}/v1/chat/completions",
+                    f"http://{self.host}:{self.port}/v1/chat/completions",
                     headers={"Content-Type": "application/json"},
                     data=json.dumps(followup_payload),
                     stream=True,

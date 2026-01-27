@@ -13,7 +13,9 @@ pip install requests json -i https://mirrors.aliyun.com/pypi/simple/
 ```
 ### 测试文本对话脚本
 ```bash
-python3 continue_chat.py
+cd ASR_LLM_TTS/chat_assistant/
+
+python3 -m llm.continue_chat
 ```
 终端输出如下，表示调用成功
 ```bash
@@ -30,7 +32,9 @@ python3 continue_chat.py
 
 ### 测试文本对话 + TTS返回完整音频脚本
 ```bash
-python3 continue_chat_tts.py
+cd ASR_LLM_TTS/chat_assistant/
+
+python3 -m llm.continue_chat_tts
 ```
 终端输出如下，表示调用成功
 ```bash
@@ -55,7 +59,9 @@ python3 continue_chat_tts.py
 
 ### llm客户端测试
 ```bash
-python3 llmclient.py
+cd ASR_LLM_TTS/chat_assistant/
+
+python3 -m llm.llmclient
 ```
 终端输出如下，表示调用成功
 ```bash
@@ -68,3 +74,9 @@ python3 llmclient.py
 你：exit
 对话结束
 ```
+
+# vLLM + Langchain + Qwen
+
+用 [LangChain（智能体框架）](https://docs.langchain.com/) + [vLLM（高性能推理引擎）](https://github.com/vllm-project/vllm) + [Qwen（本地模型）](https://qwen.ai/blog?id=qwen3)
+构建一套智能对话系统，支持多轮对话和上下文记忆。
+参考代码见： [ASR_LLM_TTS/chat_assistant/llm/llmagent.py](llmagent.py)
