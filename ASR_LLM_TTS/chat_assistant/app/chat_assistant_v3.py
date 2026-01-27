@@ -581,6 +581,16 @@ class ChatAssistant:
         except Exception as e:
             return False
 
+    def check_tts_active(self) -> bool:
+        """
+        负责检查 TTS 播放状态
+        """
+        try:
+            is_active = self.tts_client.is_active()
+            return is_active
+        except Exception as e:
+            return False
+
     def asr_infer(self, audio_path):
         """
         负责调用 ASR 完成语音识别

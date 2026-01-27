@@ -1,12 +1,14 @@
 import os
 import time
+import yaml
+from pathlib import Path
 
 import rclpy
 from rclpy.node import Node
 from rclpy.executors import ExternalShutdownException, MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
 
-from std_msgs.msg import String
+from std_msgs.msg import String, Bool
 from std_srvs.srv import Trigger
 from chat_assistant_interfaces.srv import GetString, GenerateWav
 from chat_assistant_interfaces.msg import Response
@@ -26,18 +28,6 @@ class ChatAssistantNode(Node):
 
         self.audio_cb_group = ReentrantCallbackGroup()
         self.interrupt_cb_group = ReentrantCallbackGroup()
-
-        # 创建话题发布者
-        ## 发布asr识别结果话题
-        self.asr_publisher = self.create_publisher(String, "asr_result", 10)
-
-        ## 发布 llm 生成结果话题
-        self.llm_publisher = self.create_publisher(String, "llm_result", 10)
-
-        ## 发布综合响应结果话题
-        self.response_publisher = self.create_publisher(
-            Response, "assistant_response", 10
-        )
 
         # 创建服务
         ## 重新加载配置文件参数
@@ -78,6 +68,59 @@ class ChatAssistantNode(Node):
         ## 接收文本输入和音频保存路径，调用 TTS 完成文本转语音，保存音频文件服务
         self.create_service(
             GenerateWav, "tts_generate_wav", self.handle_tts_generate_wav
+        )
+
+    def init_params(self):
+
+        self.config_path = (
+            self.get_parameter("config_path").get_parameter_value().string_value
+        )
+        self.config_yaml = Path(self.config_path).expanduser().resolve()
+        logger.info(f"配置文件路径: {self.config_yaml}")
+
+        self.load_config_and_initialize()
+
+        self.chat_assistant = ChatAssistant(config_path=self.config_path)
+
+    def load_config_and_initialize(self):
+        """
+        加载配置文件参数
+        初始化 ROS 相关参数和话题发布者
+        """
+        # ----------- 读取配置文件 -----------
+        try:
+            with open(self.config_yaml, "r", encoding="utf-8") as f:
+                self.configs = yaml.safe_load(f)
+                # logger.info(f"配置文件内容:\n{self.configs}")
+        except Exception as e:
+            logger.error(f"读取配置文件失败: {e}")
+
+        ros_cfg = self.configs.get("ros_cfg", {})
+
+        self.asr_publish_topic = ros_cfg.get("asr_publish_topic", "asr_result")
+        self.llm_publish_topic = ros_cfg.get("llm_publish_topic", "llm_result")
+        self.response_publish_topic = ros_cfg.get(
+            "response_publish_topic", "assistant_response"
+        )
+        self.tts_active_topic = ros_cfg.get(
+            "tts_active_topic", "sound_detected_default"
+        )
+
+        # 创建话题发布者
+        ## 发布asr识别结果话题
+        self.asr_publisher = self.create_publisher(String, self.asr_publish_topic, 10)
+
+        ## 发布 llm 生成结果话题
+        self.llm_publisher = self.create_publisher(String, self.llm_publish_topic, 10)
+
+        ## 发布综合响应结果话题
+        self.response_publisher = self.create_publisher(
+            Response, self.response_publish_topic, 10
+        )
+
+        ## 发布 TTS 播放状态话题
+        self.tts_status_publisher = self.create_publisher(
+            Bool, self.tts_active_topic, 1
         )
 
     def handle_interrupt_audio(self, request, response):
@@ -149,7 +192,14 @@ class ChatAssistantNode(Node):
         重新加载配置文件参数服务
         """
         logger.info("收到重新加载配置文件请求")
+
+        # 重新加载ros参数
+        self.load_config_and_initialize()
+
+        # 重新初始化聊天助手
         self.chat_assistant.load_config_and_initialize()
+        self.chat_assistant.start_recording()
+
         response.success = True
         response.message = "配置文件已重新加载"
         return response
@@ -244,15 +294,6 @@ class ChatAssistantNode(Node):
         response.message = "聊天助手已置于空闲状态"
         return response
 
-    def init_params(self):
-
-        self.config_path = (
-            self.get_parameter("config_path").get_parameter_value().string_value
-        )
-        logger.info(f"配置文件路径: {self.config_path}")
-
-        self.chat_assistant = ChatAssistant(config_path=self.config_path)
-
 
 def main(args=None):
     rclpy.init(args=args)
@@ -302,6 +343,16 @@ def main(args=None):
                 logger.info(
                     f"发布 综合响应结果 到话题: ASR Text: {response_json['asr_text']}, LLM Text: {response_json['llm_text']}"
                 )
+
+            if chat_assistant_node.chat_assistant.check_tts_active():
+                # 发布 TTS 播放状态 到话题
+                tts_msg = Bool()
+                tts_msg.data = True
+                chat_assistant_node.tts_status_publisher.publish(tts_msg)
+            else:
+                tts_msg = Bool()
+                tts_msg.data = False
+                chat_assistant_node.tts_status_publisher.publish(tts_msg)
 
             # rclpy.spin_once(chat_assistant_node, timeout_sec=0.05)
             executor.spin_once(timeout_sec=0.05)

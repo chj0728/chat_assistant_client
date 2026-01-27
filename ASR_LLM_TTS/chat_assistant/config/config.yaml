@@ -35,3 +35,10 @@ KWS:
   wake_word_pinyin: "ni hao xiao te"
 
 enable_replace_special_characters: false # 是否启用替换特殊字符功能
+
+ros_cfg:
+  asr_publish_topic: "asr_result" # 识别结果发布主题
+  llm_publish_topic: "llm_result"   # LLM 回复结果发布主题
+  response_publish_topic: "assistant_response" # 综合响应结果话题,同时包含ASR,LLM结果
+
+  tts_active_topic: "sound_detected_default" # TTS 播放状态话题

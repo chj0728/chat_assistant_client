@@ -83,9 +83,22 @@ cd  ASR_LLM_TTS
 ```
 
 ### Avilable topics
-- `/asr_result` (std_msgs/msg/String)：发布识别到的文本
-- `/llm_result` (std_msgs/msg/String)：发布大语言模型生成的文本
-- `/assistant_response` (chat_assistant_interfaces/msg/Response)：发布包含识别文本和生成文本的综合响应
+- `/asr_result`
+  - 话题名称：读取[配置文件](chat_assistant/config/config.yaml)中的 `asr_publish_topic`，
+  - 消息类型：std_msgs/msg/String
+  - 发布语音识别结果文本
+- `/llm_result`
+  - 话题名称：读取[配置文件](chat_assistant/config/config.yaml)中的 `llm_publish_topic`
+  - 消息类型：std_msgs/msg/String
+  - 发布大语言模型生成的文本结果
+- `/assistant_response`
+  - 话题名称：读取[配置文件](chat_assistant/config/config.yaml)中的 `response_publish_topic`
+  - 消息类型：chat_assistant_interfaces/msg/Response
+  - 发布包含识别文本和生成文本的综合响应
+- `/sound_detected_default`
+  - 话题名称：读取[配置文件](chat_assistant/config/config.yaml)中的 `tts_active_topic`
+  - 消息类型：std_msgs/msg/Bool
+  - 发布 TTS 播放状态，True 表示正在播放，False 表示空闲
 
 ```bash
 # 订阅示例
