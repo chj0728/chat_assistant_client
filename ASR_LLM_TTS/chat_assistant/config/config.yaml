@@ -13,7 +13,7 @@ TTS:
   voice_type: "default" # 可选值: "default"(女性活泼), "zh"(男性非标准) , "hard_zh"(男性业余), "longshu_zh"(男性专业), "longwan_zh"（女性专业）
 
 Audio:
-  rate: 32000 # 8000 ，16000， 32000， 48000 # 采样率（Hz）每秒多少个采样点（帧）
+  rate: 48000 # 8000 ，16000， 32000， 48000 # 采样率（Hz）每秒多少个采样点（帧）
   channels: 1 # 单声道
   chunk_duration_ms: 20  # 每次读取的音频块持续时间（毫秒）10,20,30
   # chunk_size: 960  # int(rate * chunk_duration_ms / 1000) * 2 # 每次读取的音频块大小（帧数）
@@ -22,19 +22,21 @@ VAD:
   output_dir: "output" # VAD 结果保存目录
   mode : 3  # 0：最宽松，允许更多非语音通过  1：平衡模式 2：较严格，减少非语音通过  3：最严格，过滤更多非语音
   no_speech_threshold: 0.60  # 静音持续多长时间后认为一句话结束 (秒)
-  reactive_kws_threshold: 45  # 多久未检测到唤醒词，重置唤醒词状态，单位：秒
+  reactive_kws_threshold: 30  # 多久未检测到唤醒词，重置唤醒词状态，单位：秒
   decibel_threshold: -40  # 分贝阈值，低于此值认为是静音 (dB)
 
   min_recording_duration: 1.0   # 最短有效录音时长 (秒)
   max_recording_duration: 10  # 最大有效录音时长 (秒)
   
-  pause_duration: 1.5  # 距离上次语音播放结束多长时间后，允许录音 (秒)
+  pause_duration: 3.0  # 距离上次语音播放结束多长时间后，允许录音 (秒)
 
 KWS:
   enable: true
-  wake_word_pinyin: "ni hao xiao te"
+  wake_word: "你好小特"
+  # wake_word_pinyin: "ni hao xiao te"
 
 enable_replace_special_characters: false # 是否启用替换特殊字符功能
+enable_interrupt_tts: true # 是否启用打断 TTS 功能
 
 ros_cfg:
   asr_publish_topic: "asr_result" # 识别结果发布主题

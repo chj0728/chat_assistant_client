@@ -96,8 +96,11 @@ class RealtimeTTSPlayer:
         严格串行的 TTS worker
         """
         while not self._stop_event.is_set():
+
+            time.sleep(0.1)
+
             try:
-                text = self.text_queue.get(timeout=0.5)
+                text = self.text_queue.get(timeout=0.1)
             except queue.Empty:
                 time.sleep(0.1)
                 continue
@@ -235,7 +238,7 @@ class RealtimeTTSPlayer:
         self.preset = preset
         logger.info(f"TTS 预设已更改为: {preset}")
 
-    def speak(self, text, interrupt=False):
+    def speak(self, text, interrupt=True):
         """
         只负责把文本放进队列，不阻塞，由后台线程处理并播放语音合成
         """
@@ -301,6 +304,8 @@ class RealtimeTTSPlayer:
     def interrupt(self):
         """打断：清空文本 + 音频"""
         self._interrupt_event.set()
+
+        time.sleep(0.2)
 
         if not self.text_queue.empty() or not self.audio_queue.empty():
             logger.info("正在清空播放队列...")

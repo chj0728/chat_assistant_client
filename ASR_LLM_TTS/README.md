@@ -250,3 +250,24 @@ requester: making request: chat_assistant_interfaces.srv.GenerateWav_Request(inp
 response:
 chat_assistant_interfaces.srv.GenerateWav_Response(success=True, message='WAV 文件已保存到 /home/xuyao/chj/ws/ymbot/ASR_LLM_TTS/chat_assistant/wavs/tts_output.wav')
 ```
+
+#### 接收文本输入，调用 ASR、LLM、TTS 完成一次完整的交互服务
+- 服务名称：`/chat_assistant_infer`
+- 服务类型：`chat_assistant_interfaces/srv/GetString`
+- 请求参数
+  - `string input`：输入文本
+  - 返回参数
+    - `bool success`：表示服务调用是否成功
+    - `string message`：生成结果文本 or 错误信息  
+- 请求示例
+```bash 
+ros2 service call /chat_assistant_infer chat_assistant_interfaces/srv/GetString "{input: '你好小特'}"
+```
+  - 响应示例      
+``` bash
+waiting for service to become available...
+requester: making request: chat_assistant_interfaces.srv.GetString_Request(input='你好小特')
+
+response:
+chat_assistant_interfaces.srv.GetString_Response(success=True, message='聊天助手完整交互已完成')
+```

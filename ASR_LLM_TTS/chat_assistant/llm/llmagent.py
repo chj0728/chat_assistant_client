@@ -18,11 +18,15 @@ import os
 
 from pydantic import SecretStr
 from langchain_openai import ChatOpenAI
-from langchain.agents import create_agent
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
-from langchain.agents.structured_output import ProviderStrategy
+
 from langgraph.checkpoint.memory import InMemorySaver
 from langchain.tools import tool
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+
+from langchain.agents import create_agent
+from langchain.agents.structured_output import ProviderStrategy
+from langchain.agents.middleware import AgentMiddleware, ModelRequest
+from langchain.agents.middleware.types import ToolCallRequest
 
 
 from logger import logger
@@ -38,19 +42,44 @@ from tools.functions import get_shanghai_time, get_current_location, get_weather
 @tool
 def get_current_time_tool() -> str:
     """获取上海当前时间的工具函数"""
+    logger.info("调用工具函数->获取上海当前时间。")
     return get_shanghai_time()
 
 
 @tool
 def get_current_location_tool() -> str:
     """获取当前位置信息的工具函数"""
+    logger.info("调用工具函数->获取当前位置信息。")
     return get_current_location()
 
 
 @tool
 def get_weather_info_tool() -> str:
     """获取天气信息的工具函数"""
+    logger.info("调用工具函数->获取天气信息。")
     return get_weather_info()
+
+
+# -------- 测试 tools --------
+# @tool(description="当有人问候的时候，挥手回应")
+# def response_wave_hands_tool() -> str:
+#     # """挥手回应的工具函数"""
+#     logger.info("工具函数: 机器人挥了挥手，表示问候！")
+#     return "机器人挥了挥手，表示问候！"
+
+
+# @tool(description="当用户想要参观的时候，引导客户前往指定区域")
+# def guide_customer_tool() -> str:
+#     """引导客户的工具函数"""
+#     logger.info("工具函数: 机器人引导客户前往指定区域。")
+#     return "机器人引导客户前往指定区域。"
+
+
+# @tool(description="当用户回答退出、结束等相关内容时，礼貌地结束对话")
+# def end_conversation_tool() -> str:
+#     """结束对话的工具函数"""
+#     logger.info("工具函数: 机器人礼貌地结束了对话。")
+#     return "机器人礼貌地结束了对话。"
 
 
 class LLMAgent:
@@ -63,9 +92,11 @@ class LLMAgent:
         self,
         host,
         port,
+        middleware_list: list[AgentMiddleware] | None = None,
+        # dynamic_tool_middlewares: AgentMiddleware | None = None,
         temperature=0.6,
         top_p=0.95,
-        top_k=20,
+        top_k=50,
         max_tokens=1024,
         enable_thinking=False,
         timeout=30,
@@ -76,9 +107,10 @@ class LLMAgent:
         参数:
             host (str): LLM 服务的主机地址。
             port (int): LLM 服务的端口号。
+            dynamic_tool_middlewares (AgentMiddleware | None): 可选的动态工具中间件。 默认值为 None。
             temperature (float): 控制生成文本的随机性。默认值为 0.6。
             top_p (float): 用于 nucleus 采样的概率阈值。默认值为 0.95。
-            top_k (int): 用于 top-k 采样的词汇数量。默认值为 20。
+            top_k (int): 用于 top-k 采样的词汇数量。默认值为 50。
             max_tokens (int): 生成文本的最大 token 数量。默认值为 1024。
             enable_thinking (bool): 是否启用思考过程。默认值为 False。
             timeout (int): 请求超时时间（秒）。默认值为 30 秒。
@@ -129,8 +161,13 @@ class LLMAgent:
                 get_current_time_tool,
                 get_current_location_tool,
                 get_weather_info_tool,
+                # response_wave_hands_tool,
+                # guide_customer_tool,
+                # end_conversation_tool,
             ],
             checkpointer=InMemorySaver(),  # 使用内存检查点保存对话状态
+            middleware=middleware_list if middleware_list else [],
+            # middleware=[dynamic_tool_middlewares] if dynamic_tool_middlewares else [],
         )
         logger.info("LLM Agent 创建完成")
 
@@ -146,7 +183,7 @@ class LLMAgent:
 只要用户询问关于时间或位置的问题时，优先使用工具来获取准确的信息，而不是直接从模型中生成答案。
 如果你不确定答案，可以礼貌地告诉用户你不知道，而不是编造答案。
 在回答中尽量避免使用标点符号结尾，以便更自然地进行语音合成。
-如果用户回答退出、结束等相关内容时，礼貌地结束对话。""",
+如果用户回答退出、结束等相关内容时，调用结束对话工具，礼貌地结束对话。"""
         )
 
     # -------- private methods --------

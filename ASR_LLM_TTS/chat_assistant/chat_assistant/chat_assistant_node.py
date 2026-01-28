@@ -2,6 +2,8 @@ import os
 import time
 import yaml
 from pathlib import Path
+from enum import Enum
+from queue import Queue, Full, Empty
 
 import rclpy
 from rclpy.node import Node
@@ -16,6 +18,119 @@ from chat_assistant_interfaces.msg import Response
 from app import ChatAssistant
 
 from logger import logger
+
+from langchain.tools import tool
+from langchain.agents.middleware import (
+    AgentMiddleware,
+    ModelRequest,
+    before_agent,
+    before_model,
+    after_model,
+    after_agent,
+)
+from langchain.agents.middleware.types import ToolCallRequest
+from langchain.agents import AgentState
+from langgraph.runtime import Runtime
+
+
+class ToolEvent(Enum):
+    WAVE_HANDS = 0  # 代表挥手回应事件
+    END_CONVERSATION = 1  # 代表结束对话事件
+
+
+MAX_QUEUE_SIZE = 10
+tool_event_queue = Queue(maxsize=MAX_QUEUE_SIZE)
+
+
+def push_queue(data_queue: Queue, value) -> None:
+    """将最新文本加入有限队列，保持队列容量受控。"""
+    try:
+        data_queue.put_nowait(value)
+    except Full:
+        try:
+            data_queue.get_nowait()
+        except Empty:
+            pass
+        data_queue.put_nowait(value)
+
+
+@tool(description="只要用户问候的时候，就挥手回应")
+def response_wave_hands_tool():
+    # """挥手回应的工具函数"""
+    logger.info("调用工具函数->机器人挥了挥手，表示问候！")
+
+    global tool_event_queue
+    push_queue(tool_event_queue, ToolEvent.WAVE_HANDS.value)
+    return
+
+
+@tool(description="当用户回答退出、结束等相关内容时，礼貌地结束对话")
+def end_conversation_tool():
+    """结束对话的工具函数"""
+    logger.info("调用工具函数->机器人礼貌地结束了对话。")
+    global tool_event_queue
+    push_queue(tool_event_queue, ToolEvent.END_CONVERSATION.value)
+    return
+
+
+class DynamicToolMiddleware(AgentMiddleware):
+    """
+    动态工具中间件示例，用于在运行时注册和调用工具
+    """
+
+    def wrap_model_call(self, request: ModelRequest, handler):
+        # 添加动态工具请求处理
+        updated = request.override(
+            tools=[*request.tools, response_wave_hands_tool, end_conversation_tool]
+        )
+        # logger.info("动态工具中间件: 添加挥手回应和结束对话工具")
+        return handler(updated)
+
+    def wrap_tool_call(self, request: ToolCallRequest, handler):
+        # 处理特定工具调用
+        if request.tool_call["name"] == "response_wave_hands_tool":
+            logger.info("动态工具中间件: 检测到挥手回应工具调用")
+            return handler(request.override(tool=response_wave_hands_tool))
+
+        if request.tool_call["name"] == "end_conversation_tool":
+            logger.info("动态工具中间件: 检测到结束对话工具调用")
+            return handler(request.override(tool=end_conversation_tool))
+
+        return handler(request)
+
+
+# call_flag = False
+
+
+@before_agent
+def test_before_agent(state: AgentState, runtime: Runtime) -> None:
+    # global call_flag
+    # call_flag = True
+    logger.info("=======> Before Agent Middleware")
+
+
+@before_model
+def test_before_model(state: AgentState, runtime: Runtime) -> None:
+    logger.info("=======> Before Model Middleware")
+
+
+@after_model
+def test_after_model(state: AgentState, runtime: Runtime) -> None:
+    logger.info("=======> After Model Middleware")
+
+
+@after_agent
+def test_after_agent(state: AgentState, runtime: Runtime) -> None:
+    logger.info("=======> After Agent Middleware")
+
+
+middlewares = [
+    DynamicToolMiddleware(),
+    test_before_agent,
+    test_before_model,
+    test_after_model,
+    test_after_agent,
+]
 
 
 class ChatAssistantNode(Node):
@@ -49,6 +164,11 @@ class ChatAssistantNode(Node):
         ## 接收文本输入，只调用 TTS 完成文本转语音，并在线播放音频服务
         self.create_service(GetString, "tts_infer", self.handle_tts_infer)
 
+        ## 接收文本输入，调用 ASR、LLM、TTS 完成一次完整的交互服务
+        self.create_service(
+            GetString, "chat_assistant_infer", self.handle_chat_assistant_infer
+        )
+
         ## 接收audio_path，直接播放音频服务
         self.create_service(
             GetString,
@@ -80,7 +200,11 @@ class ChatAssistantNode(Node):
 
         self.load_config_and_initialize()
 
-        self.chat_assistant = ChatAssistant(config_path=self.config_path)
+        self.chat_assistant = ChatAssistant(
+            config_path=self.config_path,
+            # dynamic_tool_middlewares=DynamicToolMiddleware(),
+            middleware_list=middlewares,
+        )
 
     def load_config_and_initialize(self):
         """
@@ -122,6 +246,20 @@ class ChatAssistantNode(Node):
         self.tts_status_publisher = self.create_publisher(
             Bool, self.tts_active_topic, 1
         )
+
+    def handle_chat_assistant_infer(self, request, response):
+        """
+        接收文本输入，调用 ASR、LLM、TTS 完成一次完整的交互服务
+        """
+        input_text = request.input
+
+        logger.info(f"收到聊天助手完整交互请求，输入文本: {input_text}")
+        self.chat_assistant.Inference(input_text=input_text)
+
+        response.success = True
+        response.message = "聊天助手完整交互已完成"
+        logger.info("聊天助手完整交互已完成")
+        return response
 
     def handle_interrupt_audio(self, request, response):
         """
@@ -294,6 +432,26 @@ class ChatAssistantNode(Node):
         response.message = "聊天助手已置于空闲状态"
         return response
 
+    def handle_tool_events(self):
+        """
+        处理工具事件队列中的事件
+        """
+        global tool_event_queue
+        try:
+            tool_event = tool_event_queue.get_nowait()
+
+            if tool_event == ToolEvent.WAVE_HANDS.value:
+                logger.info("Main loop handling tool event: WAVE_HANDS")
+                # 在这里添加挥手回应的具体实现代码
+
+            elif tool_event == ToolEvent.END_CONVERSATION.value:
+                logger.info("Main loop handling tool event: END_CONVERSATION")
+                # 在这里添加结束对话的具体实现代码
+                self.chat_assistant.deactivate_llm_agent()
+
+        except Empty:
+            pass
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -354,9 +512,16 @@ def main(args=None):
                 tts_msg.data = False
                 chat_assistant_node.tts_status_publisher.publish(tts_msg)
 
+            # global call_flag
+            # if call_flag:
+            #     call_flag = False
+            #     logger.info("Main loop detected middleware call.")
+
+            # handle tool events
+            chat_assistant_node.handle_tool_events()
+
             # rclpy.spin_once(chat_assistant_node, timeout_sec=0.05)
             executor.spin_once(timeout_sec=0.05)
-            # logger.debug("Main loop heartbeat...")
 
     # except KeyboardInterrupt:
     #     if rclpy.ok():  # 检查上下文是否仍然有效
