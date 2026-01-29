@@ -28,7 +28,7 @@ VAD:
   min_recording_duration: 0.8   # 最短有效录音时长 (秒)
   max_recording_duration: 10  # 最大有效录音时长 (秒)
   
-  pause_duration: 2.0  # 距离上次语音播放结束多长时间后，允许录音 (秒)
+  pause_duration: 2.0  # 距离上次语音保存多长时间后，允许再次保存音频 (秒)
 
 KWS:
   enable: true

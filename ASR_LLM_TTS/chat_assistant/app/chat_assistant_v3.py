@@ -248,7 +248,7 @@ class ChatAssistant:
         self.segments_to_save = []  # 待保存的音频片段
         self.saved_intervals = []  # 已保存的时间区间
         self.last_active_time = time.time()  # 上次检测到有效语音的时间
-        self.last_vad_end_time = 0  # 上次保存的 VAD 有效段结束时间
+        self.last_vad_end_time = time.time()  # 上次保存的 VAD 有效段结束时间
         self.last_llm_time = time.time()  # 上次与 LLM 交互的时间
         self.last_tts_time = time.time()  # 上次 TTS 播放的时间
         self.audio_file_count = 0
@@ -381,7 +381,7 @@ class ChatAssistant:
         # 缓冲时间判断
         # ===============================
         current_time = time.time()
-        if current_time - self.last_active_time < self.pause_duration:
+        if current_time - self.last_vad_end_time < self.pause_duration:
             logger.warning("缓冲时间内，跳过保存音频")
             self.segments_to_save.clear()
             return None
