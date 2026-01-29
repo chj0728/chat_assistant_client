@@ -267,6 +267,33 @@ class ChatAssistant:
         # 是否允许 ASR
         self.enable_asr = True
 
+        # ====== 能量统计 ======
+        self.energy_instability_check = self.configs.get(
+            "energy_instability_check", True
+        )
+        # self.energy_window_duration = self.configs.get("energy_window_duration", 5.0)
+        self.max_energy_frames = self.configs.get("energy_frames", 50)  # 50 x 0.1s = 5s
+        self.energy_instability_threshold = self.configs.get(
+            "energy_instability_threshold", 2.0
+        )
+        self.energy_window = []  # 每个分析块的 RMS
+
+    def _compute_energy_instability(self):
+        """
+        计算能量不稳定性指标（标准差 / 均值）
+        """
+        if len(self.energy_window) < 5:
+            return 0.0
+        mean = np.mean(self.energy_window)
+        std = np.std(self.energy_window)
+        logger.info(f"能量均值: {mean:.6f}, 标准差: {std:.6f}")
+        return std / (mean + 1e-6)
+
+    def _reset_segment_state(self):
+        """重置音频片段状态。"""
+        self.segments_to_save.clear()
+        self.energy_window.clear()
+
     def extract_chinese_and_convert_to_pinyin(self, input_string):
         """
         提取字符串中的汉字，并将其转换为拼音。
@@ -353,12 +380,29 @@ class ChatAssistant:
 
     def _finalize_pending_segments(self, timestamp: float) -> None:
         """在长时间静音后触发音频保存。"""
+
+        energy_instability = self._compute_energy_instability()
+        logger.info(f"能量不稳定性指标(标准差/均值): {energy_instability:.6f}")
+
+        # ====== 判定阈值 ======
+        if (
+            energy_instability > self.energy_instability_threshold
+            and self.energy_instability_check
+        ):
+            logger.warning("疑似多人说话，音频能量不稳定，放弃保存音频")
+            self._reset_segment_state()
+            return
+
+        # 能量稳定，保存音频
         if (
             self.segments_to_save
             and self.segments_to_save[-1][1] > self.last_vad_end_time
         ):
             self.save_audio_only()
             self.last_active_time = timestamp
+
+        # 重置状态
+        self._reset_segment_state()
 
     def save_audio_only(self):
         """
@@ -501,6 +545,14 @@ class ChatAssistant:
                 audio_bytes = self._float_to_pcm16(audio_np)
                 # 重置缓冲区
                 reset_buffer()
+
+                # === NEW: 计算 RMS 能量 ===
+                rms = np.sqrt(np.mean(audio_np**2) + 1e-8)
+                # logger.info(f"RMS 能量: {rms:.6f}")
+                self.energy_window.append(rms)
+                if len(self.energy_window) > self.max_energy_frames:
+                    # logger.info("能量窗口已满，移除最早的能量值")
+                    self.energy_window.pop(0)
 
                 # 计算分贝
                 decibel = self._calculate_decibel(audio_np)
@@ -728,11 +780,21 @@ class ChatAssistant:
                 if self.failed_enable_kws_count >= 2:
 
                     self._push_queue(
-                        self.llm_response_queue, f"你可以说出{self.set_kws}来唤醒我。"
+                        self.llm_response_queue, f"你可以说出:{self.set_kws} 来唤醒我!"
                     )
                     self.response_json["llm_text"] = (
-                        f"你可以说出{self.set_kws}来唤醒我。"
+                        f"你可以说出:{self.set_kws} 来唤醒我!"
                     )
+
+                    # 只有在 ACTIVE 状态下才播放提示语音
+                    if self.get_state() == AssistantState.ACTIVE:
+                        logger.info("语音助手处于 ACTIVE 状态，准备播放提示语音")
+                        if self.tts_client.is_active() and self.enable_interrupt_tts:
+                            logger.info("TTS 播放中，启用了打断功能，准备中断播放")
+                            self.tts_client.interrupt()
+                            time.sleep(0.1)
+
+                        self.tts_infer(f"你可以说出:{self.set_kws} 来唤醒我!")
 
                     self.failed_enable_kws_count = 0
                 else:
