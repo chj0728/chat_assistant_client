@@ -250,6 +250,7 @@ class ChatAssistant:
         self.last_active_time = time.time()  # 上次检测到有效语音的时间
         self.last_vad_end_time = 0  # 上次保存的 VAD 有效段结束时间
         self.last_llm_time = time.time()  # 上次与 LLM 交互的时间
+        self.last_tts_time = time.time()  # 上次 TTS 播放的时间
         self.audio_file_count = 0
 
         self.enable_interrupt_tts = self.configs.get("enable_interrupt_tts", False)
@@ -380,7 +381,7 @@ class ChatAssistant:
         # 缓冲时间判断
         # ===============================
         current_time = time.time()
-        if current_time - self.last_llm_time < self.pause_duration:
+        if current_time - self.last_active_time < self.pause_duration:
             logger.warning("缓冲时间内，跳过保存音频")
             self.segments_to_save.clear()
             return None
@@ -482,6 +483,8 @@ class ChatAssistant:
             now = time.time()
 
             if self.tts_client.is_active():
+
+                # tts 播放中，代表模型正在说话
                 # 更新 last_llm_time
                 self.last_llm_time = now
 

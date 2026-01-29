@@ -17,17 +17,19 @@ import sys
 import os
 
 from pydantic import SecretStr
-from langchain_openai import ChatOpenAI
 
-from langgraph.checkpoint.memory import InMemorySaver
+from langchain_openai import ChatOpenAI
+from langchain_community.llms.vllm import VLLM, VLLMOpenAI
+from langchain.chat_models import init_chat_model
+
 from langchain.tools import tool
+from langgraph.checkpoint.memory import InMemorySaver
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
 from langchain.agents import create_agent
 from langchain.agents.structured_output import ProviderStrategy
 from langchain.agents.middleware import AgentMiddleware, ModelRequest
 from langchain.agents.middleware.types import ToolCallRequest
-
 
 from logger import logger
 
@@ -39,23 +41,23 @@ sys.path.append(current_dir)
 from tools.functions import get_shanghai_time, get_current_location, get_weather_info
 
 
-@tool
+@tool(description="获取当前时间的工具函数")
 def get_current_time_tool() -> str:
-    """获取上海当前时间的工具函数"""
-    logger.info("调用工具函数->获取上海当前时间。")
+    # """获取上海当前时间的工具函数"""
+    logger.info("调用工具函数->获取当前时间。")
     return get_shanghai_time()
 
 
-@tool
+@tool(description="获取当前位置信息的工具函数")
 def get_current_location_tool() -> str:
-    """获取当前位置信息的工具函数"""
+    # """获取当前位置信息的工具函数"""
     logger.info("调用工具函数->获取当前位置信息。")
     return get_current_location()
 
 
-@tool
+@tool(description="获取天气信息的工具函数")
 def get_weather_info_tool() -> str:
-    """获取天气信息的工具函数"""
+    # """获取天气信息的工具函数"""
     logger.info("调用工具函数->获取天气信息。")
     return get_weather_info()
 
@@ -145,6 +147,7 @@ class LLMAgent:
             model=self.model_id,
             stream_usage=True,
             temperature=temperature,
+            top_p=top_p,
             max_completion_tokens=max_tokens,
             timeout=self.timeout,
             api_key=SecretStr("EMPTY"),  # vLLM不需要key
