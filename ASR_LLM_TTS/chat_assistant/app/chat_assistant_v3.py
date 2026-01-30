@@ -500,9 +500,9 @@ class ChatAssistant:
         frames_collected = 0
         self.last_active_time = time.time()
 
-        # 每收集 ≥ 100ms（或 ≥ 一个 chunk_frames）的音频，就做一次分析
+        # 每收集 ≥ 200ms（或 ≥ 一个 chunk_frames）的音频，就做一次分析
         analysis_interval_frames = max(
-            1, max(self.chunk_frames, int(0.10 * self.audio_rate))
+            1, max(self.chunk_frames, int(0.20 * self.audio_rate))
         )
 
         logger.info("音频录制已开始（sounddevice）")
