@@ -57,7 +57,35 @@ class ASRClient:
             logger.error(f"ASR failed: {result.get('msg')}")
             raise RuntimeError(f"ASR failed: {result.get('msg')}")
 
-        return result.get("text", "")
+        # 只提取 speaker_id 为 0 的文本
+        # spk_0_tex = ""
+        # sentences = result.get("sentences", [])
+        # for sentence in sentences:
+        #     logger.info(
+        #         f"speaker_id={sentence.get('speaker_id')}:start={sentence['start']:.2f}, end={sentence['end']:.2f}, text={sentence['text']}"
+        #     )
+        #     if sentence.get("speaker_id") == 0:
+        #         spk_0_tex += sentence["text"] + " "
+
+        # logger.info(f"Speaker 0 Text: {spk_0_tex.strip()}")
+        # # return result.get("text", "")
+        # return spk_0_tex.strip()
+
+        # 如果只存在speaker_id为0的句子，则返回其文本 ，否则返回空字符串
+        sentences = result.get("sentences", [])
+
+        for sentence in sentences:
+            logger.info(
+                f"speaker_id={sentence.get('speaker_id')}:start={sentence['start']:.2f}, end={sentence['end']:.2f}, text={sentence['text']}"
+            )
+
+        spk_0_sentences = [s for s in sentences if s.get("speaker_id") == 0]
+        if len(spk_0_sentences) == len(sentences):
+            spk_0_text = " ".join(s["text"] for s in spk_0_sentences)
+            # logger.info(f"Speaker 0 Text: {spk_0_text.strip()}")
+            return spk_0_text.strip()
+
+        return ""
 
 
 # ===============================
