@@ -23,21 +23,22 @@ class RealtimeTTSPlayer:
         self,
         host,
         port,
-        sample_rate=24000,
-        channels=1,
-        chunk_size=4096,
+        sample_rate: int = 48000,
+        channels: int = 1,
+        chunk_size: int = 4096,
+        buffer_size: int = 8192,  # 增加缓冲区大小
     ):
         self.host = host
         self.port = port
         self.sample_rate = sample_rate
         self.channels = channels
         self.chunk_size = chunk_size
-
+        self.buffer_size = buffer_size  # 增加缓冲区大小
         self.preset = "default"  # "default"(女性活泼), "zh"(男性非标准) , "hard_zh"(男性业余), "longshu_zh"(男性专业), "longwan_zh"（女性专业）
 
         # 文本队列 + 音频队列
         self.text_queue = queue.Queue()
-        self.audio_queue = queue.Queue()
+        self.audio_queue = queue.Queue(maxsize=10)
 
         self.sound = None
         self.is_sounding = False
@@ -49,7 +50,8 @@ class RealtimeTTSPlayer:
             samplerate=self.sample_rate,
             channels=self.channels,
             dtype="int16",
-            blocksize=0,
+            blocksize=self.buffer_size,  # 使用更大的缓冲区
+            latency="high",
         )
         self.stream.start()
 
