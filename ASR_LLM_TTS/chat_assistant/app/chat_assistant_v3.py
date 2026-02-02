@@ -839,7 +839,7 @@ class ChatAssistant:
 
         # -------- 判断asr_text中汉字数量，过少则忽略 ----------
         chinese_char_count = self.count_chinese_characters(self.asr_text)
-        if chinese_char_count < 3:
+        if chinese_char_count < 2:
             logger.warning("ASR 识别文本中汉字数量过少，跳过本次交互")
             self.last_llm_time = time.time()
             return

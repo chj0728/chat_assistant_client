@@ -23,9 +23,9 @@ class RealtimeTTSPlayer:
         self,
         host,
         port,
-        sample_rate: int = 48000,
+        sample_rate: int = 24000,
         channels: int = 1,
-        chunk_size: int = 4096,
+        chunk_size: int = 2048,
         buffer_size: int = 8192,  # 增加缓冲区大小
     ):
         self.host = host
@@ -38,7 +38,7 @@ class RealtimeTTSPlayer:
 
         # 文本队列 + 音频队列
         self.text_queue = queue.Queue()
-        self.audio_queue = queue.Queue(maxsize=10)
+        self.audio_queue = queue.Queue()
 
         self.sound = None
         self.is_sounding = False
@@ -51,7 +51,7 @@ class RealtimeTTSPlayer:
             channels=self.channels,
             dtype="int16",
             blocksize=self.buffer_size,  # 使用更大的缓冲区
-            latency="high",
+            latency="low",
         )
         self.stream.start()
 
@@ -79,7 +79,7 @@ class RealtimeTTSPlayer:
                 time.sleep(0.1)
                 continue
             try:
-                data = self.audio_queue.get(timeout=0.5)
+                data = self.audio_queue.get(timeout=0.1)
             except queue.Empty:
                 self.is_sounding = False
                 time.sleep(0.1)
@@ -89,8 +89,8 @@ class RealtimeTTSPlayer:
             try:
                 pcm = np.frombuffer(data, dtype=np.int16)
                 self.stream.write(pcm)
+                # logger.info(f"播放音频块，大小: {len(data)} 字节")
             except Exception as e:
-                # print("音频播放出错:", e)
                 logger.error(f"音频播放出错: {e}")
 
     def _tts_loop(self):
@@ -128,8 +128,8 @@ class RealtimeTTSPlayer:
                     if not chunk:
                         continue
                     self.audio_queue.put(chunk)
+                    # logger.info(f"TTS 推送音频块，大小: {len(chunk)} 字节")
         except Exception as e:
-            # print("TTS 请求失败:", e)
             logger.error(f"TTS 请求失败: {e}")
 
     # ================= 公共接口 =================
@@ -167,11 +167,9 @@ class RealtimeTTSPlayer:
             ) as resp:
                 with open(filename, "wb") as f:
                     f.write(resp.content)
-            # print(f"WAV 文件已保存到 {filename}")
             logger.info(f"WAV 文件已保存到 {filename}")
             return filename
         except Exception as e:
-            # print("TTS 请求失败:", e)
             logger.error(f"TTS 请求失败: {e}")
             return None
 
@@ -186,11 +184,9 @@ class RealtimeTTSPlayer:
             ) as resp:
                 with open(filename, "wb") as f:
                     f.write(resp.content)
-            # print(f"WAV 文件已保存到 {filename}")
             logger.info(f"WAV 文件已保存到 {filename}")
             return filename
         except Exception as e:
-            # print("TTS 请求失败:", e)
             logger.error(f"TTS 请求失败: {e}")
             return None
 
@@ -209,7 +205,6 @@ class RealtimeTTSPlayer:
             logger.info(f"WAV 文件已保存到 {filename}")
             return filename
         except Exception as e:
-            # print("TTS 请求失败:", e)
             logger.error(f"TTS 请求失败: {e}")
             return None
 
@@ -228,7 +223,6 @@ class RealtimeTTSPlayer:
             logger.info(f"WAV 文件已保存到 {filename}")
             return filename
         except Exception as e:
-            # print("TTS 请求失败:", e)
             logger.error(f"TTS 请求失败: {e}")
             return None
 
