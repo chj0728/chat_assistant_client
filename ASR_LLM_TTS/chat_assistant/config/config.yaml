@@ -1,5 +1,5 @@
 ASR:
-  host: "192.168.50.125"
+  host: "192.168.50.220"
   port: 2002
 
 LLM:
@@ -8,7 +8,7 @@ LLM:
   system_prompt: ""
 
 TTS:
-  host: "192.168.50.125"
+  host: "192.168.50.220"
   port: 50000
   voice_type: "default" # 可选值: "default"(女性活泼), "zh"(男性非标准) , "hard_zh"(男性业余), "longshu_zh"(男性专业), "longwan_zh"（女性专业）
 

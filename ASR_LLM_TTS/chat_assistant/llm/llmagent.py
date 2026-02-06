@@ -99,7 +99,7 @@ class LLMAgent:
         temperature=0.6,
         top_p=0.95,
         top_k=50,
-        max_tokens=1024,
+        max_tokens=256,
         enable_thinking=False,
         timeout=30,
     ):
@@ -113,7 +113,7 @@ class LLMAgent:
             temperature (float): 控制生成文本的随机性。默认值为 0.6。
             top_p (float): 用于 nucleus 采样的概率阈值。默认值为 0.95。
             top_k (int): 用于 top-k 采样的词汇数量。默认值为 50。
-            max_tokens (int): 生成文本的最大 token 数量。默认值为 1024。
+            max_tokens (int): 生成文本的最大 token 数量。默认值为 256。
             enable_thinking (bool): 是否启用思考过程。默认值为 False。
             timeout (int): 请求超时时间（秒）。默认值为 30 秒。
         """
@@ -168,6 +168,7 @@ class LLMAgent:
                 # guide_customer_tool,
                 # end_conversation_tool,
             ],
+            # system_prompt=self.system_msg if hasattr(self, "system_msg") else None,
             checkpointer=InMemorySaver(),  # 使用内存检查点保存对话状态
             middleware=middleware_list if middleware_list else [],
             # middleware=[dynamic_tool_middlewares] if dynamic_tool_middlewares else [],

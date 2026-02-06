@@ -4,6 +4,7 @@ import yaml
 from pathlib import Path
 from enum import Enum
 from queue import Queue, Full, Empty
+from typing import Any
 
 import rclpy
 from rclpy.node import Node
@@ -31,6 +32,8 @@ from langchain.agents.middleware import (
 from langchain.agents.middleware.types import ToolCallRequest
 from langchain.agents import AgentState
 from langgraph.runtime import Runtime
+from langchain.messages import RemoveMessage
+from langgraph.graph.message import REMOVE_ALL_MESSAGES
 
 
 class ToolEvent(Enum):
@@ -40,6 +43,8 @@ class ToolEvent(Enum):
 
 MAX_QUEUE_SIZE = 10
 tool_event_queue = Queue(maxsize=MAX_QUEUE_SIZE)
+
+MAX_MESSAGES = 30  # 对话消息队列最大数量限制(包括系统消息,工具消息，用户和AI消息)
 
 
 def push_queue(data_queue: Queue, value) -> None:
@@ -110,8 +115,55 @@ def test_before_agent(state: AgentState, runtime: Runtime) -> None:
 
 
 @before_model
-def test_before_model(state: AgentState, runtime: Runtime) -> None:
+def trim_messages(state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
+    """Keep only the last few messages to fit context window."""
+
     logger.info("=======> Before Model Middleware")
+
+    messages = state["messages"]
+    logger.info(f"历史对话消息数量: {len(messages)}")
+    if len(messages) <= MAX_MESSAGES:
+        return None
+
+    first_msg = messages[0]  # 保存系统提示消息
+    # first_msg.pretty_print()
+
+    recent_messages = messages[-(MAX_MESSAGES - 1) :]  # 获取最近的消息
+    new_messages = [first_msg] + recent_messages
+    logger.info(f"历史对话消息量超过最大限制 ({MAX_MESSAGES})，删除旧消息")
+    return {"messages": [RemoveMessage(id=REMOVE_ALL_MESSAGES), *new_messages]}
+
+
+@after_model
+def delete_old_messages(state: AgentState, runtime: Runtime) -> dict | None:
+    logger.info("=======> After Model Middleware")
+    """Remove old messages to keep conversation manageable."""
+    messages = state["messages"]
+    logger.info(f"历史对话消息数量: {len(messages)}")
+
+    # messages[0].pretty_print()
+    # ================================ System Message ================================
+
+    # 你需要简洁且有礼貌地回答用户的问题，请保持回答简短且有条理，控制在100字以内。
+    # 只要用户询问关于时间或位置的问题时，优先使用工具来获取准确的信息，而不是直接从模型中生成答案。
+    # 如果你不确定答案，可以礼貌地告诉用户你不知道，而不是编造答案。
+    # 在回答中尽量避免使用标点符号结尾，以便更自然地进行语音合成。
+    # 如果用户回答退出、结束等相关内容时，调用结束对话工具，礼貌地结束对话。
+    # logger.info(f"system message : {state['messages'][0].pretty_print()}")
+
+    if len(messages) > MAX_MESSAGES:
+        logger.info(
+            f"对话消息数量 ({len(messages)}) 超过最大限制 ({MAX_MESSAGES})，删除过旧消息"
+        )
+        # remove the earliest two messages
+        # logger.info("删除过旧消息控制对话长度")
+        return {
+            "messages": [
+                RemoveMessage(id=m.id if m.id else "")
+                for m in messages[1 : len(messages) - MAX_MESSAGES + 1]
+            ]
+        }
+    return None
 
 
 @after_model
@@ -127,7 +179,8 @@ def test_after_agent(state: AgentState, runtime: Runtime) -> None:
 middlewares = [
     DynamicToolMiddleware(),
     test_before_agent,
-    test_before_model,
+    trim_messages,
+    # delete_old_messages,
     test_after_model,
     test_after_agent,
 ]
