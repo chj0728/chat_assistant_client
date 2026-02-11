@@ -45,6 +45,6 @@ ros_cfg:
 enable_replace_special_characters: false # 是否启用替换特殊字符功能
 enable_interrupt_tts: true # 是否启用打断 TTS 功能
 
-energy_instability_check: true  # 是否启用能量不稳定性检测
+energy_instability_check: false  # 是否启用能量不稳定性检测
 energy_frames: 50  # 能量窗口最大帧数 (内部使用)  50 x 0.1s = 5s
 energy_instability_threshold: 2.5  # 能量不稳定性阈值，超过此值认为多人说话

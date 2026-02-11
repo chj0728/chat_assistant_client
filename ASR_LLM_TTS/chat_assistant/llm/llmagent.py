@@ -41,21 +41,21 @@ sys.path.append(current_dir)
 from tools.functions import get_shanghai_time, get_current_location, get_weather_info
 
 
-@tool(description="获取当前时间的工具函数")
+@tool(description="当用户询问当前时间时，获取上海当前时间的工具函数")
 def get_current_time_tool() -> str:
     # """获取上海当前时间的工具函数"""
     logger.info("调用工具函数->获取当前时间。")
     return get_shanghai_time()
 
 
-@tool(description="获取当前位置信息的工具函数")
+@tool(description="当用户询问当前位置信息时，获取当前位置信息的工具函数")
 def get_current_location_tool() -> str:
     # """获取当前位置信息的工具函数"""
     logger.info("调用工具函数->获取当前位置信息。")
     return get_current_location()
 
 
-@tool(description="获取天气信息的工具函数")
+@tool(description="当用户询问天气信息时，获取天气信息的工具函数")
 def get_weather_info_tool() -> str:
     # """获取天气信息的工具函数"""
     logger.info("调用工具函数->获取天气信息。")
