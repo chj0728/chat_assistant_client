@@ -11,7 +11,6 @@ This project implements a chat assistant that integrates Automatic Speech Recogn
 ```bash
 cd ASR_LLM_TTS
 python3 -m venv venv
-source venv/bin/activate
 
 # deactivate the virtual environment
 # deactivate
@@ -20,6 +19,9 @@ source venv/bin/activate
 ## Install dependencies
 
 ```bash
+sudo apt install portaudio19-dev
+
+source venv/bin/activate
 pip3 install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
 ```
 
