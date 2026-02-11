@@ -59,7 +59,7 @@ def push_queue(data_queue: Queue, value) -> None:
         data_queue.put_nowait(value)
 
 
-@tool(description="只要用户问候的时候，就挥手回应")
+@tool(description="当有人问候的时候，挥手回应")
 def response_wave_hands_tool():
     # """挥手回应的工具函数"""
     logger.info("调用工具函数->机器人挥了挥手，表示问候！")
@@ -69,7 +69,7 @@ def response_wave_hands_tool():
     return
 
 
-@tool(description="当用户回答退出、结束等相关内容时，礼貌地结束对话")
+@tool(description="只有当用户回答退出、结束等相关内容时，才礼貌地结束对话")
 def end_conversation_tool():
     """结束对话的工具函数"""
     logger.info("调用工具函数->机器人礼貌地结束了对话。")
