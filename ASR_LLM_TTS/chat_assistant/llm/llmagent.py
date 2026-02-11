@@ -41,23 +41,26 @@ sys.path.append(current_dir)
 from tools.functions import get_shanghai_time, get_current_location, get_weather_info
 
 
-@tool(description="当用户询问当前时间时，获取上海当前时间的工具函数")
+# @tool(description="当用户询问当前时间时，获取上海当前时间的工具函数")
+@tool
 def get_current_time_tool() -> str:
-    # """获取上海当前时间的工具函数"""
+    """获取上海当前时间的工具函数"""
     logger.info("调用工具函数->获取当前时间。")
     return get_shanghai_time()
 
 
-@tool(description="当用户询问当前位置信息时，获取当前位置信息的工具函数")
+# @tool(description="当用户询问当前位置信息时，获取当前位置信息的工具函数")
+@tool
 def get_current_location_tool() -> str:
-    # """获取当前位置信息的工具函数"""
+    """获取当前位置信息的工具函数"""
     logger.info("调用工具函数->获取当前位置信息。")
     return get_current_location()
 
 
-@tool(description="当用户询问天气信息时，获取天气信息的工具函数")
+# @tool(description="当用户询问天气信息时，获取天气信息的工具函数")
+@tool
 def get_weather_info_tool() -> str:
-    # """获取天气信息的工具函数"""
+    """获取天气信息的工具函数"""
     logger.info("调用工具函数->获取天气信息。")
     return get_weather_info()
 
@@ -157,6 +160,20 @@ class LLMAgent:
         )
         logger.info("LLM 模型初始化完成")
 
+        self.system_msg = SystemMessage(
+            # """
+            # 你需要简洁且有礼貌地回答用户的问题，请保持回答简短且有条理，控制在100字以内。
+            # 只要用户询问关于时间或位置的问题时，优先使用工具来获取准确的信息，而不是直接从模型中生成答案。
+            # 如果你不确定答案，可以礼貌地告诉用户你不知道，而不是编造答案。
+            # 在回答中尽量避免使用标点符号结尾，以便更自然地进行语音合成。
+            # 如果用户回答退出、结束等相关内容时，礼貌地结束对话。
+            # """
+            content="""你需要简洁且有礼貌地回答用户的问题，请保持回答简短且有条理，控制在100字以内。
+                    在回答中尽量避免使用标点符号结尾，以便更自然地进行语音合成。
+                    只有当用户回答退出、结束等相关内容时，调用结束对话的工具函数，礼貌地结束对话。
+                    """
+        )
+
         # 创建聊天代理
         self.agent = create_agent(
             self.llm_model,
@@ -168,26 +185,12 @@ class LLMAgent:
                 # guide_customer_tool,
                 # end_conversation_tool,
             ],
-            # system_prompt=self.system_msg if hasattr(self, "system_msg") else None,
+            system_prompt=self.system_msg,  # if hasattr(self, "system_msg") else None,
             checkpointer=InMemorySaver(),  # 使用内存检查点保存对话状态
             middleware=middleware_list if middleware_list else [],
             # middleware=[dynamic_tool_middlewares] if dynamic_tool_middlewares else [],
         )
         logger.info("LLM Agent 创建完成")
-
-        self.system_msg = SystemMessage(
-            # """
-            # 你需要简洁且有礼貌地回答用户的问题，请保持回答简短且有条理，控制在100字以内。
-            # 只要用户询问关于时间或位置的问题时，优先使用工具来获取准确的信息，而不是直接从模型中生成答案。
-            # 如果你不确定答案，可以礼貌地告诉用户你不知道，而不是编造答案。
-            # 在回答中尽量避免使用标点符号结尾，以便更自然地进行语音合成。
-            # 如果用户回答退出、结束等相关内容时，礼貌地结束对话。
-            # """
-            content="""你需要简洁且有礼貌地回答用户的问题，请保持回答简短且有条理，控制在100字以内。
-在回答中尽量避免使用标点符号结尾，以便更自然地进行语音合成。
-如果用户回答退出、结束等相关内容时，礼貌地结束对话。
-"""
-        )
 
     # -------- private methods --------
     def get_last_ai_content(self, state) -> str | None:
@@ -226,12 +229,12 @@ class LLMAgent:
         发送用户输入，返回完整回答文本
         """
         human_msg = HumanMessage(content=user_text)
-        messages = [
-            self.system_msg,
-            human_msg,
-        ]
+        # messages = [
+        #     self.system_msg,
+        #     human_msg,
+        # ]
         result = self.agent.invoke(
-            {"messages": messages},
+            {"messages": [human_msg]},
             {"configurable": {"thread_id": "1"}},
             stream_mode="values",
         )

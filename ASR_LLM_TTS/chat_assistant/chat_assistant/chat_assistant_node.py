@@ -69,9 +69,11 @@ def response_wave_hands_tool():
     return
 
 
-@tool(description="只有当用户回答退出、结束等相关内容时，才礼貌地结束对话")
+@tool(
+    description="只有当用户回答退出、结束等相关内容时，调用结束对话工具，礼貌地结束对话"
+)
 def end_conversation_tool():
-    """结束对话的工具函数"""
+    # """结束对话的工具函数"""
     logger.info("调用工具函数->机器人礼貌地结束了对话。")
     global tool_event_queue
     push_queue(tool_event_queue, ToolEvent.END_CONVERSATION.value)
@@ -115,6 +117,11 @@ def test_before_agent(state: AgentState, runtime: Runtime) -> None:
 
 
 @before_model
+def test_before_model(state: AgentState, runtime: Runtime) -> None:
+    logger.info("=======> Before Model Middleware")
+
+
+@before_model
 def trim_messages(state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
     """Keep only the last few messages to fit context window."""
 
@@ -122,6 +129,7 @@ def trim_messages(state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
 
     messages = state["messages"]
     logger.info(f"历史对话消息数量: {len(messages)}")
+
     if len(messages) <= MAX_MESSAGES:
         return None
 
@@ -160,7 +168,7 @@ def delete_old_messages(state: AgentState, runtime: Runtime) -> dict | None:
         return {
             "messages": [
                 RemoveMessage(id=m.id if m.id else "")
-                for m in messages[1 : len(messages) - MAX_MESSAGES + 1]
+                for m in messages[: len(messages) // 3]
             ]
         }
     return None
@@ -179,9 +187,10 @@ def test_after_agent(state: AgentState, runtime: Runtime) -> None:
 middlewares = [
     DynamicToolMiddleware(),
     test_before_agent,
-    trim_messages,
-    # delete_old_messages,
-    test_after_model,
+    test_before_model,
+    # trim_messages,
+    delete_old_messages,
+    # test_after_model,
     test_after_agent,
 ]
 
