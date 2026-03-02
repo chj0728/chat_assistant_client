@@ -410,7 +410,7 @@ class ChatAssistantNode(Node):
         """
         input_text = request.input
 
-        logger.info(f"收到 TTS 推理请求，输入文本: {input_text}")
+        logger.info(f"TTS 收到请求，输入文本: [{input_text}]")
         tts_result = self.chat_assistant.tts_infer(input_text)
 
         # 检查 TTS 结果是否有效
@@ -422,7 +422,7 @@ class ChatAssistantNode(Node):
 
         response.success = True
         response.message = "TTS 合成并播放音频成功"
-        logger.info("TTS 推理成功")
+        logger.info("TTS 请求成功")
         return response
 
     def handle_llm_infer(self, request, response):
@@ -431,7 +431,7 @@ class ChatAssistantNode(Node):
         """
         input_text = request.input
 
-        logger.info(f"收到 LLM 推理请求，输入文本: {input_text}")
+        logger.info(f"LLM 收到请求，输入文本: [{input_text}]")
         llm_result = self.chat_assistant.llm_infer(input_text)
 
         # 检查 LLM 结果是否有效
@@ -443,7 +443,7 @@ class ChatAssistantNode(Node):
 
         response.success = True
         response.message = llm_result
-        logger.info(f"LLM 推理结果: {llm_result}")
+        logger.info("LLM 请求成功")
         return response
 
     def handle_asr_infer(self, request, response):
@@ -459,7 +459,7 @@ class ChatAssistantNode(Node):
             logger.error(response.message)
             return response
 
-        logger.info(f"收到 ASR 推理请求，音频路径: {audio_path}")
+        logger.info(f"ASR 收到请求，音频路径: {audio_path}")
         asr_result = self.chat_assistant.asr_infer(audio_path)
 
         # 检查 ASR 结果是否有效
@@ -471,7 +471,7 @@ class ChatAssistantNode(Node):
 
         response.success = True
         response.message = asr_result
-        logger.info(f"ASR 推理结果: {asr_result}")
+        logger.info("ASR 请求成功")
         return response
 
     def handle_activate_assistant(self, request, response):
@@ -535,7 +535,7 @@ def main(args=None):
                 msg = String()
                 msg.data = asr_text
                 chat_assistant_node.asr_publisher.publish(msg)
-                logger.info(f"发布 ASR 识别结果到话题: {asr_text}")
+                logger.info(f"发布 ASR 识别结果到话题: [{asr_text}]")
 
             if chat_assistant_node.chat_assistant.llm_response_queue.empty() is False:
                 llm_response = (
@@ -548,7 +548,7 @@ def main(args=None):
                 msg = String()
                 msg.data = llm_response
                 chat_assistant_node.llm_publisher.publish(msg)
-                logger.info(f"发布 LLM 生成结果到话题: {llm_response}")
+                logger.info(f"发布 LLM 生成结果到话题: [{llm_response}]")
 
             if chat_assistant_node.chat_assistant.response_queue.empty() is False:
                 response_json = chat_assistant_node.chat_assistant.response_queue.get(
@@ -561,7 +561,7 @@ def main(args=None):
                 response_msg.llm_text = response_json["llm_text"]
                 chat_assistant_node.response_publisher.publish(response_msg)
                 logger.info(
-                    f"发布 综合响应结果 到话题: ASR Text: {response_json['asr_text']}, LLM Text: {response_json['llm_text']}"
+                    f"发布 综合响应结果 到话题: ASR Text: [{response_json['asr_text']}], LLM Text: [{response_json['llm_text']}]"
                 )
 
             if chat_assistant_node.chat_assistant.check_tts_active():

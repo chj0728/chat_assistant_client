@@ -71,21 +71,25 @@ class ASRClient:
         # # return result.get("text", "")
         # return spk_0_tex.strip()
 
-        # 如果只存在speaker_id为0的句子，则返回其文本 ，否则返回空字符串
-        sentences = result.get("sentences", [])
+        # # 如果只存在speaker_id为0的句子，则返回其文本 ，否则返回空字符串
+        # sentences = result.get("sentences", [])
 
-        for sentence in sentences:
-            logger.info(
-                f"speaker_id={sentence.get('speaker_id')}:start={sentence['start']:.2f}, end={sentence['end']:.2f}, text={sentence['text']}"
-            )
+        # for sentence in sentences:
+        #     logger.info(
+        #         f"speaker_id={sentence.get('speaker_id')}:start={sentence['start']:.2f}, end={sentence['end']:.2f}, text={sentence['text']}"
+        #     )
 
-        spk_0_sentences = [s for s in sentences if s.get("speaker_id") == 0]
-        if len(spk_0_sentences) == len(sentences):
-            spk_0_text = " ".join(s["text"] for s in spk_0_sentences)
-            # logger.info(f"Speaker 0 Text: {spk_0_text.strip()}")
-            return spk_0_text.strip()
+        # spk_0_sentences = [s for s in sentences if s.get("speaker_id") == 0]
+        # if len(spk_0_sentences) == len(sentences):
+        #     spk_0_text = " ".join(s["text"] for s in spk_0_sentences)
+        #     # logger.info(f"Speaker 0 Text: {spk_0_text.strip()}")
+        #     return spk_0_text.strip()
 
-        return ""
+        # return ""
+
+        # 读取 "text" 字段，如果不存在则返回空字符串
+        text = result.get("text", "").strip()
+        return text
 
 
 # ===============================

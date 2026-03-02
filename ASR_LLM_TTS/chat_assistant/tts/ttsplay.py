@@ -107,7 +107,10 @@ class RealtimeTTSPlayer:
                 time.sleep(0.1)
                 continue
 
+            start_time = time.time()
             self._tts_request(text)
+            elapsed_time = time.time() - start_time
+            logger.info(f"完整音频传输耗时: {elapsed_time:.2f} 秒")
 
     def _tts_request(self, text):
         """

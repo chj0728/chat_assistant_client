@@ -685,9 +685,12 @@ class ChatAssistant:
         负责调用 ASR 完成语音识别
         """
         logger.info(f"开始 ASR 识别: {audio_path}")
+        time_now = time.time()
         try:
             asr_text = self.asr_client.recognize(audio_path).strip()
-            logger.info(f"ASR 识别结果: {asr_text}")
+            logger.info(
+                f"ASR 识别结果: [{asr_text}], 耗时: {(time.time() - time_now) * 1000:.2f} ms"
+            )
             return asr_text
         except Exception as e:
             logger.error(f"ASR 识别失败: {e}")
@@ -699,9 +702,12 @@ class ChatAssistant:
         """
         logger.info("开始与模型对话...")
         llm_response = ""
+        time_now = time.time()
         try:
             llm_response = self.llm_client.chat_response(asr_text)
-            logger.info(f"LLM 回复: {llm_response}")
+            logger.info(
+                f"LLM 回复: [{llm_response}], 耗时: {(time.time() - time_now) * 1000:.2f} ms"
+            )
             return llm_response
         except Exception as e:
             logger.error(f"LLM 对话失败: {e}")
