@@ -13,7 +13,7 @@ TTS:
   voice_type: "default" # 可选值: "default"(女性活泼), "zh"(男性非标准) , "hard_zh"(男性业余), "longshu_zh"(男性专业), "longwan_zh"（女性专业）
 
 Audio:
-  rate: 48000 # 8000 ，16000， 32000， 48000 # 采样率（Hz）每秒多少个采样点（帧）
+  rate: 16000 # 8000 ，16000， 32000， 48000 # 采样率（Hz）每秒多少个采样点（帧）
   channels: 1 # 单声道
   chunk_duration_ms: 20  # 每次读取的音频块持续时间（毫秒）10,20,30
   # chunk_size: 960  # int(rate * chunk_duration_ms / 1000) * 2 # 每次读取的音频块大小（帧数）
