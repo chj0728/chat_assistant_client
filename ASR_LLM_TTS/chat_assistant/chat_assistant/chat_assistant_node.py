@@ -421,7 +421,7 @@ class ChatAssistantNode(Node):
             return response
 
         response.success = True
-        response.message = "TTS 合成并播放音频成功"
+        response.message = "TTS 请求成功"
         logger.info("TTS 请求成功")
         return response
 

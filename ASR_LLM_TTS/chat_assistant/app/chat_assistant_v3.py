@@ -684,7 +684,7 @@ class ChatAssistant:
         """
         负责调用 ASR 完成语音识别
         """
-        logger.info(f"开始 ASR 识别: {audio_path}")
+        logger.info("ASR 识别中...")
         time_now = time.time()
         try:
             asr_text = self.asr_client.recognize(audio_path).strip()
@@ -700,13 +700,13 @@ class ChatAssistant:
         """
         负责调用 LLM 完成对话
         """
-        logger.info("开始与模型对话...")
+        logger.info("LLM 推理中...")
         llm_response = ""
         time_now = time.time()
         try:
             llm_response = self.llm_client.chat_response(asr_text)
             logger.info(
-                f"LLM 回复: [{llm_response}], 耗时: {(time.time() - time_now) * 1000:.2f} ms"
+                f"LLM 推理结果: [{llm_response}], 耗时: {(time.time() - time_now) * 1000:.2f} ms"
             )
             return llm_response
         except Exception as e:
@@ -717,9 +717,19 @@ class ChatAssistant:
         """
         负责调用 TTS 完成语音合成和播放
         """
-        logger.info("开始 TTS 播放...")
+        logger.info("TTS 合成和播放中...")
+        time_now = time.time()
         try:
             self.tts_client.speak(llm_response.strip())
+
+            while not self.tts_client.is_active():
+                if time.time() - time_now > 4.0:
+                    logger.error("等待 TTS 播放超时")
+                    return False
+                time.sleep(0.01)
+
+            elapsed_time = time.time() - time_now
+            logger.info(f"TTS 合成并播放音频耗时: {elapsed_time:.2f} 秒")
             return True
         except Exception as e:
             logger.error(f"TTS 播放失败: {e}")
