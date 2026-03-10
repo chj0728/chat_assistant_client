@@ -185,7 +185,7 @@ def test_after_agent(state: AgentState, runtime: Runtime) -> None:
 
 
 middlewares = [
-    DynamicToolMiddleware(),
+    # DynamicToolMiddleware(),
     test_before_agent,
     test_before_model,
     # trim_messages,
