@@ -3,7 +3,7 @@
 This project implements a chat assistant that integrates Automatic Speech Recognition (ASR), Large Language Models (LLM), and Text-to-Speech (TTS) functionalities. The assistant can process voice inputs, generate responses using LLMs, and convert text responses back to speech.
 
 ## Workflow diagram of the complete chat assistant
-![alt text](<1.svg>)
+![alt text](<workflow.svg>)
 
 
 ## creating a virtual environment
@@ -66,6 +66,7 @@ python3 -m app.chat_assistant_v3
 ```bash
 cd ASR_LLM_TTS
 
+deactivate
 colcon build --symlink-install
 # colcon build --symlink-install --packages-select chat_assistant_interfaces
 # colcon build --symlink-install --packages-select chat_assistant
