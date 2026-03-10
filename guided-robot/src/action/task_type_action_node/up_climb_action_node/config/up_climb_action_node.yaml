@@ -1,5 +1,0 @@
-up_climb_action_node:
-  ros__parameters:
-    up_limb_srv_name_: "up_climb_srv"
-    up_climb_fixed_action_name_: "up_climb_action"
-    service_wait_over_time: 5

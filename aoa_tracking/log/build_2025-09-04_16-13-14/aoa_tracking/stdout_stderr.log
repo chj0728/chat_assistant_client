@@ -1,9 +1,0 @@
-[35m[1mConsolidate compiler generated dependencies of target aoa_tracking_node[0m
-[ 50%] [32mBuilding CXX object CMakeFiles/aoa_tracking_node.dir/src/aoa_tracking_node.cpp.o[0m
-[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:[m[K In constructor ‘[01m[Kymrobot::AoaTracking::AoaTracking()[m[K’:
-[01m[K/home/ymrobot/ros2_ws_guidance/src/aoa_tracking/src/aoa_tracking_node.cpp:16:5:[m[K [01;31m[Kerror: [m[Kexpected ‘[01m[K;[m[K’ before ‘[01m[K}[m[K’ token
-   16 |     [01;31m[K}[m[K
-      |     [01;31m[K^[m[K
-gmake[2]: *** [CMakeFiles/aoa_tracking_node.dir/build.make:76：CMakeFiles/aoa_tracking_node.dir/src/aoa_tracking_node.cpp.o] 错误 1
-gmake[1]: *** [CMakeFiles/Makefile2:137：CMakeFiles/aoa_tracking_node.dir/all] 错误 2
-gmake: *** [Makefile:146：all] 错误 2

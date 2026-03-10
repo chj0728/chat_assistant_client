@@ -1,5 +1,0 @@
-robot:
-  is_open_active_wake_up: true
-  welcome_word: 你好，尊敬的客人
-  awakening_words: 小雪小雪
-  standby_point: 充电桩

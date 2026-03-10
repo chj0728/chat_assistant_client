@@ -1,8 +1,0 @@
-# Request
-string mp3_file_path
----
-# Result
-bool success
----
-# Feedback
-string status

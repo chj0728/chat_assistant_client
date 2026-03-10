@@ -1,6 +1,0 @@
-relocation_node:
-  ros__parameters:
-    relcation_action_str: "relocation_node/relocation_action"    #重定位action名称
-    relocalizer_task_srv_name: "localizer/relocation_map_slam"
-    re_pcd_srv_name: "localizer/relocalize"
-    maps_dir: "/home/ymrobot/ros2_ws/src/ceiling/assets/maps"

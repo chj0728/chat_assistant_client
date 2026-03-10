@@ -1,3 +1,0 @@
-MapTaskCommand map_task
-string pcd_file
-string pgm_file

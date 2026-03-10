@@ -1,6 +1,0 @@
-robot_pose_manager_action_node:
-  ros__parameters:
-    pose_manager_action_name: "map_manager_action"
-    pose_manager_csv_adress: "/home/ymrobot/ros2_ws/src/ceiling/assets/pose.csv"
-    save_pose_str: ""
-    delete_pose_str: ""

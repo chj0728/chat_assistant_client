@@ -910,13 +910,13 @@ class ChatAssistant:
 
         # -------- 检查当前状态是否为空闲 ----------
         if self.get_state() == AssistantState.IDLE:
-            logger.warning("语音助手未激活，跳过本次交互")
+            logger.warning("语音助手未激活，跳过TTS播放")
             self.last_llm_time = time.time()
             time.sleep(0.1)
             return
 
         if self.tts_client.is_active() and not self.enable_interrupt_tts:
-            logger.warning("语音播放中，未启用打断，跳过本次交互")
+            logger.warning("语音播放中，未启用打断，跳过TTS播放")
             self.last_llm_time = time.time()
             return
 

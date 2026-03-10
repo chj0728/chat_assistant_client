@@ -21,17 +21,17 @@ Audio:
 VAD:
   output_dir: "output" # VAD 结果保存目录
   mode : 2  # 0：最宽松，允许更多非语音通过  1：平衡模式 2：较严格，减少非语音通过  3：最严格，过滤更多非语音
-  no_speech_threshold: 0.60  # 静音持续多长时间后认为一句话结束 (秒)
-  reactive_kws_threshold: 30  # 多久未检测到唤醒词，重置唤醒词状态，单位：秒
+  no_speech_threshold: 0.40  # 静音持续多长时间后认为一句话结束 (秒)
+  reactive_kws_threshold: 60  # 多久未检测到唤醒词，重置唤醒词状态，单位：秒
   decibel_threshold: -35  # 分贝阈值，低于此值认为是静音 (dB)
 
   min_recording_duration: 0.8   # 最短有效录音时长 (秒)
   max_recording_duration: 10  # 最大有效录音时长 (秒)
   
-  pause_duration: 2.0  # 距离上次语音保存多长时间后，允许再次保存音频 (秒)
+  pause_duration: 4.0  # 距离上次语音保存多长时间后，允许再次保存音频 (秒)
 
 KWS:
-  enable: true
+  enable: false # 是否启用唤醒词检测
   wake_word: "你好小特"
 
 ros_cfg:

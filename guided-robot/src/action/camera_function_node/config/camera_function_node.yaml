@@ -1,6 +1,0 @@
-camera_function_node:
-  ros__parameters:
-    image_sub_name: "/camera/color/image_raw"                                                     
-    cemera_action_server_name: "cemera_action_server"                                                          
-    default_image_path: "/home/ymrobot/ros2_ws_guidance/src/guided-robot/assets/image"                                        
-    video_default_path: "/home/ymrobot/ros2_ws_guidance/src/guided-robot/assets/video"

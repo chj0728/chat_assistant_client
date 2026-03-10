@@ -1,2 +1,0 @@
-bool chassis_status
-bool auto_status
