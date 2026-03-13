@@ -217,6 +217,16 @@ class ChatAssistantNode(Node):
         ## 将聊天助手置于空闲状态服务
         self.create_service(Trigger, "idle_assistant", self.handle_idle_assistant)
 
+        ## 激活LLM
+        self.create_service(Trigger, "activate_llm", self.handle_activate_llm)
+        ## 置于空闲状态，停用LLM
+        self.create_service(Trigger, "idle_llm", self.handle_idle_llm)
+
+        ## 激活TTS
+        self.create_service(Trigger, "activate_tts", self.handle_activate_tts)
+        ## 置于空闲状态，停用TTS
+        self.create_service(Trigger, "idle_tts", self.handle_idle_tts)
+
         ## 接收audio_path，只调用 ASR 完成语音识别，返回文本结果服务
         self.create_service(GetString, "asr_infer", self.handle_asr_infer)
 
@@ -476,22 +486,64 @@ class ChatAssistantNode(Node):
 
     def handle_activate_assistant(self, request, response):
         """
-        激活聊天助手服务
+        激活LLM 和TTS服务
         """
-        logger.info("激活聊天助手")
-        self.chat_assistant.activate()
+        logger.info("激活LLM 和TTS服务")
+        self.chat_assistant.activate_llm_agent()
+        self.chat_assistant.activate_tts_client()
         response.success = True
-        response.message = "聊天助手已激活"
+        response.message = "LLM 和 TTS 已激活"
         return response
 
     def handle_idle_assistant(self, request, response):
         """
-        将聊天助手置于空闲状态服务
+        将LLM 和TTS置于空闲状态服务
         """
-        logger.info("将聊天助手置于空闲状态")
-        self.chat_assistant.idle()
+        logger.info("将LLM 和TTS置于空闲状态")
+        self.chat_assistant.deactivate_llm_agent()
+        self.chat_assistant.deactivate_tts_client()
         response.success = True
-        response.message = "聊天助手已置于空闲状态"
+        response.message = "LLM 和 TTS 已置于空闲状态"
+        return response
+
+    def handle_activate_llm(self, request, response):
+        """
+        激活LLM服务
+        """
+        logger.info("激活LLM")
+        self.chat_assistant.activate_llm_agent()
+        response.success = True
+        response.message = "LLM已激活"
+        return response
+
+    def handle_idle_llm(self, request, response):
+        """
+        将LLM置于空闲状态服务
+        """
+        logger.info("将LLM置于空闲状态")
+        self.chat_assistant.deactivate_llm_agent()
+        response.success = True
+        response.message = "LLM已置于空闲状态"
+        return response
+
+    def handle_activate_tts(self, request, response):
+        """
+        激活TTS服务
+        """
+        logger.info("激活TTS")
+        self.chat_assistant.activate_tts_client()
+        response.success = True
+        response.message = "TTS已激活"
+        return response
+
+    def handle_idle_tts(self, request, response):
+        """
+        将TTS置于空闲状态服务
+        """
+        logger.info("将TTS置于空闲状态")
+        self.chat_assistant.deactivate_tts_client()
+        response.success = True
+        response.message = "TTS已置于空闲状态"
         return response
 
     def handle_tool_events(self):

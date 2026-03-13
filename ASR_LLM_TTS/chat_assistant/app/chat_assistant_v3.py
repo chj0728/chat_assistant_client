@@ -73,6 +73,11 @@ class LLMAgentState(Enum):
     ACTIVE = 1  # 激活状态
 
 
+class TTSClientState(Enum):
+    IDLE = 0  # 空闲
+    ACTIVE = 1  # 激活状态
+
+
 class ChatAssistant:
     def __init__(
         self, config_path: str, dynamic_tool_middlewares=None, middleware_list=None
@@ -174,7 +179,7 @@ class ChatAssistant:
             # raise e
 
         # ----------- 初始化ASR、LLM、TTS客户端 -----------
-        ############ ASR 服务器选择和初始化 ##########
+        ############ ASR 服务器选择和客户端初始化 ##########
         asr_server_type = self.configs.get("asr_server", ["asr_local"])[0]
         logger.info(f"选择的 ASR 服务器类型: {asr_server_type}")
         asr_cfg = self.configs.get(asr_server_type, {})
@@ -185,7 +190,7 @@ class ChatAssistant:
             timeout=asr_cfg.get("timeout", 30),
         )
 
-        ########### LLM 服务器选择和初始化 ##########
+        ########### LLM 服务器选择和客户端初始化 ##########
         llm_cfg = self.configs.get("LLM", {})
         self.llm_client = LLMAgent(
             host=llm_cfg.get("host", "192.168.50.125"),
@@ -197,7 +202,7 @@ class ChatAssistant:
         if system_prompt:
             self.llm_client.add_system_prompt(system_prompt)
 
-        ########### TTS 服务器选择和初始化 ##########
+        ########### TTS 服务器选择和客户端初始化 ##########
         tts_server_type = self.configs.get("tts_server", ["tts_local"])[0]
         logger.info(f"选择的 TTS 服务器类型: {tts_server_type}")
         tts_cfg = self.configs.get(tts_server_type, {})
@@ -257,7 +262,7 @@ class ChatAssistant:
         kws_cfg = self.configs.get("KWS", {})
         self.set_kws = kws_cfg.get("wake_word", "你好小特")
         # self.set_kws_pinyin = kws_cfg.get("wake_word_pinyin", "hi xiao bai")
-        self.set_kws_pinyin = self.extract_chinese_and_convert_to_pinyin(self.set_kws)
+        self.set_kws_pinyin = self._extract_chinese_and_convert_to_pinyin(self.set_kws)
         logger.info(f"设置的唤醒词: {self.set_kws}, 拼音: {self.set_kws_pinyin}")
         self.flag_kws_used = kws_cfg.get("enable", True)
         self.flag_kws = 0  # 唤醒词检测标志
@@ -282,6 +287,7 @@ class ChatAssistant:
         self.state_lock = threading.Lock()
 
         self.llm_agent_state = LLMAgentState.IDLE
+        self.tts_client_state = TTSClientState.IDLE
 
         # 是否允许 ASR
         self.enable_asr = True
@@ -313,7 +319,7 @@ class ChatAssistant:
         self.segments_to_save.clear()
         self.energy_window.clear()
 
-    def extract_chinese_and_convert_to_pinyin(self, input_string):
+    def _extract_chinese_and_convert_to_pinyin(self, input_string):
         """
         提取字符串中的汉字，并将其转换为拼音。
 
@@ -333,7 +339,7 @@ class ChatAssistant:
         return pinyin_text
 
     # 统计字符串中的汉字数量
-    def count_chinese_characters(self, input_string):
+    def _count_chinese_characters(self, input_string):
         """
         统计字符串中的汉字数量。
 
@@ -344,7 +350,7 @@ class ChatAssistant:
         return len(chinese_characters)
 
     # 替换字符串中的特殊字符为智己
-    def replace_special_characters(self, input_string):
+    def _replace_special_characters(self, input_string):
         """
         替换字符串中的特殊字符如为智己。
 
@@ -360,7 +366,7 @@ class ChatAssistant:
 
         return input_string
 
-    def check_vad_activity(self, audio_bytes: bytes) -> bool:
+    def _check_vad_activity(self, audio_bytes: bytes) -> bool:
         """
         audio_bytes: int16 PCM, mono
         """
@@ -423,6 +429,7 @@ class ChatAssistant:
         # 重置状态
         self._reset_segment_state()
 
+    ################## 保存音频的模块 ##################
     def save_audio_only(self):
         """
         只负责把 segments_to_save 中的音频保存为 wav 文件
@@ -512,7 +519,7 @@ class ChatAssistant:
 
         return audio_output_path
 
-    # 音频录制线程
+    #################### 音频录制线程 ###################
     def audio_recorder_thread(self):
 
         audio_buffer = []
@@ -598,7 +605,7 @@ class ChatAssistant:
                 ## 分贝高于阈值，继续处理
                 else:
                     ### 如果 检测 VAD 活动，则保存音频段
-                    if self.check_vad_activity(audio_bytes):
+                    if self._check_vad_activity(audio_bytes):
                         logger.info("检测到语音活动，分贝: {:.2f} dB".format(decibel))
                         self.last_active_time = now
                         self.segments_to_save.append((audio_bytes, now))
@@ -630,6 +637,7 @@ class ChatAssistant:
         # print("音频录制已停止")
         logger.info("音频录制已停止")
 
+    ############# 功能模块激活状态管理 #############
     def activate(self):
         """
         激活助手，进入 ACTIVE 状态
@@ -654,6 +662,21 @@ class ChatAssistant:
         """
         self.llm_agent_state = LLMAgentState.IDLE
 
+    def activate_tts_client(self):
+        """
+        激活 TTS Client，进入 ACTIVE 状态
+        """
+        self.tts_client_state = TTSClientState.ACTIVE
+
+    def deactivate_tts_client(self):
+        """
+        使 TTS Client 进入空闲状态
+        """
+        self.tts_client_state = TTSClientState.IDLE
+
+    ###############################################
+
+    ################# 业务功能接口 ##################
     def generate_wav(self, text, output_path) -> bool:
         """
         负责调用 TTS 完成文本转语音，保存音频文件
@@ -763,7 +786,7 @@ class ChatAssistant:
         """
 
         # 提取汉字并转换为拼音
-        pinyin_text = self.extract_chinese_and_convert_to_pinyin(asr_text)
+        pinyin_text = self._extract_chinese_and_convert_to_pinyin(asr_text)
         logger.info(f"转换为拼音: {pinyin_text}")
 
         if self.set_kws_pinyin in pinyin_text and self.tts_client.is_active():
@@ -825,8 +848,8 @@ class ChatAssistant:
                     )
 
                     # 只有在 ACTIVE 状态下才播放提示语音
-                    if self.get_state() == AssistantState.ACTIVE:
-                        logger.info("语音助手处于 ACTIVE 状态，准备播放提示语音")
+                    if self.tts_client_state == TTSClientState.ACTIVE:
+                        logger.info("TTS处于 ACTIVE 状态，准备播放提示语音")
                         if self.tts_client.is_active() and self.enable_interrupt_tts:
                             logger.info("TTS 播放中，启用了打断功能，准备中断播放")
                             self.tts_client.interrupt()
@@ -848,6 +871,9 @@ class ChatAssistant:
             logger.info("不需要唤醒词激活")
             return True
 
+    ##########################################################
+
+    ####################### 核心交互流程 #######################
     def Inference(self, audio_path: str | None = None, input_text: str | None = None):
         """
         负责调用 ASR、LLM、TTS 完成一次完整的交互
@@ -876,7 +902,7 @@ class ChatAssistant:
             return
 
         # -------- 判断asr_text中汉字数量，过少则忽略 ----------
-        chinese_char_count = self.count_chinese_characters(self.asr_text)
+        chinese_char_count = self._count_chinese_characters(self.asr_text)
         if chinese_char_count < 2:
             logger.warning("ASR 识别文本中汉字数量过少，跳过本次交互")
             self.last_llm_time = time.time()
@@ -885,7 +911,7 @@ class ChatAssistant:
         # ------- 替换特殊词汇 -------
         if self.enable_replace_special_characters:
             logger.info(f"替换前 ASR 文本: {self.asr_text}")
-            self.asr_text = self.replace_special_characters(self.asr_text)
+            self.asr_text = self._replace_special_characters(self.asr_text)
             logger.info(f"替换后 ASR 文本: {self.asr_text}")
         else:
             logger.info("未启用特殊词汇替换功能")
@@ -896,12 +922,13 @@ class ChatAssistant:
         self.response_json["asr_text"] = self.asr_text
 
         # ----------- 唤醒词检测 -----------
-        if not self.kws_infer(self.asr_text):
-            # self._set_state(AssistantState.LISTENING)
-            # 更新 response_queue 队列
-            self._push_queue(self.response_queue, self.response_json)
-            self.last_llm_time = time.time()
-            return
+        if self.flag_kws_used:
+            if not self.kws_infer(self.asr_text):
+                # self._set_state(AssistantState.LISTENING)
+                # 更新 response_queue 队列
+                self._push_queue(self.response_queue, self.response_json)
+                self.last_llm_time = time.time()
+                return
 
         # self._set_state(AssistantState.THINKING)
 
@@ -913,26 +940,47 @@ class ChatAssistant:
 
         # -------- llm 对话 -----------
         if self.llm_agent_state == LLMAgentState.IDLE:
+
             self.last_llm_time = time.time()
+
             logger.warning("LLM 模块未激活，跳过本次交互")
+
+            self._push_queue(self.llm_response_queue, "")
+            self.response_json["llm_text"] = ""
+            self._push_queue(self.response_queue, self.response_json)
+
             return
+
         self.llm_response = self.llm_infer(self.asr_text)
+
         if not self.llm_response:
+
             self.last_llm_time = time.time()
+
             # self._set_state(AssistantState.LISTENING)
             logger.warning("LLM 模块未生成有效回复，跳过本次交互")
+            self._push_queue(self.llm_response_queue, "")
+            self.response_json["llm_text"] = ""
+            self._push_queue(self.response_queue, self.response_json)
+
             return
+
         ## 更新llm_response队列
         self._push_queue(self.llm_response_queue, self.llm_response)
-
         ## response_json 更新 llm_text
         self.response_json["llm_text"] = self.llm_response
         ## 更新 response_queue 队列
         self._push_queue(self.response_queue, self.response_json)
 
         # -------- 检查当前状态是否为空闲 ----------
-        if self.get_state() == AssistantState.IDLE:
-            logger.warning("语音助手未激活，跳过TTS播放")
+        # if self.get_state() == AssistantState.IDLE:
+        #     logger.warning("语音助手未激活，跳过TTS播放")
+        #     self.last_llm_time = time.time()
+        #     time.sleep(0.1)
+        #     return
+
+        if self.tts_client_state == TTSClientState.IDLE:
+            logger.warning("TTS 模块未激活，跳过TTS播放")
             self.last_llm_time = time.time()
             time.sleep(0.1)
             return
