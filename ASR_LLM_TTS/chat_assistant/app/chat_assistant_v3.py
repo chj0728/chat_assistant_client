@@ -252,7 +252,6 @@ class ChatAssistant:
         self.output_dir = (current_dir / vad_cfg.get("output_dir", "output")).resolve()
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.no_speech_threshold = vad_cfg.get("no_speech_threshold", 0.5)
-        self.reactive_kws_threshold = vad_cfg.get("reactive_kws_threshold", 30)
         self.decibel_threshold = vad_cfg.get("decibel_threshold", -40)
         self.min_recording_duration = vad_cfg.get("min_recording_duration", 1.0)
         self.max_recording_duration = vad_cfg.get("max_recording_duration", 10.0)
@@ -267,6 +266,16 @@ class ChatAssistant:
         self.flag_kws_used = kws_cfg.get("enable", True)
         self.flag_kws = 0  # 唤醒词检测标志
         self.failed_enable_kws_count = 0  # 连续未检测到唤醒词计数
+        self.failed_kws_counts = kws_cfg.get(
+            "failed_kws_counts", 2
+        )  # 连续未检测到唤醒词次数达到此值时，推送提示语音
+        self.failed_kws_threshold = kws_cfg.get(
+            "failed_kws_threshold", 30
+        )  # 连续未检测到唤醒词次数 达到 failed_kws_counts 后，推送提示语音的时间间隔 (秒)
+        self.reactive_kws_threshold = kws_cfg.get(
+            "reactive_kws_threshold", 100
+        )  # 重置 需要唤醒词检测 激活 LLM 时间间隔 (秒)
+        self.last_failed_kws_time = time.time()
 
         self.recording_active = False  # 当前是否处于录音状态
         self.segments_to_save = []  # 待保存的音频片段
@@ -286,7 +295,7 @@ class ChatAssistant:
         self.state = AssistantState.IDLE
         self.state_lock = threading.Lock()
 
-        self.llm_agent_state = LLMAgentState.IDLE
+        self.llm_agent_state = LLMAgentState.ACTIVE
         self.tts_client_state = TTSClientState.IDLE
 
         # 是否允许 ASR
@@ -812,9 +821,13 @@ class ChatAssistant:
             logger.info("长时间未与 LLM 交互，重置 LLM 模块为 IDLE 状态")
 
         # 判断是否启用唤醒词检测
-        if self.flag_kws_used and self.llm_agent_state == LLMAgentState.IDLE:
+        if self.flag_kws_used:
 
-            logger.info("需要唤醒词激活")
+            # logger.info("需要唤醒词激活")
+            if self.llm_agent_state == LLMAgentState.ACTIVE:
+                logger.info("LLM 模块已处于 ACTIVE 状态，无需检测唤醒词")
+                self.last_llm_time = time.time()
+                return True
 
             if self.set_kws_pinyin in pinyin_text:
 
@@ -838,7 +851,12 @@ class ChatAssistant:
                     "未检测到唤醒词，失败次数: {}".format(self.failed_enable_kws_count)
                 )
 
-                if self.failed_enable_kws_count >= 2:
+                # 如果连续多次未检测到唤醒词，且距离上次提示已超过一定时间，则推送提示语音
+                if (
+                    self.failed_enable_kws_count >= self.failed_kws_counts
+                    and time.time() - self.last_failed_kws_time
+                    > self.failed_kws_threshold
+                ):
 
                     self._push_queue(
                         self.llm_response_queue, f"你可以说出:{self.set_kws} 来唤醒我!"
@@ -858,6 +876,8 @@ class ChatAssistant:
                         self.tts_infer(f"你可以说出:{self.set_kws} 来唤醒我!")
 
                     self.failed_enable_kws_count = 0
+                    self.last_failed_kws_time = time.time()
+
                 else:
                     self._push_queue(self.llm_response_queue, "")
                     self.response_json["llm_text"] = ""

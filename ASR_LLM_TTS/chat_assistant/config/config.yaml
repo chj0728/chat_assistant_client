@@ -39,8 +39,8 @@ Audio:
 VAD:
   output_dir: "output" # VAD 结果保存目录
   mode : 2  # 0：最宽松，允许更多非语音通过  1：平衡模式 2：较严格，减少非语音通过  3：最严格，过滤更多非语音
-  no_speech_threshold: 0.40  # 静音持续多长时间后认为一句话结束 (秒)
-  reactive_kws_threshold: 100  # 多久未检测到唤醒词，重置唤醒词状态，单位：秒
+  no_speech_threshold: 0.50  # 静音持续多长时间后认为一句话结束 (秒)
+  # reactive_kws_threshold: 100  # 重置唤醒词检测 激活 LLM 时间间隔 (秒) 
   decibel_threshold: -35  # 分贝阈值，低于此值认为是静音 (dB)
 
   min_recording_duration: 0.8   # 最短有效录音时长 (秒)
@@ -49,7 +49,10 @@ VAD:
   pause_duration: 4.0  # 距离上次语音保存多长时间后，允许再次保存音频 (秒)
 
 KWS:
-  enable: false # 是否启用唤醒词检测
+  enable: true # 是否启用唤醒词检测
+  failed_kws_counts : 2  # 连续未检测到唤醒词次数达到此值时，推送提示语音
+  failed_kws_threshold: 30  # 连续未检测到唤醒词次数 达到 failed_kws_counts 后，推送提示语音的时间间隔 (秒)
+  reactive_kws_threshold: 100  # 重置 需要唤醒词检测 激活 LLM 时间间隔 (秒) 
   wake_word: "你好小特"
 
 ros_cfg:
