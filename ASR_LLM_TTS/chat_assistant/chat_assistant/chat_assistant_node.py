@@ -371,7 +371,7 @@ class ChatAssistantNode(Node):
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
         logger.info(
-            f"收到 TTS 生成 WAV 文件请求，输入文本: {input_text}，保存路径: {output_path}"
+            f"收到 TTS 生成 WAV 文件请求\n输入文本:[{input_text}]\n保存路径: {output_path}"
         )
         tts_result = self.chat_assistant.generate_wav(input_text, output_path)
 
@@ -383,8 +383,8 @@ class ChatAssistantNode(Node):
             return response
 
         response.success = True
-        response.message = f"WAV 文件已保存到 {tts_result}"
-        logger.info(f"WAV 文件已保存到 {tts_result}")
+        response.message = f"WAV 文件已保存到 {output_path}"
+        logger.info("请求 TTS 生成 WAV 文件成功")
         return response
 
     def handle_reload_config(self, request, response):

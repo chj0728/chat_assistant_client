@@ -15,7 +15,7 @@ from enum import Enum
 
 from asr import ASRClient
 from llm import LLMAgent, LLMClient
-from tts import RealtimeTTSPlayer
+from tts import RealtimeTTSPlayer, TTSClient
 
 from logger import logger
 
@@ -174,9 +174,10 @@ class ChatAssistant:
             # raise e
 
         # ----------- 初始化ASR、LLM、TTS客户端 -----------
-        asr_cfg = self.configs.get("ASR", {})
-        llm_cfg = self.configs.get("LLM", {})
-        tts_cfg = self.configs.get("TTS", {})
+        ############ ASR 服务器选择和初始化 ##########
+        asr_server_type = self.configs.get("asr_server", ["asr_local"])[0]
+        logger.info(f"选择的 ASR 服务器类型: {asr_server_type}")
+        asr_cfg = self.configs.get(asr_server_type, {})
 
         self.asr_client = ASRClient(
             host=asr_cfg.get("host", "192.168.50.125"),
@@ -184,6 +185,8 @@ class ChatAssistant:
             timeout=asr_cfg.get("timeout", 30),
         )
 
+        ########### LLM 服务器选择和初始化 ##########
+        llm_cfg = self.configs.get("LLM", {})
         self.llm_client = LLMAgent(
             host=llm_cfg.get("host", "192.168.50.125"),
             port=llm_cfg.get("port", 8000),
@@ -194,13 +197,29 @@ class ChatAssistant:
         if system_prompt:
             self.llm_client.add_system_prompt(system_prompt)
 
-        self.tts_client = RealtimeTTSPlayer(
-            host=tts_cfg.get("host", "192.168.50.125"),
-            port=tts_cfg.get("port", 50000),
-        )
-        self.tts_client.change_preset(
-            tts_cfg.get("voice_type", "default")
-        )  # "default"(女性活泼), "zh"(男性非标准) , "hard_zh"(男性业余), "longshu_zh"(男性专业), "longwan_zh"（女性专业）
+        ########### TTS 服务器选择和初始化 ##########
+        tts_server_type = self.configs.get("tts_server", ["tts_local"])[0]
+        logger.info(f"选择的 TTS 服务器类型: {tts_server_type}")
+        tts_cfg = self.configs.get(tts_server_type, {})
+
+        if tts_server_type == "tts_remote":
+            self.tts_client = RealtimeTTSPlayer(
+                host=tts_cfg.get("host", "192.168.50.220"),
+                port=tts_cfg.get("port", 50000),
+            )
+            self.tts_client.change_preset(
+                tts_cfg.get("voice_type", "default")
+            )  # "default"(女性活泼), "zh"(男性非标准) , "hard_zh"(男性业余), "longshu_zh"(男性专业), "longwan_zh"（女性专业）
+        elif tts_server_type == "tts_local":
+            self.tts_client = TTSClient(
+                host=tts_cfg.get("host", "192.168.10.101"),
+                port=tts_cfg.get("port", 50000),
+                speaker_id=tts_cfg.get("speaker_id", 0),
+                speed=tts_cfg.get("speed", 1.0),
+            )
+        else:
+            logger.error(f"未知的 TTS 服务器类型: {tts_server_type}")
+            raise ValueError(f"未知的 TTS 服务器类型: {tts_server_type}")
 
         # ----------- 初始化音频录制和VAD参数 -----------
         audio_cfg = self.configs.get("Audio", {})
@@ -635,13 +654,16 @@ class ChatAssistant:
         """
         self.llm_agent_state = LLMAgentState.IDLE
 
-    def generate_wav(self, text, output_path):
+    def generate_wav(self, text, output_path) -> bool:
         """
         负责调用 TTS 完成文本转语音，保存音频文件
         """
-        logger.info(f"开始 TTS 生成 WAV 文件: {output_path}")
+        logger.info("请求 TTS 生成语音文件中...")
+        time_now = time.time()
         try:
             tts_result = self.tts_client.generate_wav(text, output_path)
+            elapsed_time = time.time() - time_now
+            logger.info(f"TTS 生成语音文件耗时: {elapsed_time:.2f} 秒")
             return tts_result
         except Exception as e:
             return False

@@ -1,16 +1,34 @@
-ASR:
-  host: "192.168.50.220"
+##################### ASR 配置 ######################
+asr_server: ['asr_local'] # 可选值: "asr_local"（本地 jestson orin 设备提供的 ASR 服务） "asr_remote"（远程服务器提供的 ASR 服务 ）
+asr_local:
+  host: "192.168.10.101" # 本地 ASR 服务器地址，通常是 Jetson Orin 设备的 IP 地址
   port: 2002
+asr_remote:
+  host: "192.168.50.220" # 远程 ASR 服务器地址
+  port: 2002
+#####################################################
 
+###################### LLM 配置 ######################
 LLM:
   host: "192.168.50.125"
   port: 8000
   system_prompt: ""
+#####################################################
 
-TTS:
-  host: "192.168.50.220"
+###################### TTS 配置 ######################
+tts_server: ['tts_local'] # 可选值: "tts_local"（本地 jestson orin 设备提供的 TTS 服务） "tts_remote"（远程服务器提供的 TTS 服务 ）
+tts_local:
+  host: "192.168.10.101" # 本地 TTS 服务器地址，通常是 Jetson Orin 设备的 IP 地址
   port: 50000
-  voice_type: "default" # 可选值: "default"(女性活泼), "zh"(男性非标准) , "hard_zh"(男性业余), "longshu_zh"(男性专业), "longwan_zh"（女性专业）
+  speaker_id: 0
+  speed: 1.0
+
+tts_remote:
+  host: "192.168.50.220" # 远程 TTS 服务器地址
+  port: 50000
+  voice_type: "longshu_zh" # 可选值: "default"(女性活泼), "zh"(男性非标准) , "hard_zh"(男性业余), "longshu_zh"(男性专业), "longwan_zh"（女性专业）
+#######################################################
+
 
 Audio:
   rate: 16000 # 8000 ，16000， 32000， 48000 # 采样率（Hz）每秒多少个采样点（帧）
