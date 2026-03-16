@@ -22,6 +22,7 @@ tts_local:
   port: 50000
   speaker_id: 0
   speed: 1.0
+  use_websocket: true # 是否使用 WebSocket 连接 TTS 服务器，确保服务器支持 WebSocket
 
 tts_remote:
   host: "192.168.50.220" # 远程 TTS 服务器地址

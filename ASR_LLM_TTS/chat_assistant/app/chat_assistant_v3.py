@@ -221,6 +221,7 @@ class ChatAssistant:
                 port=tts_cfg.get("port", 50000),
                 speaker_id=tts_cfg.get("speaker_id", 0),
                 speed=tts_cfg.get("speed", 1.0),
+                use_websocket=tts_cfg.get("use_websocket", True),
             )
         else:
             logger.error(f"未知的 TTS 服务器类型: {tts_server_type}")
