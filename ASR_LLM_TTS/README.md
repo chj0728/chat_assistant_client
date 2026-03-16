@@ -49,7 +49,11 @@ python3 -m llm.llmagent
 
 - TTS Demo(文本转语音)
 ```bash
+# cosyvoice TTS
 python3 -m tts.ttsplay
+
+# sherpa-onnx TTS
+python3 -m tts.ttsclient
 ```
 
 - LLM + TTS Demo(大语言模型 + 文本转语音)
@@ -137,7 +141,7 @@ data: 查询当前时间。
 ros2 service call /reload_config std_srvs/srv/Trigger
 ```
 
-### 激活LLM服务
+#### 激活LLM服务
 ```bash
 ros2 service call /activate_llm std_srvs/srv/Trigger
 ```

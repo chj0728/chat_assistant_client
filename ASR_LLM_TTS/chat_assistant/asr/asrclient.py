@@ -97,12 +97,12 @@ class ASRClient:
 # ===============================
 if __name__ == "__main__":
     client = ASRClient(
-        host="192.168.50.125",
+        host="192.168.50.107",
         port=2002,
         timeout=30,
     )
 
-    wav = "/home/xuyao/chj/ws/ymbot/ASR_LLM_TTS/chat_assistant/example.wav"
+    wav = "./wavs/example.wav"
     text = client.recognize(wav)
     # print("ASR Result:", text)
     logger.info(f"ASR Result: {text}")

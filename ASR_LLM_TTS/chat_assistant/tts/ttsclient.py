@@ -277,3 +277,22 @@ class TTSClient:
 
         self.play_thread.join()
         self.tts_thread.join()
+
+
+if __name__ == "__main__":
+
+    tts_client = TTSClient(host="192.168.50.107", port=50000, speaker_id=0, speed=1.0)
+
+    # 测试 TTS 播放
+    tts_client.speak("你好，这是一段测试语音。")
+    time.sleep(1)
+    while tts_client.is_active():
+        time.sleep(1)
+    logger.info("播放完成")
+
+    # 测试生成 WAV 文件
+    tts_client.generate_wav(
+        "你好，这是一段测试语音保存的语音合成示例。",
+        "./wavs/example.wav",
+    )
+    logger.info("WAV 文件生成完成")

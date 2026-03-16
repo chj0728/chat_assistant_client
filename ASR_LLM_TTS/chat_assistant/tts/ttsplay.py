@@ -341,13 +341,13 @@ class RealtimeTTSPlayer:
 if __name__ == "__main__":
 
     tts_player = RealtimeTTSPlayer(
-        host="192.168.50.125",
+        host="192.168.50.220",
         port=50000,
     )
 
     # real-time TTS with no interruption
     tts_player.speak("我叫千问，是Qwen3模型驱动的智能助手，专注于回答各种问题。")
-    time.sleep(1)
+    time.sleep(2)
 
     # tts_player.speak("您好！有什么可以帮助您的吗？")
     # time.sleep(2)
