@@ -61,23 +61,19 @@ class TTSClient:
         self.is_sounding = False
         self._stop_event = threading.Event()
         self._interrupt_event = threading.Event()
+        self._audio_lock = threading.Lock()
+        self._playback_buffer = np.empty((0, self.channels), dtype=np.float32)
 
-        # 音频输出流
+        # 回调式音频输出流。队列空时自动补静音，避免设备断粮 underrun。
         self.stream = sd.OutputStream(
             samplerate=self.sample_rate,
             channels=self.channels,
             dtype="float32",
             blocksize=self.buffer_size,
             latency="low",
+            callback=self._audio_callback,
         )
         self.stream.start()
-
-        # 播放线程（只负责播）
-        self.play_thread = threading.Thread(
-            target=self._play_loop,
-            daemon=True,
-        )
-        self.play_thread.start()
 
         # TTS 线程
         self.tts_thread = threading.Thread(
@@ -88,31 +84,45 @@ class TTSClient:
 
     # ================= 私有接口 =================
 
-    def _play_loop(self):
-        while not self._stop_event.is_set():
+    def _audio_callback(self, outdata, frames, time_info, status):
+        del time_info
+        if status:
+            # 回调状态日志保留为 debug，避免刷屏。
+            logger.debug(f"音频回调状态: {status}")
 
-            if self._interrupt_event.is_set():
-                self.is_sounding = False
-                time.sleep(0.1)
-                continue
-            try:
-                data = self.audio_queue.get(timeout=0.1)
-            except queue.Empty:
-                self.is_sounding = False
-                time.sleep(0.1)
-                continue
+        if self._stop_event.is_set() or self._interrupt_event.is_set():
+            outdata.fill(0)
+            self.is_sounding = False
+            return
 
-            self.is_sounding = True
-            try:
-                pcm = np.frombuffer(data, dtype=np.float32)
-                if pcm.size % self.channels != 0:
-                    logger.warning("丢弃未对齐的音频块")
-                    continue
-                pcm = np.ascontiguousarray(pcm.reshape(-1, self.channels))
-                self.stream.write(pcm)
-                # logger.info(f"播放音频块，大小: {len(data)} 字节")
-            except Exception as e:
-                logger.error(f"音频播放出错: {e}")
+        filled = 0
+        with self._audio_lock:
+            while filled < frames:
+                if self._playback_buffer.shape[0] == 0:
+                    try:
+                        chunk = self.audio_queue.get_nowait()
+                    except queue.Empty:
+                        break
+
+                    pcm = np.frombuffer(chunk, dtype=np.float32)
+                    if pcm.size == 0:
+                        continue
+                    if pcm.size % self.channels != 0:
+                        logger.warning("丢弃未对齐的音频块")
+                        continue
+                    self._playback_buffer = np.ascontiguousarray(
+                        pcm.reshape(-1, self.channels)
+                    )
+
+                take = min(frames - filled, self._playback_buffer.shape[0])
+                outdata[filled : filled + take] = self._playback_buffer[:take]
+                self._playback_buffer = self._playback_buffer[take:]
+                filled += take
+
+        if filled < frames:
+            outdata[filled:].fill(0)
+
+        self.is_sounding = filled > 0
 
     def _tts_loop(self):
         """
@@ -357,6 +367,7 @@ class TTSClient:
         """检查播放器是否正在播放音频"""
         return (
             self.is_sounding
+            or not self.audio_queue.empty()
             # or not self.text_queue.empty()
             # or not self.audio_queue.empty()
             # or not self.stream.stopped
@@ -422,6 +433,9 @@ class TTSClient:
             except queue.Empty:
                 break
 
+        with self._audio_lock:
+            self._playback_buffer = np.empty((0, self.channels), dtype=np.float32)
+
         if self.sound is not None and self.sound.is_alive():
             self.sound.stop()
             time.sleep(0.1)
@@ -435,8 +449,6 @@ class TTSClient:
         self._close_ws_runtime()
         self.stream.stop()
         self.stream.close()
-
-        self.play_thread.join()
         self.tts_thread.join()
 
 
