@@ -5,6 +5,11 @@ This project implements a chat assistant that integrates Automatic Speech Recogn
 ## Workflow diagram of the complete chat assistant
 ![alt text](<workflow.svg>)
 
+## clone the repository
+
+```bash
+git clone http://192.168.50.220:8090/external/ymbot.git -b dev-chj
+```
 
 ## creating a virtual environment
 
