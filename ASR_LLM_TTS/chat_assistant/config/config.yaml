@@ -36,6 +36,7 @@ Audio:
   channels: 1 # 单声道
   chunk_duration_ms: 20  # 每次读取的音频块持续时间（毫秒）10,20,30
   # chunk_size: 960  # int(rate * chunk_duration_ms / 1000) * 2 # 每次读取的音频块大小（帧数）
+  max_file_count: 20  # 最大保存音频文件数量，超过后循环覆盖
 
 VAD:
   output_dir: "output" # VAD 结果保存目录

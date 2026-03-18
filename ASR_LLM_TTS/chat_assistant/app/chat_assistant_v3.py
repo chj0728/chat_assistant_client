@@ -21,13 +21,6 @@ from logger import logger
 
 MAX_QUEUE_SIZE = 10
 
-# 获取当前文件所在目录
-current_dir = Path(__file__).resolve().parent
-logger.info(f"当前文件目录: {current_dir}")
-config_yaml_path = (current_dir / "../config/config.yaml").resolve()
-logger.info(f"配置文件路径: {config_yaml_path}")
-
-
 SPECIAL_WORD_MAP = {
     "智己": [
         "自己",
@@ -234,6 +227,8 @@ class ChatAssistant:
         self.audio_rate = audio_cfg.get("rate", 16000)
         self.audio_channels = audio_cfg.get("channels", 1)
         self.chunk_duration_ms = audio_cfg.get("chunk_duration_ms", 30)
+        self.audio_file_count = 0
+        self.max_file_count = audio_cfg.get("max_file_count", 50)
         # self.chunk_size = audio_cfg.get("chunk_size", 1024)
 
         # 帧 = 采样率 * 持续时间(秒) （给 sounddevice 用）
@@ -250,7 +245,9 @@ class ChatAssistant:
             self.chunk_bytes = self.chunk_frames * 2
 
         self.vad_mode = vad_cfg.get("mode", 3)
-        self.output_dir = (current_dir / vad_cfg.get("output_dir", "output")).resolve()
+        self.output_dir = (
+            Path(__file__).resolve().parent.parent / vad_cfg.get("output_dir", "output")
+        ).resolve()
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.no_speech_threshold = vad_cfg.get("no_speech_threshold", 0.5)
         self.decibel_threshold = vad_cfg.get("decibel_threshold", -40)
@@ -285,7 +282,6 @@ class ChatAssistant:
         self.last_vad_end_time = time.time()  # 上次保存的 VAD 有效段结束时间
         self.last_llm_time = time.time()  # 上次与 LLM 交互的时间
         self.last_tts_time = time.time()  # 上次 TTS 播放的时间
-        self.audio_file_count = 0
 
         self.enable_interrupt_tts = self.configs.get("enable_interrupt_tts", False)
         self.enable_replace_special_characters = self.configs.get(
@@ -492,10 +488,9 @@ class ChatAssistant:
             return None
 
         # ===============================
-        # 1. 生成输出路径
+        # 1. 生成输出路径 ,循环保存最近 self.max_file_count 条音频
         # ===============================
-        # self.audio_file_count += 1
-        self.audio_file_count = 1
+        self.audio_file_count = (self.audio_file_count % self.max_file_count) + 1
         audio_output_path = self.output_dir / f"audio_{self.audio_file_count}.wav"
 
         # ===============================
@@ -1026,6 +1021,12 @@ class ChatAssistant:
 
 
 if __name__ == "__main__":
+
+    # 获取当前文件所在目录
+    current_dir = Path(__file__).resolve().parent
+    logger.info(f"当前文件目录: {current_dir}")
+    config_yaml_path = (current_dir / "../config/config.yaml").resolve()
+    logger.info(f"配置文件路径: {config_yaml_path}")
 
     assistant = ChatAssistant(config_path=str(config_yaml_path))
 

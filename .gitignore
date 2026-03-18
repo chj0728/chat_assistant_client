@@ -11,3 +11,5 @@ log/
 **/logs/
 
 **.log
+
+**.wav
