@@ -207,7 +207,7 @@ class TTSClient:
         asyncio.set_event_loop(loop)
         self._ws_loop = loop
         self._ws_started.set()
-        logger.info("WebSocket 事件循环线程已启动")
+        logger.info("TTS WebSocket 事件循环线程已启动")
         try:
             loop.run_forever()
         finally:

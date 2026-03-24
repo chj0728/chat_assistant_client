@@ -2,7 +2,9 @@
 asr_server: ['asr_local'] # 可选值: "asr_local"（本地 jestson orin 设备提供的 ASR 服务） "asr_remote"（远程服务器提供的 ASR 服务 ）
 asr_local:
   host: "192.168.10.101" # 本地 ASR 服务器地址，通常是 Jetson Orin 设备的 IP 地址
-  port: 2002
+  port: 6006 # 2002（FunASR 服务端 HTTP 模式）或 6006（sherpa_onnx_asr 服务端 HTTP/WebSocket 模式）
+  use_websocket: true # 是否使用 WebSocket ，确保服务端支持 WebSocket
+
 asr_remote:
   host: "192.168.50.220" # 远程 ASR 服务器地址
   port: 2002
@@ -45,14 +47,14 @@ VAD:
   # reactive_kws_threshold: 100  # 重置唤醒词检测 激活 LLM 时间间隔 (秒) 
   decibel_threshold: -35  # 分贝阈值，低于此值认为是静音 (dB)
 
-  min_recording_duration: 0.8   # 最短有效录音时长 (秒)
+  min_recording_duration: 0.4   # 最短有效录音时长 (秒)
   max_recording_duration: 10  # 最大有效录音时长 (秒)
   
   pause_duration: 4.0  # 距离上次语音保存多长时间后，允许再次保存音频 (秒)
 
 KWS:
   enable: true # 是否启用唤醒词检测
-  failed_kws_counts : 2  # 连续未检测到唤醒词次数达到此值时，推送提示语音
+  failed_kws_counts : 1  # 连续未检测到唤醒词次数达到此值时，推送提示语音
   failed_kws_threshold: 30  # 连续未检测到唤醒词次数 达到 failed_kws_counts 后，推送提示语音的时间间隔 (秒)
   reactive_kws_threshold: 100  # 重置 需要唤醒词检测 激活 LLM 时间间隔 (秒) 
   wake_word: "你好小特"

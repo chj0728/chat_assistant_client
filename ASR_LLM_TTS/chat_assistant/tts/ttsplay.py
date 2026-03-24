@@ -23,7 +23,7 @@ class RealtimeTTSPlayer:
         self,
         host,
         port,
-        sample_rate: int = 24000,
+        sample_rate: int = 16000,
         channels: int = 1,
         chunk_size: int = 2048,
         buffer_size: int = 8192,  # 增加缓冲区大小
