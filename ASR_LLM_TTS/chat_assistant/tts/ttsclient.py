@@ -58,6 +58,7 @@ class TTSClient:
         self.audio_queue = queue.Queue()
 
         self.sound = None
+        self.count = 0
         self.is_sounding = False
         self._stop_event = threading.Event()
         self._interrupt_event = threading.Event()
@@ -122,7 +123,18 @@ class TTSClient:
         if filled < frames:
             outdata[filled:].fill(0)
 
-        self.is_sounding = filled > 0
+        ####### 声音检测逻辑，判断是否正在播放声音 #########
+        if filled > 0:
+            self.count += 1
+            if self.count % 2 == 0:
+                self.is_sounding = True
+                self.count = 0
+        else:
+            self.is_sounding = False
+            self.count = 0
+
+        # self.is_sounding = filled > 0
+        ################################################
 
     def _tts_loop(self):
         """
@@ -367,7 +379,7 @@ class TTSClient:
         """检查播放器是否正在播放音频"""
         return (
             self.is_sounding
-            or not self.audio_queue.empty()
+            # or not self.audio_queue.empty()
             # or not self.text_queue.empty()
             # or not self.audio_queue.empty()
             # or not self.stream.stopped
