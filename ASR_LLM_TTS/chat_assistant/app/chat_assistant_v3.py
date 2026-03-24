@@ -178,9 +178,10 @@ class ChatAssistant:
         asr_cfg = self.configs.get(asr_server_type, {})
 
         self.asr_client = ASRClient(
-            host=asr_cfg.get("host", "192.168.50.125"),
+            host=asr_cfg.get("host", "192.168.10.101"),
             port=asr_cfg.get("port", 2002),
             timeout=asr_cfg.get("timeout", 30),
+            use_websocket=asr_cfg.get("use_websocket", False),
         )
 
         ########### LLM 服务器选择和客户端初始化 ##########
