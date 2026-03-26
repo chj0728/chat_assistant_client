@@ -24,13 +24,29 @@ formatter = logging.Formatter(
     "[%(asctime)s][%(levelname)s][%(filename)s:%(lineno)d]: %(message)s"
 )
 
+# 定义宏，在日志消息中使用不同的颜色来区分不同级别的日志（需要支持 ANSI 转义序列的终端）
+LOG_COLORS = {
+    logging.DEBUG: "\033[36m",  # 青色
+    # logging.INFO: "\033[32m",  # 绿色
+    logging.WARNING: "\033[33m",  # 黄色
+    logging.ERROR: "\033[31m",  # 红色
+    logging.CRITICAL: "\033[35m",  # 紫色
+}
+
+
+class ColoredFormatter(logging.Formatter):
+    def format(self, record):
+        log_color = LOG_COLORS.get(record.levelno, "\033[0m")  # 默认颜色
+        message = super().format(record)
+        return f"{log_color}{message}\033[0m"  # 添加颜色并重置
+
+
 # 控制台处理器
 console_handler = logging.StreamHandler()  # 默认输出到sys.stderr（控制台）
 console_handler.setLevel(
     logging.DEBUG
 )  # 控制台输出INFO及以上级别日志（可根据需要调整）
-console_handler.setFormatter(formatter)
-
+console_handler.setFormatter(ColoredFormatter(formatter._fmt))
 
 # timed_handler：每小时生成一个新的日志文件，保留48小时的日志文件
 timed_handler = logging.handlers.TimedRotatingFileHandler(
