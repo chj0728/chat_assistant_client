@@ -25,7 +25,7 @@ class TTSClient:
         sample_rate: int = 16000,
         channels: int = 1,
         chunk_size: int = 2048,
-        buffer_size: int = 8192,  # 增加缓冲区大小
+        buffer_size: int = 4096,  # 增加缓冲区大小
         speaker_id: int = 0,
         speed: float = 1.0,
         use_websocket: bool = False,
@@ -126,7 +126,7 @@ class TTSClient:
         ####### 声音检测逻辑，判断是否正在播放声音 #########
         if filled > 0:
             self.count += 1
-            if self.count % 2 == 0:
+            if self.count % 4 == 0:
                 self.is_sounding = True
                 self.count = 0
         else:

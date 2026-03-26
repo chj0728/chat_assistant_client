@@ -774,8 +774,8 @@ class ChatAssistant:
             self.tts_client.speak(llm_response.strip())
 
             while not self.tts_client.is_active():
-                if time.time() - time_now > 4.0:
-                    logger.error("等待 TTS 播放超时")
+                if time.time() - time_now > 3.0:
+                    logger.error("TTS 播放超时 或者 TTS 播放音频太短")
                     return False
                 time.sleep(0.01)
 

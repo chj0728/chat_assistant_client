@@ -426,8 +426,7 @@ class ChatAssistantNode(Node):
         # 检查 TTS 结果是否有效
         if tts_result is False:
             response.success = False
-            response.message = "TTS 未能成功合成或播放音频"
-            logger.error(response.message)
+            response.message = "TTS 播放超时 或者 TTS 播放音频太短"
             return response
 
         response.success = True
