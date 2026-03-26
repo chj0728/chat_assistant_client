@@ -25,6 +25,7 @@ tts_local:
   speaker_id: 0
   speed: 1.0
   use_websocket: true # 是否使用 WebSocket 连接 TTS 服务器，确保服务器支持 WebSocket
+  playback_start_delay_sec: 0.5 # 起播确认延迟时间，单位秒，根据实际情况调整，影响 tts_active_topic 发布时机，过短可能导致发布过早，过长可能导致响应感觉迟钝
 
 tts_remote:
   host: "192.168.50.220" # 远程 TTS 服务器地址

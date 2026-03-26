@@ -202,6 +202,7 @@ class ChatAssistant:
         tts_cfg = self.configs.get(tts_server_type, {})
 
         if tts_server_type == "tts_remote":
+
             self.tts_client = RealtimeTTSPlayer(
                 host=tts_cfg.get("host", "192.168.50.220"),
                 port=tts_cfg.get("port", 50000),
@@ -209,6 +210,7 @@ class ChatAssistant:
             self.tts_client.change_preset(
                 tts_cfg.get("voice_type", "default")
             )  # "default"(女性活泼), "zh"(男性非标准) , "hard_zh"(男性业余), "longshu_zh"(男性专业), "longwan_zh"（女性专业）
+
         elif tts_server_type == "tts_local":
             self.tts_client = TTSClient(
                 host=tts_cfg.get("host", "192.168.10.101"),
@@ -216,6 +218,7 @@ class ChatAssistant:
                 speaker_id=tts_cfg.get("speaker_id", 0),
                 speed=tts_cfg.get("speed", 1.0),
                 use_websocket=tts_cfg.get("use_websocket", True),
+                playback_start_delay_sec=tts_cfg.get("playback_start_delay_sec", 0.0),
             )
         else:
             logger.error(f"未知的 TTS 服务器类型: {tts_server_type}")
@@ -779,8 +782,17 @@ class ChatAssistant:
                     return False
                 time.sleep(0.01)
 
-            elapsed_time = time.time() - time_now
-            logger.info(f"TTS 合成并播放音频耗时: {elapsed_time:.2f} 秒")
+            elapsed_time = 0
+            if isinstance(self.tts_client, RealtimeTTSPlayer):
+                elapsed_time = time.time() - time_now
+            else:
+                elapsed_time = (
+                    time.time()
+                    - time_now
+                    - self.tts_client.get_playback_start_delay_sec()
+                )
+
+            logger.info(f"TTS 合成并播放音频延迟: {elapsed_time:.2f} 秒")
             return True
         except Exception as e:
             logger.error(f"TTS 播放失败: {e}")

@@ -32,7 +32,25 @@ class TTSClient:
         ws_path: str = "/ws/inference_zero_shot",
         ws_ping_interval: Optional[float] = None,
         ws_ping_timeout: Optional[float] = None,
+        playback_start_delay_sec: float = 0.0,
     ):
+        """_summary_
+
+        Args:
+            host (str): TTS server 的主机地址。
+            port (int): TTS server 的端口号。
+            speaker_id (int, optional): 选择的说话人 ID。默认值为 0。
+            sample_rate (int, optional): 音频播放的采样率。默认值为 16000。
+            channels (int, optional): 音频通道数。默认值为 1。
+            chunk_size (int, optional): 音频块的大小。默认值为 2048。
+            buffer_size (int, optional): 音频缓冲区的大小。默认值为 4096。
+            speed (float, optional): 播放速度。默认值为 1.0。
+            use_websocket (bool, optional): 是否使用 WebSocket 进行 TTS。默认值为 False。
+            ws_path (str, optional): WebSocket 路径。默认值为 "/ws/inference_zero_shot"。
+            ws_ping_interval (Optional[float], optional): WebSocket ping 间隔。默认值为 None。
+            ws_ping_timeout (Optional[float], optional): WebSocket ping 超时。默认值为 None。
+            playback_start_delay_sec (float, optional): 判断起播的延迟时间，单位为秒。默认值为 0.0 秒，即没有延迟。
+        """
         self.host = host
         self.port = port
         self.sample_rate = sample_rate
@@ -58,8 +76,11 @@ class TTSClient:
         self.audio_queue = queue.Queue()
 
         self.sound = None
-        self.count = 0
         self.is_sounding = False
+        self._audio_active_started_ts = 0.0  # 首帧时间戳，用于起播确认
+        self._last_audio_chunk_ts = 0.0  # 最后一次收到音频块的时间戳，用于挂起判断
+        self._playback_start_delay_sec = playback_start_delay_sec  # 起播确认延迟时间
+        self._playback_hangover_sec = 0.0  # 结束后的挂起时间
         self._stop_event = threading.Event()
         self._interrupt_event = threading.Event()
         self._audio_lock = threading.Lock()
@@ -87,6 +108,7 @@ class TTSClient:
 
     def _audio_callback(self, outdata, frames, time_info, status):
         del time_info
+        now = time.monotonic()
         if status:
             # 回调状态日志保留为 debug，避免刷屏。
             logger.debug(f"音频回调状态: {status}")
@@ -94,6 +116,8 @@ class TTSClient:
         if self._stop_event.is_set() or self._interrupt_event.is_set():
             outdata.fill(0)
             self.is_sounding = False
+            self._audio_active_started_ts = 0.0
+            self._last_audio_chunk_ts = 0.0
             return
 
         filled = 0
@@ -123,17 +147,23 @@ class TTSClient:
         if filled < frames:
             outdata[filled:].fill(0)
 
-        ####### 声音检测逻辑，判断是否正在播放声音 #########
+        ####### 声音检测逻辑，延迟判断起播音频播放状态 #######
         if filled > 0:
-            self.count += 1
-            if self.count % 4 == 0:
-                self.is_sounding = True
-                self.count = 0
+            # 先记录首帧时间；达到起播确认窗口后再判定为播放。
+            if self._audio_active_started_ts <= 0.0:
+                self._audio_active_started_ts = now
+            self._last_audio_chunk_ts = now
+            self.is_sounding = (
+                now - self._audio_active_started_ts
+            ) >= self._playback_start_delay_sec
         else:
-            self.is_sounding = False
-            self.count = 0
-
-        # self.is_sounding = filled > 0
+            # 短暂挂起窗口用于吸收回调调度抖动，避免状态频繁抖动。
+            keep_active = (
+                now - self._last_audio_chunk_ts
+            ) < self._playback_hangover_sec
+            self.is_sounding = keep_active
+            if not keep_active:
+                self._audio_active_started_ts = 0.0
         ################################################
 
     def _tts_loop(self):
@@ -447,6 +477,8 @@ class TTSClient:
 
         with self._audio_lock:
             self._playback_buffer = np.empty((0, self.channels), dtype=np.float32)
+            self._audio_active_started_ts = 0.0
+            self._last_audio_chunk_ts = 0.0
 
         if self.sound is not None and self.sound.is_alive():
             self.sound.stop()
@@ -454,6 +486,9 @@ class TTSClient:
             logger.info("正在停止当前播放的音频...")
 
         self._interrupt_event.clear()
+
+    def get_playback_start_delay_sec(self):
+        return self._playback_start_delay_sec
 
     def stop(self):
         """停止播放器"""
