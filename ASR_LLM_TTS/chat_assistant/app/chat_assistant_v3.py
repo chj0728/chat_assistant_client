@@ -1,6 +1,7 @@
 import os
 import re
 import wave
+from difflib import SequenceMatcher
 import sounddevice as sd
 import numpy as np
 import time
@@ -22,33 +23,9 @@ from logger import logger
 MAX_QUEUE_SIZE = 10
 
 SPECIAL_WORD_MAP = {
-    "智己": [
-        "自己",
-        "智几",
-        "治己",
-        "之际",
-        "知己",
-        "只记",
-        "只几",
-        "只机",
-        "只及",
-        "之几",
-        "之机",
-        "之及",
-        "治几",
-        "治机",
-        "治及",
-        "直几",
-        "直机",
-        "直及",
-        "植机",
-        "植及",
-        "执机",
-        "执及",
-        "职机",
-        "职及",
-        "置机",
-        "置及",
+    # 这里目标正确词作为键，常见错误变体列表作为值，可以根据实际情况调整和扩展
+    "": [
+        # 常见 ASR 错误示例，可以根据实际情况调整和扩展
     ],
 }
 
@@ -180,7 +157,7 @@ class ChatAssistant:
         self.asr_client = ASRClient(
             host=asr_cfg.get("host", "192.168.10.101"),
             port=asr_cfg.get("port", 2002),
-            timeout=asr_cfg.get("timeout", 30),
+            timeout_sec=asr_cfg.get("timeout_sec", 30),
             use_websocket=asr_cfg.get("use_websocket", False),
         )
 
@@ -215,6 +192,7 @@ class ChatAssistant:
             self.tts_client = TTSClient(
                 host=tts_cfg.get("host", "192.168.10.101"),
                 port=tts_cfg.get("port", 50000),
+                timeout_sec=tts_cfg.get("timeout_sec", 30),
                 speaker_id=tts_cfg.get("speaker_id", 0),
                 speed=tts_cfg.get("speed", 1.0),
                 use_websocket=tts_cfg.get("use_websocket", True),
@@ -223,10 +201,10 @@ class ChatAssistant:
         else:
             logger.error(f"未知的 TTS 服务器类型: {tts_server_type}")
             raise ValueError(f"未知的 TTS 服务器类型: {tts_server_type}")
+        # ------------------------------------------------
 
-        # ----------- 初始化音频录制和VAD参数 -----------
+        ############## 音频采集参数 ##############
         audio_cfg = self.configs.get("Audio", {})
-        vad_cfg = self.configs.get("VAD", {})
 
         self.audio_rate = audio_cfg.get("rate", 16000)
         self.audio_channels = audio_cfg.get("channels", 1)
@@ -247,6 +225,10 @@ class ChatAssistant:
             self.chunk_duration_ms = 20
             self.chunk_frames = int(self.audio_rate * self.chunk_duration_ms / 1000)
             self.chunk_bytes = self.chunk_frames * 2
+        #########################################
+
+        ############## VAD 参数 ##############
+        vad_cfg = self.configs.get("VAD", {})
 
         self.vad_mode = vad_cfg.get("mode", 3)
         self.output_dir = (
@@ -259,13 +241,21 @@ class ChatAssistant:
         self.max_recording_duration = vad_cfg.get("max_recording_duration", 10.0)
         self.pause_duration = vad_cfg.get("pause_duration", 1.5)
         self.vad = webrtcvad.Vad(self.vad_mode)
+        ######################################
 
+        ############## 唤醒词参数 ##############
         kws_cfg = self.configs.get("KWS", {})
+
         self.set_kws = kws_cfg.get("wake_word", "你好小特")
-        # self.set_kws_pinyin = kws_cfg.get("wake_word_pinyin", "hi xiao bai")
         self.set_kws_pinyin = self._extract_chinese_and_convert_to_pinyin(self.set_kws)
+        self.kws_fuzzy_similarity_threshold = kws_cfg.get(
+            "fuzzy_similarity_threshold", 0.78
+        )
         logger.info(f"设置的唤醒词: {self.set_kws}, 拼音: {self.set_kws_pinyin}")
+
         self.flag_kws_used = kws_cfg.get("enable", True)
+        if not self.flag_kws_used:
+            logger.info("未启用唤醒词激活功能")
         self.flag_kws = 0  # 唤醒词检测标志
         self.failed_enable_kws_count = 0  # 连续未检测到唤醒词计数
         self.failed_kws_counts = kws_cfg.get(
@@ -278,7 +268,9 @@ class ChatAssistant:
             "reactive_kws_threshold", 100
         )  # 重置 需要唤醒词检测 激活 LLM 时间间隔 (秒)
         self.last_failed_kws_time = time.time()
+        #######################################
 
+        ################ 其他状态变量 ##############
         self.recording_active = False  # 当前是否处于录音状态
         self.segments_to_save = []  # 待保存的音频片段
         self.saved_intervals = []  # 已保存的时间区间
@@ -347,6 +339,71 @@ class ChatAssistant:
         pinyin_text = " ".join([item[0] for item in pinyin_result])
 
         return pinyin_text
+
+    def _is_kws_pinyin_match(self, detected_pinyin: str) -> bool:
+        """判断待检测拼音是否与唤醒词拼音近似匹配。"""
+        if not detected_pinyin or not self.set_kws_pinyin:
+            return False
+
+        detected_tokens = detected_pinyin.split()
+        target_tokens = self.set_kws_pinyin.split()
+
+        if not detected_tokens or not target_tokens:
+            return False
+
+        # 先走快速路径：包含完整目标拼音，直接判定为命中。
+        if self.set_kws_pinyin in detected_pinyin:
+            logger.info("唤醒词拼音包含精确匹配")
+            return True
+
+        target_joined = "".join(target_tokens)
+        target_len = len(target_tokens)
+
+        # 使用滑窗计算拼音相似度，允许长度有 1 个音节误差。
+        candidate_lens = {target_len}
+        if target_len > 1:
+            candidate_lens.add(target_len - 1)
+            candidate_lens.add(target_len + 1)
+
+        best_score = 0.0
+        best_window = ""
+
+        for win_len in sorted(candidate_lens):
+            if win_len <= 0:
+                continue
+
+            if len(detected_tokens) < win_len:
+                window_tokens_list = [detected_tokens]
+            else:
+                window_tokens_list = [
+                    detected_tokens[i : i + win_len]
+                    for i in range(0, len(detected_tokens) - win_len + 1)
+                ]
+
+            for window_tokens in window_tokens_list:
+                window_joined = "".join(window_tokens)
+                score = SequenceMatcher(None, window_joined, target_joined).ratio()
+
+                if score > best_score:
+                    best_score = score
+                    best_window = " ".join(window_tokens)
+
+                if score >= self.kws_fuzzy_similarity_threshold:
+                    logger.info(
+                        "唤醒词近似匹配成功, 窗口拼音: '%s', 相似度: %.3f, 阈值: %.3f",
+                        " ".join(window_tokens),
+                        score,
+                        self.kws_fuzzy_similarity_threshold,
+                    )
+                    return True
+
+        logger.info(
+            "唤醒词近似匹配未命中, 最佳窗口: '%s', 最佳相似度: %.3f, 阈值: %.3f",
+            best_window,
+            best_score,
+            self.kws_fuzzy_similarity_threshold,
+        )
+        return False
 
     # 统计字符串中的汉字数量
     def _count_chinese_characters(self, input_string):
@@ -777,7 +834,7 @@ class ChatAssistant:
             self.tts_client.speak(llm_response.strip())
 
             while not self.tts_client.is_active():
-                if time.time() - time_now > 3.0:
+                if time.time() - time_now > 5.0:
                     logger.error("TTS 播放超时 或者 TTS 播放音频太短")
                     return False
                 time.sleep(0.01)
@@ -806,8 +863,9 @@ class ChatAssistant:
         # 提取汉字并转换为拼音
         pinyin_text = self._extract_chinese_and_convert_to_pinyin(asr_text)
         logger.info(f"转换为拼音: {pinyin_text}")
+        wake_word_matched = self._is_kws_pinyin_match(pinyin_text)
 
-        if self.set_kws_pinyin in pinyin_text and self.tts_client.is_active():
+        if wake_word_matched and self.tts_client.is_active():
             logger.warning("检测到唤醒词， TTS 播放中，打断播放以避免语音叠加")
 
             # self.flag_kws = 1
@@ -838,7 +896,7 @@ class ChatAssistant:
                 self.last_llm_time = time.time()
                 return True
 
-            if self.set_kws_pinyin in pinyin_text:
+            if wake_word_matched:
 
                 # self.flag_kws = 1
                 self.llm_agent_state = LLMAgentState.ACTIVE
@@ -897,7 +955,7 @@ class ChatAssistant:
         else:
             self.llm_agent_state = LLMAgentState.ACTIVE
             self.last_llm_time = time.time()
-            logger.info("不需要唤醒词激活")
+            logger.info("未启用唤醒词激活功能")
             return True
 
     ##########################################################
@@ -942,8 +1000,8 @@ class ChatAssistant:
             logger.info(f"替换前 ASR 文本: {self.asr_text}")
             self.asr_text = self._replace_special_characters(self.asr_text)
             logger.info(f"替换后 ASR 文本: {self.asr_text}")
-        else:
-            logger.info("未启用特殊词汇替换功能")
+        # else:
+        #     logger.info("未启用特殊词汇替换功能")
 
         ## 更新asr_text队列
         self._push_queue(self.asr_text_queue, self.asr_text)

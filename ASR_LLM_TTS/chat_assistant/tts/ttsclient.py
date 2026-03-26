@@ -22,6 +22,7 @@ class TTSClient:
         self,
         host,
         port,
+        timeout_sec: float = 30.0,
         sample_rate: int = 16000,
         channels: int = 1,
         chunk_size: int = 2048,
@@ -39,6 +40,7 @@ class TTSClient:
         Args:
             host (str): TTS server 的主机地址。
             port (int): TTS server 的端口号。
+            timeout_sec (float): 请求超时时间，单位为秒。默认值为 30 秒。
             speaker_id (int, optional): 选择的说话人 ID。默认值为 0。
             sample_rate (int, optional): 音频播放的采样率。默认值为 16000。
             channels (int, optional): 音频通道数。默认值为 1。
@@ -53,6 +55,7 @@ class TTSClient:
         """
         self.host = host
         self.port = port
+        self.timeout = timeout_sec
         self.sample_rate = sample_rate
         self.channels = channels
         self.chunk_size = chunk_size
@@ -67,9 +70,6 @@ class TTSClient:
         self._ws = None
         self._ws_thread: Optional[threading.Thread] = None
         self._ws_started = threading.Event()
-
-        if self.use_websocket:
-            self._start_ws_runtime()
 
         # 文本队列 + 音频队列
         self.text_queue = queue.Queue()
@@ -86,7 +86,7 @@ class TTSClient:
         self._audio_lock = threading.Lock()
         self._playback_buffer = np.empty((0, self.channels), dtype=np.float32)
 
-        # 回调式音频输出流。队列空时自动补静音，避免设备断粮 underrun。
+        ######### 回调式音频输出流。队列空时自动补静音，避免设备断粮 underrun #########
         self.stream = sd.OutputStream(
             samplerate=self.sample_rate,
             channels=self.channels,
@@ -97,12 +97,24 @@ class TTSClient:
         )
         self.stream.start()
 
-        # TTS 线程
+        ######### 后台 TTS worker 线程，串行处理文本到语音的请求和播放 #########
         self.tts_thread = threading.Thread(
             target=self._tts_loop,
             daemon=True,
         )
         self.tts_thread.start()
+
+        #### 如果使用 WebSocket，提前启动事件循环线程，避免首次请求时的启动延迟 ####
+        if self.use_websocket:
+            self._start_ws_runtime()
+            time.sleep(1.0)  # 确保事件循环线程启动完成
+            try:
+                self._run_ws_coro(self._ensure_ws_connected(), timeout=self.timeout)
+            except TimeoutError:
+                logger.error("TTS WebSocket 连接超时")
+            except Exception as e:
+                logger.error(f"TTS WebSocket 连接失败: {e}")
+        ####################################################################
 
     # ================= 私有接口 =================
 
@@ -224,10 +236,13 @@ class TTSClient:
     def _tts_request_ws(self, text):
         try:
             self._start_ws_runtime()
-            self._run_ws_coro(self._tts_request_ws_async(text), timeout=None)
+            self._run_ws_coro(self._tts_request_ws_async(text), timeout=self.timeout)
+        except TimeoutError:
+            logger.error("TTS WebSocket 请求超时")
+            self._run_ws_coro(self._close_ws_async(), timeout=self.timeout)
         except Exception as e:
             logger.error(f"WebSocket TTS 请求失败: {e}")
-            self._run_ws_coro(self._close_ws_async(), timeout=3)
+            self._run_ws_coro(self._close_ws_async(), timeout=self.timeout)
 
     def _start_ws_runtime(self):
         if self._ws_thread is not None and self._ws_thread.is_alive():
@@ -261,6 +276,18 @@ class TTSClient:
                 loop.close()
 
     def _run_ws_coro(self, coro, timeout: Optional[float]):
+        """在 WebSocket 事件循环中运行协程，并等待结果
+
+        Args:
+            coro (Coroutine): 要在 WebSocket 事件循环中运行的协程
+            timeout (Optional[float]): 等待结果的超时时间（秒），为 None 表示无限等待
+
+        Raises:
+            RuntimeError: 如果 WebSocket 事件循环未初始化
+
+        Returns:
+            Any: 协程的返回结果
+        """
         if self._ws_loop is None:
             raise RuntimeError("WebSocket 事件循环未初始化")
 
@@ -284,7 +311,7 @@ class TTSClient:
             ping_interval=self.ws_ping_interval,
             ping_timeout=self.ws_ping_timeout,
         )
-        logger.info(f"WebSocket 已连接: {url}")
+        logger.info(f"TTS WebSocket 已连接: {url}")
 
     async def _close_ws_async(self):
         if self._ws is None:
@@ -292,9 +319,9 @@ class TTSClient:
 
         try:
             await self._ws.close()
-            logger.info("WebSocket 已关闭")
+            logger.info("TTS WebSocket 已关闭")
         except Exception as e:
-            logger.warning(f"关闭 WebSocket 失败: {e}")
+            logger.warning(f"关闭 TTS WebSocket 失败: {e}")
         finally:
             self._ws = None
 

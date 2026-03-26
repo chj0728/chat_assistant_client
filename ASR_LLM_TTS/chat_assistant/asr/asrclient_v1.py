@@ -4,6 +4,7 @@ import os
 import queue
 import threading
 import wave
+import time
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from typing import Optional
 
@@ -32,7 +33,7 @@ class ASRClient:
         self,
         host="192.168.50.125",
         port=2002,
-        timeout: int = 60,
+        timeout_sec: float = 30.0,
         use_websocket: bool = False,
         ws_path: str = "/",
         ws_ping_interval: Optional[float] = None,
@@ -47,7 +48,7 @@ class ASRClient:
         """
         :param host: ASR 服务地址
         :param port: ASR 服务端口
-        :param timeout: 请求超时时间（秒）
+        :param timeout_sec: 请求超时时间（秒）
         :param use_websocket: 是否使用 WebSocket 流式识别
         :param ws_path: WebSocket 路径
         :param ws_ping_interval: WebSocket ping 间隔
@@ -61,7 +62,7 @@ class ASRClient:
         """
         self.host = host
         self.port = port
-        self.timeout = timeout
+        self.timeout = timeout_sec
         self.use_websocket = use_websocket
         self.ws_path = ws_path
         self.ws_ping_interval = ws_ping_interval
@@ -84,9 +85,18 @@ class ASRClient:
         self._mic_started = threading.Event()
         self._mic_stop_event = threading.Event()
 
+        ############# 如果使用 WebSocket 模式，提前启动事件循环线程，避免首次请求时的启动延迟 #############
         if self.use_websocket:
             self._start_ws_runtime()
             # self.start_mic_stream() # 目前不默认启动麦克风流式识别，由上层传输wav文件时调用 recognize() 方法即可
+            time.sleep(1.0)  # 确保事件循环线程启动完成
+            try:
+                self._run_ws_coro(self._ensure_ws_connected(), timeout=self.timeout)
+            except TimeoutError:
+                logger.error("ASR WebSocket 连接超时")
+            except Exception as e:
+                logger.error(f"ASR WebSocket 连接异常: {e}")
+        ###################################################################
 
     ############ 公共接口 ############
     def recognize(self, wav_path: str, use_websocket: Optional[bool] = True) -> str:
@@ -335,10 +345,18 @@ class ASRClient:
         return ""
 
     def _recognize_ws(self, wav_path: str) -> str:
-        self._start_ws_runtime()
-        return self._run_ws_coro(
-            self._recognize_ws_async(wav_path), timeout=self.timeout
-        )
+        try:
+            return self._run_ws_coro(
+                self._recognize_ws_async(wav_path), timeout=self.timeout
+            )
+        except TimeoutError:
+            logger.error("ASR WebSocket 连接超时")
+            self._run_ws_coro(self._close_ws_async(), timeout=self.timeout)
+            return ""
+        except Exception as e:
+            logger.error(f"ASR WebSocket 连接失败: {e}")
+            self._run_ws_coro(self._close_ws_async(), timeout=self.timeout)
+            return ""
 
     def _push_recognized_text(self, text: str):
         text = text.strip()
@@ -538,7 +556,7 @@ if __name__ == "__main__":
     ws_client = ASRClient(
         host="192.168.50.220",
         port=6006,
-        timeout=30,
+        timeout_sec=30,
         use_websocket=True,
         ws_path="/",
     )
