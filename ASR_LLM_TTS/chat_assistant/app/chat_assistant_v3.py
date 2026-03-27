@@ -66,6 +66,7 @@ class ChatAssistant:
         self.response_queue = Queue(maxsize=MAX_QUEUE_SIZE)
         self.response_json = {}
 
+        self.input_stream = None
         self.recorder_thread = None
         self.recording_active = False
 
@@ -126,15 +127,22 @@ class ChatAssistant:
         """
         停止录音
         """
+
+        if self.input_stream:
+            self.input_stream.close()
+            self.input_stream = None
+            logger.info("音频输入流已关闭")
+
         if not self.recording_active:
             logger.info("录音线程已停止")
             return
-
         self.recording_active = False
 
         if self.recorder_thread and self.recorder_thread.is_alive():
             self.recorder_thread.join()
+            logger.info("录音线程正在停止...")
         self.recorder_thread = None
+
         # self._set_state(AssistantState.IDLE)
 
     def load_config_and_initialize(self):
@@ -687,21 +695,28 @@ class ChatAssistant:
                     # self.segments_to_save.append((audio_bytes, now))
                     self._finalize_pending_segments(now)
 
-        with sd.InputStream(
+        # with self.input_stream =sd.InputStream(
+        #     samplerate=self.audio_rate,
+        #     channels=self.audio_channels,
+        #     dtype="float32",
+        #     blocksize=self.chunk_frames,
+        #     callback=audio_callback,
+        # ):
+        self.input_stream = sd.InputStream(
             samplerate=self.audio_rate,
             channels=self.audio_channels,
             dtype="float32",
             blocksize=self.chunk_frames,
             callback=audio_callback,
-        ):
-            # logger.info(
-            #     "sd.default.device info: {}".format(sd.query_devices(sd.default.device))
-            # )
-            while self.recording_active:
-                time.sleep(1)
+        )
+        # logger.info(
+        #     "sd.default.device info: {}".format(sd.query_devices(sd.default.device))
+        # )
+        while self.recording_active:
+            time.sleep(1)
 
         # print("音频录制已停止")
-        logger.info("音频录制已停止")
+        # logger.info("音频录制已停止")
 
     ############# 功能模块激活状态管理 #############
     def activate(self):

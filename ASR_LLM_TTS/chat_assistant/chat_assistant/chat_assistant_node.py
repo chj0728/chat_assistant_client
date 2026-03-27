@@ -648,6 +648,7 @@ def main(args=None):
 
     finally:
         if rclpy.ok():
+            chat_assistant_node.chat_assistant.stop_recording()
             chat_assistant_node.destroy_node()
             rclpy.shutdown()
 

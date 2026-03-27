@@ -730,12 +730,24 @@ def main() -> None:
     print(f"[log-web] logs dir: {logs_dir}")
     print(f"[log-web] active log: {ACTIVE_LOG_NAME}")
 
+    import signal
+    import sys
+    import threading
+
+    def handle_sigterm(signum, frame):
+        print("\n[log-web] received SIGTERM, stopping...")
+        # running shutdown in a separate thread because shutdown() blocks until the server loop exits
+        threading.Thread(target=server.shutdown, daemon=True).start()
+
+    signal.signal(signal.SIGTERM, handle_sigterm)
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         print("\n[log-web] stopped")
     finally:
         server.server_close()
+        sys.exit(0)
 
 
 if __name__ == "__main__":
