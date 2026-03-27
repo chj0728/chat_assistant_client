@@ -70,6 +70,26 @@ python3 -m app.llm_tts_stream
 python3 -m app.chat_assistant_v3
 ```
 
+- 日志前端浏览器（实时查看 + 删除历史）
+```bash
+cd ASR_LLM_TTS
+source venv/bin/activate
+cd chat_assistant
+
+# 方式1：模块启动
+python3 -m chat_assistant.log_web_server --host 0.0.0.0 --port 17890
+
+# 方式2：ros2 环境中用入口脚本启动
+# cd ASR_LLM_TTS
+# source install/setup.bash
+# ros2 run chat_assistant chat_assistant_log_web
+```
+
+打开浏览器访问：`http://127.0.0.1:17890`
+
+- 实时日志：`chat_assistant/logs/asr_llm_tts`（页面自动轮询增量刷新）
+- 历史日志：`chat_assistant/logs/asr_llm_tts.YYYY-MM-DD_HH`（可在页面中删除）
+
 ## Run as a ROS2 Node
 - build the interfaces and package
 ```bash
@@ -83,13 +103,15 @@ colcon build --symlink-install
 source install/setup.bash
 source venv/bin/activate
 ```
-- run the node
+- run the nodes
 ```bash
 ## ros2 run chat_assistant chat_assistant_node
+## ros2 run chat_assistant chat_assistant_log_web
 
 # use the module way
 ## cd chat_assistant
 ## python3 -m chat_assistant.chat_assistant_node
+## python3 -m chat_assistant.log_web_server --host 0.0.0.0 --port 17890
 
 # or use the run.sh script
 cd  ASR_LLM_TTS

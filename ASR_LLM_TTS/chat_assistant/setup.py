@@ -24,6 +24,7 @@ setup(
     entry_points={
         "console_scripts": [
             "chat_assistant_node = chat_assistant.chat_assistant_node:main",
+            "chat_assistant_log_web = chat_assistant.log_web_server:main",
         ],
     },
 )
