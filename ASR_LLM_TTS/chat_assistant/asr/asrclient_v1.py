@@ -5,6 +5,7 @@ import queue
 import threading
 import wave
 import time
+import re
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from typing import Optional
 
@@ -111,14 +112,26 @@ class ASRClient:
             logger.warning(
                 "ASRClient 当前未启用 WebSocket 模式，默认使用 HTTP 请求进行识别。"
             )
-            return self._recognize_http(wav_path)
+            return self._clean_asr_text(self._recognize_http(wav_path))
 
         if self.use_websocket and use_websocket:
-            return self._recognize_ws(wav_path)
+            return self._clean_asr_text(self._recognize_ws(wav_path))
 
-        return self._recognize_http(wav_path)
+        return self._clean_asr_text(self._recognize_http(wav_path))
 
     ###################################
+
+    def _clean_asr_text(self, text: str) -> str:
+        # 1. 删除 <unk>
+        text = re.sub(r"<unk>", "", text)
+
+        # 2. 合并多空格
+        text = re.sub(r"\s+", " ", text)
+
+        # # 3. 合并类似 "s s v v" → "ssvv"
+        # text = re.sub(r"\b([a-zA-Z])\s+(?=[a-zA-Z]\b)", r"\1", text)
+
+        return text.strip()
 
     def _recognize_http(self, wav_path: str) -> str:
         if not os.path.exists(wav_path):
@@ -354,7 +367,7 @@ class ASRClient:
             self._run_ws_coro(self._close_ws_async(), timeout=self.timeout)
             return ""
         except Exception as e:
-            logger.error(f"ASR WebSocket 连接失败: {e}")
+            logger.error(f"ASR WebSocket 识别异常: {e}")
             self._run_ws_coro(self._close_ws_async(), timeout=self.timeout)
             return ""
 
