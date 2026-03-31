@@ -702,18 +702,21 @@ class ChatAssistant:
         #     blocksize=self.chunk_frames,
         #     callback=audio_callback,
         # ):
-        self.input_stream = sd.InputStream(
+        with sd.InputStream(
             samplerate=self.audio_rate,
             channels=self.audio_channels,
             dtype="float32",
             blocksize=self.chunk_frames,
             callback=audio_callback,
-        )
+        ) as self.input_stream:
+            logger.info("音频输入流已打开，等待录音...")
+            while self.recording_active:
+                time.sleep(1)
         # logger.info(
         #     "sd.default.device info: {}".format(sd.query_devices(sd.default.device))
         # )
-        while self.recording_active:
-            time.sleep(1)
+        # while self.recording_active:
+        #     time.sleep(1)
 
         # print("音频录制已停止")
         # logger.info("音频录制已停止")
