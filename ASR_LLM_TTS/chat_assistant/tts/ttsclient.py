@@ -30,7 +30,7 @@ class TTSClient:
         speaker_id: int = 0,
         speed: float = 1.0,
         use_websocket: bool = False,
-        ws_path: str = "/ws/inference_zero_shot",
+        ws_path: str = "/ws/api/tts",
         ws_ping_interval: Optional[float] = None,
         ws_ping_timeout: Optional[float] = None,
         playback_start_delay_sec: float = 0.0,
@@ -48,7 +48,7 @@ class TTSClient:
             buffer_size (int, optional): 音频缓冲区的大小。默认值为 4096。
             speed (float, optional): 播放速度。默认值为 1.0。
             use_websocket (bool, optional): 是否使用 WebSocket 进行 TTS。默认值为 False。
-            ws_path (str, optional): WebSocket 路径。默认值为 "/ws/inference_zero_shot"。
+            ws_path (str, optional): WebSocket 路径。默认值为 "/ws/api/tts"。
             ws_ping_interval (Optional[float], optional): WebSocket ping 间隔。默认值为 None。
             ws_ping_timeout (Optional[float], optional): WebSocket ping 超时。默认值为 None。
             playback_start_delay_sec (float, optional): 判断起播的延迟时间，单位为秒。默认值为 0.0 秒，即没有延迟。
@@ -210,7 +210,7 @@ class TTSClient:
     def _tts_request_http(self, text):
         try:
             with requests.post(
-                "http://" + self.host + f":{self.port}/inference_zero_shot",
+                "http://" + self.host + f":{self.port}/api/tts",
                 data={
                     "tts_text": text,
                     "data_type": "pcm",
@@ -390,7 +390,7 @@ class TTSClient:
 
     def generate_wav(self, text, filename) -> bool:
         try:
-            url = f"http://{self.host}:{self.port}/inference_zero_shot"
+            url = f"http://{self.host}:{self.port}/api/tts"
 
             resp = requests.post(
                 url,

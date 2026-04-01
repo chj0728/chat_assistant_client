@@ -36,7 +36,7 @@ class ASRClient:
         port=2002,
         timeout_sec: float = 30.0,
         use_websocket: bool = False,
-        ws_path: str = "/",
+        ws_path: str = "/ws/api/asr",
         ws_ping_interval: Optional[float] = None,
         ws_ping_timeout: Optional[float] = None,
         samples_per_message: int = 8000,
@@ -141,7 +141,7 @@ class ASRClient:
             files = {"file": (os.path.basename(wav_path), f, "audio/wav")}
 
             response = requests.post(
-                "http://" + self.host + ":" + str(self.port) + "/asr",
+                "http://" + self.host + ":" + str(self.port) + "/api/asr",
                 files=files,
                 timeout=self.timeout,
             )
