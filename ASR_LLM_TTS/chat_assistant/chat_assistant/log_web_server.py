@@ -103,16 +103,11 @@ INDEX_HTML = """<!doctype html>
     .layout {
       display: grid;
       grid-template-columns: 300px 1fr;
-      grid-template-rows: 1fr 1fr;
       gap: 16px;
       padding: 16px;
       max-width: 1800px;
       margin: 0 auto;
       height: 100vh;
-    }
-
-    .layout > .panel:first-child {
-      grid-row: span 2;
     }
 
     .panel {
@@ -219,7 +214,11 @@ INDEX_HTML = """<!doctype html>
     .viewer {
       display: flex;
       flex-direction: column;
-      min-height: 0;
+      height: calc(100vh - 32px);
+    }
+
+    .hidden {
+      display: none !important;
     }
 
     .viewer-toolbar {
@@ -257,17 +256,12 @@ INDEX_HTML = """<!doctype html>
     @media (max-width: 980px) {
       .layout {
         grid-template-columns: 1fr;
-        grid-template-rows: auto;
         height: auto;
         padding: 10px;
       }
 
-      .layout > .panel:first-child {
-        grid-row: auto;
-      }
-
       .log-list { max-height: 36vh; }
-      .viewer { height: 40vh; }
+      .viewer { height: 60vh; }
     }
 
     @keyframes fade-in {
@@ -290,7 +284,7 @@ INDEX_HTML = """<!doctype html>
     </section>
 
     <!-- 实时日志窗口 -->
-    <section class="panel viewer">
+    <section id="liveViewer" class="panel viewer">
       <div class="panel-header">
         <div>
           <h2 class="title" style="font-size:16px;">实时日志 (asr_llm_tts)</h2>
@@ -307,7 +301,7 @@ INDEX_HTML = """<!doctype html>
     </section>
 
     <!-- 历史日志窗口 -->
-    <section class="panel viewer">
+    <section id="historyViewer" class="panel viewer hidden">
       <div class="panel-header">
         <div>
           <h2 id="viewerTitle" class="title" style="font-size:16px;">请选择历史日志</h2>
@@ -347,7 +341,9 @@ INDEX_HTML = """<!doctype html>
       refreshBtn: document.getElementById("refreshBtn"),
       deleteBtn: document.getElementById("deleteBtn"),
       clearBtn: document.getElementById("clearBtn"),
-      liveClearBtn: document.getElementById("liveClearBtn")
+      liveClearBtn: document.getElementById("liveClearBtn"),
+      liveViewer: document.getElementById("liveViewer"),
+      historyViewer: document.getElementById("historyViewer")
     };
 
     function formatSize(bytes) {
@@ -439,10 +435,15 @@ INDEX_HTML = """<!doctype html>
 
     async function selectLog(logName) {
       if (logName === ACTIVE_LOG_NAME) {
+         els.liveViewer.classList.remove("hidden");
+         els.historyViewer.classList.add("hidden");
          // 点击实时日志时，重新加载实时日志
          startPollingActiveLog(true);
          return; 
       }
+      
+      els.historyViewer.classList.remove("hidden");
+      els.liveViewer.classList.add("hidden");
       
       state.selectedLog = logName;
       state.offset = 0;
@@ -561,15 +562,11 @@ INDEX_HTML = """<!doctype html>
         // Setup live logging regardless of what is selected
         const active = state.logs.find(x => x.is_active);
         if (active) {
+          els.liveViewer.classList.remove("hidden");
+          els.historyViewer.classList.add("hidden");
           startPollingActiveLog();
         } else {
           setStatus("未找到实时日志 asr_llm_tts", true);
-        }
-
-        // Auto select a historical log if available
-        const history = state.logs.find(x => !x.is_active);
-        if (history) {
-           await selectLog(history.name);
         }
 
       } catch (err) {
