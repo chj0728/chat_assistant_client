@@ -102,11 +102,17 @@ INDEX_HTML = """<!doctype html>
 
     .layout {
       display: grid;
-      grid-template-columns: 300px 1fr 1fr;
+      grid-template-columns: 300px 1fr;
+      grid-template-rows: 1fr 1fr;
       gap: 16px;
       padding: 16px;
       max-width: 1800px;
       margin: 0 auto;
+      height: 100vh;
+    }
+
+    .layout > .panel:first-child {
+      grid-row: span 2;
     }
 
     .panel {
@@ -213,7 +219,7 @@ INDEX_HTML = """<!doctype html>
     .viewer {
       display: flex;
       flex-direction: column;
-      height: calc(100vh - 32px);
+      min-height: 0;
     }
 
     .viewer-toolbar {
@@ -251,7 +257,13 @@ INDEX_HTML = """<!doctype html>
     @media (max-width: 980px) {
       .layout {
         grid-template-columns: 1fr;
+        grid-template-rows: auto;
+        height: auto;
         padding: 10px;
+      }
+
+      .layout > .panel:first-child {
+        grid-row: auto;
       }
 
       .log-list { max-height: 36vh; }
