@@ -321,7 +321,7 @@ class ChatAssistant:
             return 0.0
         mean = np.mean(self.energy_window)
         std = np.std(self.energy_window)
-        logger.info(f"能量均值: {mean:.6f}, 标准差: {std:.6f}")
+        # logger.info(f"能量均值: {mean:.6f}, 标准差: {std:.6f}")
         return std / (mean + 1e-6)
 
     def _reset_segment_state(self):
@@ -482,13 +482,15 @@ class ChatAssistant:
         """在长时间静音后触发音频保存。"""
 
         energy_instability = self._compute_energy_instability()
-        logger.info(f"能量不稳定性指标(标准差/均值): {energy_instability:.6f}")
+        # logger.info(f"能量不稳定性指标(标准差/均值): {energy_instability:.6f}")
 
         # ====== 判定阈值 ======
         if (
             energy_instability > self.energy_instability_threshold
             and self.energy_instability_check
         ):
+            logger.info(f"当前指标(标准差/均值): {energy_instability:.6f}")
+            logger.info(f"阈值(标准差/均值): {self.energy_instability_threshold:.6f}")
             logger.warning("疑似多人说话，音频能量不稳定，放弃保存音频")
             self._reset_segment_state()
             return
@@ -983,7 +985,7 @@ class ChatAssistant:
         """
         负责调用 ASR、LLM、TTS 完成一次完整的交互
         """
-        logger.info("\n开始一次完整的交互流程...")
+        logger.info("\n\n开始一次完整的交互流程...")
 
         # jason 形式的响应文本，包括 asr_text 和 llm_text
         self.response_json = {}

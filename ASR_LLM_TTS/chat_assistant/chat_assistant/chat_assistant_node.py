@@ -113,19 +113,21 @@ class DynamicToolMiddleware(AgentMiddleware):
 def test_before_agent(state: AgentState, runtime: Runtime) -> None:
     # global call_flag
     # call_flag = True
-    logger.info("=======> Before Agent Middleware")
+    pass
+    # logger.info("=======> Before Agent Middleware")
 
 
 @before_model
 def test_before_model(state: AgentState, runtime: Runtime) -> None:
-    logger.info("=======> Before Model Middleware")
+    pass
+    # logger.info("=======> Before Model Middleware")
 
 
 @before_model
 def trim_messages(state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
     """Keep only the last few messages to fit context window."""
 
-    logger.info("=======> Before Model Middleware")
+    # logger.info("=======> Before Model Middleware")
 
     messages = state["messages"]
     logger.info(f"历史对话消息数量: {len(messages)}")
@@ -144,7 +146,7 @@ def trim_messages(state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
 
 @after_model
 def delete_old_messages(state: AgentState, runtime: Runtime) -> dict | None:
-    logger.info("=======> After Model Middleware")
+    # logger.info("=======> After Model Middleware")
     """Remove old messages to keep conversation manageable."""
     messages = state["messages"]
     logger.info(f"历史对话消息数量: {len(messages)}")
@@ -176,12 +178,14 @@ def delete_old_messages(state: AgentState, runtime: Runtime) -> dict | None:
 
 @after_model
 def test_after_model(state: AgentState, runtime: Runtime) -> None:
-    logger.info("=======> After Model Middleware")
+    # logger.info("=======> After Model Middleware")
+    pass
 
 
 @after_agent
 def test_after_agent(state: AgentState, runtime: Runtime) -> None:
-    logger.info("=======> After Agent Middleware")
+    # logger.info("=======> After Agent Middleware")
+    pass
 
 
 middlewares = [
