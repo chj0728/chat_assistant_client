@@ -1,24 +1,21 @@
-import os
 import re
+import threading
+import time
 import wave
 from difflib import SequenceMatcher
-import sounddevice as sd
-import numpy as np
-import time
-import threading
-import yaml
-import webrtcvad
-from scipy.io.wavfile import write
-from pathlib import Path
-from queue import Queue, Full, Empty
-from pypinyin import pinyin, Style
 from enum import Enum
+from pathlib import Path
+from queue import Empty, Full, Queue
 
+import numpy as np
+import sounddevice as sd
+import webrtcvad
+import yaml
 from asr import ASRClient
-from llm import LLMAgent, LLMClient
-from tts import RealtimeTTSPlayer, TTSClient
-
+from llm import LLMAgent
 from logger import logger
+from pypinyin import Style, pinyin
+from tts import RealtimeTTSPlayer, TTSClient
 
 MAX_QUEUE_SIZE = 10
 
@@ -187,7 +184,6 @@ class ChatAssistant:
         tts_cfg = self.configs.get(tts_server_type, {})
 
         if tts_server_type == "tts_remote":
-
             self.tts_client = RealtimeTTSPlayer(
                 host=tts_cfg.get("host", "192.168.50.220"),
                 port=tts_cfg.get("port", 50000),
@@ -229,7 +225,7 @@ class ChatAssistant:
             int(self.audio_rate * ms / 1000) * 2 for ms in (10, 20, 30)
         }
         if self.chunk_bytes not in valid_frame_bytes:
-            logger.warning(f"chunk_duration_ms 设置不合适，已调整为 20 ms 对应的字节数")
+            logger.warning("chunk_duration_ms 设置不合适，已调整为 20 ms 对应的字节数")
             self.chunk_duration_ms = 20
             self.chunk_frames = int(self.audio_rate * self.chunk_duration_ms / 1000)
             self.chunk_bytes = self.chunk_frames * 2
@@ -629,7 +625,6 @@ class ChatAssistant:
             now = time.time()
 
             if self.tts_client.is_active():
-
                 # tts 播放中，代表模型正在说话
                 # 更新 last_llm_time
                 self.last_llm_time = now
@@ -640,7 +635,6 @@ class ChatAssistant:
 
             # 累积足够的音频进行分析
             if frames_collected >= analysis_interval_frames:
-
                 # 合并音频块
                 audio_np = np.concatenate(audio_buffer, axis=0)
                 # 转为 PCM16 字节流
@@ -661,7 +655,6 @@ class ChatAssistant:
 
                 ## 如果分贝低于阈值
                 if decibel < self.decibel_threshold:
-
                     ### 静音时间超过 no_speech_threshold and 有待保存音频段 则保存音频段
                     if (
                         now - self.last_active_time > self.no_speech_threshold
@@ -774,7 +767,7 @@ class ChatAssistant:
             elapsed_time = time.time() - time_now
             logger.info(f"TTS 生成语音文件耗时: {elapsed_time:.2f} 秒")
             return tts_result
-        except Exception as e:
+        except Exception:
             return False
 
     def play_audio(self, audio_path):
@@ -785,7 +778,7 @@ class ChatAssistant:
         try:
             self.tts_client.play_audio(audio_path, block=False)
             return True
-        except Exception as e:
+        except Exception:
             return False
 
     def interrupt(self):
@@ -798,7 +791,7 @@ class ChatAssistant:
             self.tts_client.interrupt()
             logger.info("后台播放已中断")
             return True
-        except Exception as e:
+        except Exception:
             return False
 
     def check_tts_active(self) -> bool:
@@ -808,7 +801,7 @@ class ChatAssistant:
         try:
             is_active = self.tts_client.is_active()
             return is_active
-        except Exception as e:
+        except Exception:
             return False
 
     def asr_infer(self, audio_path):
@@ -900,7 +893,6 @@ class ChatAssistant:
 
         # 判断是否需要重置唤醒词状态
         if time.time() - self.last_llm_time > self.reactive_kws_threshold:
-
             # self.flag_kws = 0
             # if self.llm_agent_state == LLMAgentState.ACTIVE:
             self.llm_agent_state = LLMAgentState.IDLE
@@ -909,7 +901,6 @@ class ChatAssistant:
 
         # 判断是否启用唤醒词检测
         if self.flag_kws_used:
-
             # logger.info("需要唤醒词激活")
             if self.llm_agent_state == LLMAgentState.ACTIVE:
                 logger.info("LLM 模块已处于 ACTIVE 状态，无需检测唤醒词")
@@ -917,7 +908,6 @@ class ChatAssistant:
                 return True
 
             if wake_word_matched:
-
                 # self.flag_kws = 1
                 self.llm_agent_state = LLMAgentState.ACTIVE
 
@@ -928,7 +918,6 @@ class ChatAssistant:
                 logger.info("检测到唤醒词，激活 LLM 模块")
                 return True
             else:
-
                 # self.flag_kws = 0
                 self.llm_agent_state = LLMAgentState.IDLE
 
@@ -944,7 +933,6 @@ class ChatAssistant:
                     and time.time() - self.last_failed_kws_time
                     > self.failed_kws_threshold
                 ):
-
                     self._push_queue(
                         self.llm_response_queue, f"你可以说出:{self.set_kws} 来唤醒我!"
                     )
@@ -1047,7 +1035,6 @@ class ChatAssistant:
 
         # -------- llm 对话 -----------
         if self.llm_agent_state == LLMAgentState.IDLE:
-
             self.last_llm_time = time.time()
 
             logger.warning("LLM 模块未激活，跳过本次交互")
@@ -1061,7 +1048,6 @@ class ChatAssistant:
         self.llm_response = self.llm_infer(self.asr_text)
 
         if not self.llm_response:
-
             self.last_llm_time = time.time()
 
             # self._set_state(AssistantState.LISTENING)
@@ -1112,7 +1098,6 @@ class ChatAssistant:
 
 
 if __name__ == "__main__":
-
     # 获取当前文件所在目录
     current_dir = Path(__file__).resolve().parent
     logger.info(f"当前文件目录: {current_dir}")
@@ -1127,7 +1112,6 @@ if __name__ == "__main__":
     logger.info("ChatAssistant 初始化完成")
 
     try:
-
         logger.info("按 Ctrl+C 停止程序")
 
         while True:

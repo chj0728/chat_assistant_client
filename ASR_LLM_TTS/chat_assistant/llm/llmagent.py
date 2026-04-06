@@ -11,34 +11,24 @@ description: 该模块定义了用于创建和管理基于大型语言模型（L
 - LangChain GitHub 仓库: https://github.com/langchain-ai/langchain
 """
 
-import requests
-import json
-import sys
 import os
+import sys
 
-from pydantic import SecretStr
-
-from langchain_openai import ChatOpenAI
-from langchain_community.llms.vllm import VLLM, VLLMOpenAI
-from langchain.chat_models import init_chat_model
-
-from langchain.tools import tool
-from langgraph.checkpoint.memory import InMemorySaver
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
-
+import requests
 from langchain.agents import create_agent
-from langchain.agents.structured_output import ProviderStrategy
-from langchain.agents.middleware import AgentMiddleware, ModelRequest
-from langchain.agents.middleware.types import ToolCallRequest
-
+from langchain.agents.middleware import AgentMiddleware
+from langchain.tools import tool
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_openai import ChatOpenAI
+from langgraph.checkpoint.memory import InMemorySaver
 from logger import logger
-
+from pydantic import SecretStr
 
 # 获取当前文件所在目录
 current_dir = os.path.dirname(os.path.abspath(__file__))
 # 将当前目录添加到Python路径（如果是相对导入）
 sys.path.append(current_dir)
-from tools.functions import get_shanghai_time, get_current_location, get_weather_info
+from tools.functions import get_current_location, get_shanghai_time, get_weather_info
 
 
 # @tool(description="当用户询问当前时间时，获取上海当前时间的工具函数")
@@ -244,7 +234,6 @@ class LLMAgent:
 
 
 if __name__ == "__main__":
-
     llm_agent = LLMAgent(host="192.168.50.125", port=8000)
 
     # llm_agent.add_system_prompt("你叫小白，是一个智能助理。")

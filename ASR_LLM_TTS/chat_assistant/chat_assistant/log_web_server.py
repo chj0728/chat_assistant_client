@@ -9,7 +9,6 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-
 ACTIVE_LOG_NAME = "asr_llm_tts"
 
 

@@ -3,6 +3,7 @@
 This project implements a chat assistant that integrates Automatic Speech Recognition (ASR), Large Language Models (LLM), and Text-to-Speech (TTS) functionalities. The assistant can process voice inputs, generate responses using LLMs, and convert text responses back to speech.
 
 ## Workflow diagram of the complete chat assistant
+
 ![alt text](<workflow.svg>)
 
 ## clone the repository
@@ -39,11 +40,13 @@ cd chat_assistant
 ```
 
 - ASR Demo(语音识别)
+
 ```bash
 python3 -m asr.asrclient
 ```
 
 - LLM Demo(大语言模型)
+
 ```bash
 # 原始版本
 #python3 -m llm.llmclient
@@ -53,6 +56,7 @@ python3 -m llm.llmagent
 ```
 
 - TTS Demo(文本转语音)
+
 ```bash
 # cosyvoice TTS
 python3 -m tts.ttsplay
@@ -62,15 +66,19 @@ python3 -m tts.ttsclient
 ```
 
 - LLM + TTS Demo(大语言模型 + 文本转语音)
+
 ```bash
 python3 -m app.llm_tts_stream
 ```
+
 - Chat Assistant Demo(集成语音识别、大语言模型、文本转语音)
+
 ```bash
 python3 -m app.chat_assistant_v3
 ```
 
 - 日志前端浏览器（实时查看 + 删除历史）
+
 ```bash
 cd ASR_LLM_TTS
 source venv/bin/activate
@@ -91,7 +99,9 @@ python3 -m chat_assistant.log_web_server --host 0.0.0.0 --port 17890
 - 历史日志：`chat_assistant/logs/asr_llm_tts.YYYY-MM-DD_HH`（可在页面中删除）
 
 ## Run as a ROS2 Node
+
 - build the interfaces and package
+
 ```bash
 cd ASR_LLM_TTS
 
@@ -103,7 +113,9 @@ colcon build --symlink-install
 source install/setup.bash
 source venv/bin/activate
 ```
+
 - run the nodes
+
 ```bash
 ## ros2 run chat_assistant chat_assistant_node
 ## ros2 run chat_assistant chat_assistant_log_web
@@ -120,6 +132,7 @@ cd  ASR_LLM_TTS
 ```
 
 ### Avilable topics
+
 - `/asr_result`
   - 话题名称：读取[配置文件](chat_assistant/config/config.yaml)中的 `asr_publish_topic`，
   - 消息类型：std_msgs/msg/String
@@ -147,7 +160,7 @@ llm_text: 您好，我是导购小特，请问有什么可以帮助您的吗？
 asr_text: 就是但是就是有个新的话题，然后。
 llm_text: 好的，请告诉我你想讨论的新话题是什么。
 ---
-``` 
+```
 
 ```bash
 # 订阅示例
@@ -162,50 +175,56 @@ data: 查询当前时间。
 
 ### Available services
 
-
 #### 重新加载配置文件
+
 ```bash
 ros2 service call /reload_config std_srvs/srv/Trigger
 ```
 
-#### 激活LLM服务
+#### 激活LLM
+
 ```bash
 ros2 service call /activate_llm std_srvs/srv/Trigger
 ```
 
-#### 停用LLM服务
+#### 停用LLM
+
 ```bash
 ros2 service call /idle_llm std_srvs/srv/Trigger
 ```
 
-#### 激活TTS服务
+#### 激活TTS
+
 ```bash
 ros2 service call /activate_tts std_srvs/srv/Trigger
 ```
 
-#### 停用TTS服务
+#### 停用TTS
+
 ```bash
 ros2 service call /idle_tts std_srvs/srv/Trigger
 ```
 
 #### 激活对话助手(同时激活LLM和TTS服务)
-```bash 
+
+```bash
 ros2 service call /activate_assistant std_srvs/srv/Trigger
 ```
 
 #### 停止对话助手(同时停用LLM和TTS服务)
-```bash 
+
+```bash
 ros2 service call /idle_assistant std_srvs/srv/Trigger
 ```
 
 #### 打断语音播放
+
 ```bash
 ros2 service call /interrupt_audio std_srvs/srv/Trigger
 ```
 
+#### 播放音频（传入音频文件路径，播放该音频文件）
 
-
-#### 播放音频文件（传入音频文件路径，播放该音频文件）
 - 服务名称：`/play_audio_file`
 - 服务类型：`chat_assistant_interfaces/srv/GetString`
 - 请求参数
@@ -214,10 +233,13 @@ ros2 service call /interrupt_audio std_srvs/srv/Trigger
     - `bool success`：表示服务调用是否成功
     - `string message`：播放结果描述 or 错误信息  
 - 请求示例
-```bash 
+
+```bash
 ros2 service call /play_audio_file chat_assistant_interfaces/srv/GetString "{input: '/home/xuyao/chj/ws/ymbot/ASR_LLM_TTS/chat_assistant/wavs/enable_kws.wav'}"
 ```
-  - 响应示例
+
+- 响应示例
+
 ```bash
 waiting for service to become available...
 requester: making request: chat_assistant_interfaces.srv.GetString_Request(input='/home/xuyao/chj/ws/ymbot/ASR_LLM_TTS/chat_assistant/wavs/enable_kws.wav')
@@ -226,7 +248,8 @@ response:
 chat_assistant_interfaces.srv.GetString_Response(success=True, message='音频播放成功')
 ```
 
-#### 单独调用语音识别服务（传入音频文件路径，返回识别文本）
+#### 语音识别服务（传入音频文件路径，返回识别文本）
+
 - 服务名称：`/asr_infer`
 - 服务类型：`chat_assistant_interfaces/srv/GetString`
 - 请求参数
@@ -236,10 +259,13 @@ chat_assistant_interfaces.srv.GetString_Response(success=True, message='音频�
     - `string message`：识别结果文本 or 错误信息
   
 - 请求示例
-```bash 
+
+```bash
 ros2 service call /asr_infer chat_assistant_interfaces/srv/GetString "{input: '/home/xuyao/chj/ws/ymbot/ASR_LLM_TTS/chat_assistant/wavs/enable_kws.wav'}"
 ```
-  - 响应示例
+
+- 响应示例
+
 ```bash
 waiting for service to become available...
 requester: making request: chat_assistant_interfaces.srv.GetString_Request(input='/home/xuyao/chj/ws/ymbot/ASR_LLM_TTS/chat_assistant/wavs/enable_kws.wav')
@@ -248,7 +274,8 @@ response:
 chat_assistant_interfaces.srv.GetString_Response(success=True, message='请说出正确的唤醒词号，再进行对话。😊')
 ```
 
-#### 单独调用大语言模型服务（传入文本，返回生成文本）
+#### 大语言模型服务（传入文本，返回生成文本）
+
 - 服务名称：`/llm_infer`
 - 服务类型：`chat_assistant_interfaces/srv/GetString`
 - 请求参数
@@ -257,10 +284,13 @@ chat_assistant_interfaces.srv.GetString_Response(success=True, message='请说�
     - `bool success`：表示服务调用是否成功
     - `string message`：生成结果文本 or 错误信息  
 - 请求示例
-```bash 
+
+```bash
 ros2 service call /llm_infer chat_assistant_interfaces/srv/GetString "{input: '你好，今天天气怎么样？'}"
 ```
-  - 响应示例
+
+- 响应示例
+
 ```bash
 waiting for service to become available...
 requester: making request: chat_assistant_interfaces.srv.GetString_Request(input='你好，今天天气怎么样？')
@@ -269,7 +299,8 @@ response:
 chat_assistant_interfaces.srv.GetString_Response(success=True, message='今天天气晴朗，适合外出。')
 ```
 
-#### 单独调用文本转语音服务（传入文本，合成语音并播放）
+#### 在线文本转语音服务（传入文本，合成语音并播放）
+
 - 服务名称：`/tts_infer`
 - 服务类型：`chat_assistant_interfaces/srv/GetString`
 - 请求参数
@@ -278,19 +309,23 @@ chat_assistant_interfaces.srv.GetString_Response(success=True, message='今天�
     - `bool success`：表示服务调用是否成功
     - `string message`：合成结果描述 or 错误信息  
 - 请求示例
-```bash 
+
+```bash
 ros2 service call /tts_infer chat_assistant_interfaces/srv/GetString "{input: '你好，这是一个文本转语音的测试。'}"
 ```
-  - 响应示例
+
+- 响应示例
+
 ```bash
 waiting for service to become available...
 requester: making request: chat_assistant_interfaces.srv.GetString_Request(input='你好，这是一个文本转语音的测试。')
 
 response:
 chat_assistant_interfaces.srv.GetString_Response(success=True, message='TTS 合成并播放音频成功')
-``` 
+```
 
-#### 单独调用文本转语音服务（传入文本，保存为 WAV 文件）
+#### 离线文本转语音服务（传入文本，保存为 WAV 文件）
+
 - 服务名称：`/tts_generate_wav`
 - 服务类型：`chat_assistant_interfaces/srv/GenerateWav`
 - 请求参数
@@ -300,10 +335,13 @@ chat_assistant_interfaces.srv.GetString_Response(success=True, message='TTS 合�
     - `bool success`：表示服务调用是否成功
     - `string message`：合成结果描述 or 错误信息  
 - 请求示例
-```bash 
+
+```bash
 ros2 service call /tts_generate_wav chat_assistant_interfaces/srv/GenerateWav "{input_text: '你好，这是一个文本转语音的测试。', input_filename: '/home/xuyao/chj/ws/ymbot/ASR_LLM_TTS/chat_assistant/wavs/tts_output.wav'}"
 ```
-  - 响应示例
+
+- 响应示例
+
 ```bash
 waiting for service to become available...
 requester: making request: chat_assistant_interfaces.srv.GenerateWav_Request(input_text='你好，这是一个文本转语音的测试。', input_filename='/home/xuyao/chj/ws/ymbot/ASR_LLM_TTS/chat_assistant/wavs/tts_output.wav')
@@ -313,6 +351,7 @@ chat_assistant_interfaces.srv.GenerateWav_Response(success=True, message='WAV �
 ```
 
 #### 接收文本输入，调用 ASR、LLM、TTS 完成一次完整的交互服务
+
 - 服务名称：`/chat_assistant_infer`
 - 服务类型：`chat_assistant_interfaces/srv/GetString`
 - 请求参数
@@ -321,10 +360,13 @@ chat_assistant_interfaces.srv.GenerateWav_Response(success=True, message='WAV �
     - `bool success`：表示服务调用是否成功
     - `string message`：生成结果文本 or 错误信息  
 - 请求示例
-```bash 
+
+```bash
 ros2 service call /chat_assistant_infer chat_assistant_interfaces/srv/GetString "{input: '你好小特'}"
 ```
-  - 响应示例      
+
+- 响应示例
+
 ``` bash
 waiting for service to become available...
 requester: making request: chat_assistant_interfaces.srv.GetString_Request(input='你好小特')
