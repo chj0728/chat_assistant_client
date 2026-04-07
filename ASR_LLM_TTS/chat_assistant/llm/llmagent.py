@@ -15,6 +15,21 @@ import os
 import sys
 
 import requests
+from pydantic import SecretStr
+
+from langchain_openai import ChatOpenAI
+from langchain_community.llms.vllm import VLLM, VLLMOpenAI
+from langchain.chat_models import init_chat_model
+
+from langchain.tools import tool
+from langgraph.checkpoint.memory import InMemorySaver
+from langchain_core.messages import (
+    HumanMessage,
+    AIMessage,
+    AIMessageChunk,
+    SystemMessage,
+)
+
 from langchain.agents import create_agent
 from langchain.agents.middleware import AgentMiddleware
 from langchain.tools import tool
@@ -232,6 +247,63 @@ class LLMAgent:
         last_ai_content = self.get_last_ai_content(result)
         return last_ai_content
 
+    def chat_response_stream(self, user_text: str):
+        """
+        发送用户输入，以流式方式返回回答文本的分段内容，适合边说边播的场景
+        """
+        index = 0
+        human_msg = HumanMessage(content=user_text)
+        buffer = ""
+        min_chunk_chars = 20
+        max_chunk_chars = 50
+        punctuation_marks = "。！？!?；;，,：:"
+        for chunk in self.agent.stream(
+            {"messages": [human_msg]},
+            {"configurable": {"thread_id": "1"}},
+            stream_mode="messages",
+        ):
+            ai_chunk = chunk[0] if isinstance(chunk, tuple) else chunk
+            if not isinstance(ai_chunk, AIMessageChunk):
+                continue
+
+            chunk_text = ai_chunk.content
+            if isinstance(chunk_text, list):
+                chunk_text = "".join(
+                    part if isinstance(part, str) else str(part) for part in chunk_text
+                )
+            elif chunk_text is None:
+                chunk_text = ""
+            else:
+                chunk_text = str(chunk_text)
+
+            if not chunk_text:
+                continue
+
+            buffer += chunk_text
+
+            while buffer:
+                flush_index = None
+                if len(buffer) >= min_chunk_chars:
+                    # Look for punctuation only starting from min_chunk_chars to ensure chunk has enough text
+                    last_punctuation = max(
+                        (buffer.rfind(mark) for mark in punctuation_marks), default=-1
+                    )
+
+                    if last_punctuation >= min_chunk_chars:
+                        flush_index = last_punctuation + 1
+                    elif len(buffer) >= max_chunk_chars:
+                        flush_index = max_chunk_chars
+
+                if flush_index is None:
+                    break
+
+                yield buffer[:flush_index], index
+                buffer = buffer[flush_index:]
+                index += 1
+
+        if buffer:
+            yield buffer, index
+
 
 if __name__ == "__main__":
     llm_agent = LLMAgent(host="192.168.50.125", port=8000)
@@ -242,5 +314,10 @@ if __name__ == "__main__":
         user_input = input("User: ").strip()
         if user_input.lower() in ["exit", "quit"]:
             break
-        response = llm_agent.chat_response(user_input)
-        print("AI:", response)
+        # response = llm_agent.chat_response(user_input)
+
+        # print("AI:", response)
+
+        for response_chunk, index in llm_agent.chat_response_stream(user_input):
+            print(response_chunk, end="\n", flush=False)
+        print()

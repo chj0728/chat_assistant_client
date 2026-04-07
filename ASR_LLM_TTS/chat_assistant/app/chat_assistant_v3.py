@@ -177,6 +177,7 @@ class ChatAssistant:
         system_prompt = llm_cfg.get("system_prompt", "")
         if system_prompt:
             self.llm_client.add_system_prompt(system_prompt)
+        self.enable_stream = llm_cfg.get("enable_stream", False)
 
         ########### TTS 服务器选择和客户端初始化 ##########
         tts_server_type = self.configs.get("tts_server", ["tts_local"])[0]
@@ -767,7 +768,8 @@ class ChatAssistant:
             elapsed_time = time.time() - time_now
             logger.info(f"TTS 生成语音文件耗时: {elapsed_time:.2f} 秒")
             return tts_result
-        except Exception:
+        except Exception as e:
+            logger.error(f"TTS 生成语音文件失败: {e}")
             return False
 
     def play_audio(self, audio_path):
@@ -791,8 +793,36 @@ class ChatAssistant:
             self.tts_client.interrupt()
             logger.info("后台播放已中断")
             return True
-        except Exception:
+        except Exception as e:
+            logger.error(f"中断后台播放失败: {e}")
             return False
+
+    def check_tts_status(self) -> bool:
+        """
+        检查 TTS 模块状态并根据当前状态决定是否继续播放
+
+        Returns:
+            bool: 如果可以继续播放返回 True，否则返回 False
+        """
+        # -------- 检查 TTS 模块状态 ----------
+        if self.tts_client_state == TTSClientState.IDLE:
+            logger.warning("TTS 模块未激活，跳过TTS播放")
+            self.last_llm_time = time.time()
+            time.sleep(0.1)
+            return False
+        # -------- 检查 TTS 播放状态 如果正在播放且未启用打断功能，则跳过播放 -----------
+        if self.tts_client.is_active() and not self.enable_interrupt_tts:
+            logger.warning("语音播放中，未启用打断，跳过TTS播放")
+            self.last_llm_time = time.time()
+            return False
+        # --------- 检查 TTS 播放状态，如果正在播放且启用了打断功能，则中断当前播放 -----------
+        if self.tts_client.is_active() and self.enable_interrupt_tts:
+            logger.info("语音播放中，启用了打断功能，准备中断播放")
+            self.tts_client.interrupt()
+            time.sleep(0.1)
+            return True
+
+        return True
 
     def check_tts_active(self) -> bool:
         """
@@ -825,48 +855,141 @@ class ChatAssistant:
         负责调用 LLM 完成对话
         """
         logger.info("LLM 推理中...")
-        llm_response = ""
+        self.llm_response = ""
         time_now = time.time()
         try:
-            llm_response = self.llm_client.chat_response(asr_text)
+            self.llm_response = self.llm_client.chat_response(asr_text)
             logger.info(
-                f"LLM 推理结果: [{llm_response}], 耗时: {(time.time() - time_now) * 1000:.2f} ms"
+                f"LLM 推理结果: [{self.llm_response}], 耗时: {(time.time() - time_now) * 1000:.2f} ms"
             )
-            return llm_response
+
+            ## 更新llm_response队列
+            self._push_queue(self.llm_response_queue, self.llm_response)
+            ## response_json 更新 llm_text
+            self.response_json["llm_text"] = self.llm_response
+            ## 更新 response_queue 队列
+            self._push_queue(self.response_queue, self.response_json)
+
+            self.last_llm_time = time.time()
+            return self.llm_response
+
         except Exception as e:
             logger.error(f"LLM 对话失败: {e}")
+
+            self._push_queue(self.llm_response_queue, "")
+            self.response_json["llm_text"] = ""
+            self._push_queue(self.response_queue, self.response_json)
+
+            self.last_llm_time = time.time()
             return ""
+
+    def llm_stream_infer(self, asr_text):
+        """
+        负责调用 LLM 完成对话，返回生成器用于流式输出
+        """
+        logger.info("LLM 流式推理中...")
+        time_now = time.time()
+        self.llm_response = ""
+        llm_response_chunks = []
+        index = 0
+        try:
+            for llm_response_chunk, index in self.llm_client.chat_response_stream(
+                asr_text
+            ):
+                logger.info(
+                    f"LLM 流式推理输出 [{index}]: [{llm_response_chunk}], 耗时: {(time.time() - time_now) * 1000:.2f} ms"
+                )
+                llm_response_chunks.append(llm_response_chunk)
+                self.llm_response = "".join(llm_response_chunks)
+                time_now = time.time()
+
+                yield llm_response_chunk, index
+
+            ## 更新llm_response队列
+            self._push_queue(self.llm_response_queue, self.llm_response)
+            ## response_json 更新 llm_text
+            self.response_json["llm_text"] = self.llm_response
+            ## 更新 response_queue 队列
+            self._push_queue(self.response_queue, self.response_json)
+
+            self.last_llm_time = time.time()
+
+        except Exception as e:
+            logger.error(f"LLM 流式对话失败: {e}")
+            yield "", index
 
     def tts_infer(self, llm_response):
         """
         负责调用 TTS 完成语音合成和播放
         """
+        # -------- 检查 TTS 逻辑状态 ----------
+        if not self.check_tts_status():
+            return
+
         logger.info("TTS 合成和播放中...")
         time_now = time.time()
         try:
             self.tts_client.speak(llm_response.strip())
 
-            while not self.tts_client.is_active():
-                if time.time() - time_now > 5.0:
-                    logger.error("TTS 播放超时 或者 TTS 播放音频太短")
-                    return False
-                time.sleep(0.01)
+            # while not self.tts_client.is_active():
+            #     if time.time() - time_now > 5.0:
+            #         logger.error("TTS 播放超时 或者 TTS 播放音频太短")
+            #         return False
+            #     time.sleep(0.01)
 
-            elapsed_time = 0
-            if isinstance(self.tts_client, RealtimeTTSPlayer):
-                elapsed_time = time.time() - time_now
-            else:
-                elapsed_time = (
-                    time.time()
-                    - time_now
-                    - self.tts_client.get_playback_start_delay_sec()
-                )
+            # elapsed_time = 0
+            # if isinstance(self.tts_client, RealtimeTTSPlayer):
+            #     elapsed_time = time.time() - time_now
+            # else:
+            #     elapsed_time = (
+            #         time.time()
+            #         - time_now
+            #         - self.tts_client.get_playback_start_delay_sec()
+            #     )
 
-            logger.info(f"TTS 合成并播放音频延迟: {elapsed_time:.2f} 秒")
-            return True
+            # logger.info(f"TTS 合成并播放音频延迟: {elapsed_time:.2f} 秒")
+            return self.tts_cost_time(time_now)
+
+            # return True
         except Exception as e:
             logger.error(f"TTS 播放失败: {e}")
             return False
+
+    def tts_stream_infer(self, llm_response_chunk, index):
+        """
+        负责调用 TTS 完成流式语音片段的合成和推送（非阻塞）
+        """
+        logger.info(f"TTS 推送流式片段 [{index}]...")
+        time_now = time.time()
+        try:
+            # 假设 tts_client.speak 为异步或基于缓冲队列的非阻塞调用
+            self.tts_client.speak(llm_response_chunk.strip(), interrupt=False)
+            if index == 0:
+                threading.Thread(target=self.tts_cost_time, args=(time_now,)).start()
+            return True
+        except Exception as e:
+            logger.error(f"TTS 推送流式片段 [{index}] 失败: {e}")
+            return False
+
+    def tts_cost_time(self, start_time):
+
+        while not self.tts_client.is_active():
+            if time.time() - start_time > 5.0:
+                logger.error("TTS 播放超时 或者 TTS 播放音频太短")
+                return False
+            time.sleep(0.01)
+
+        elapsed_time = 0
+        if isinstance(self.tts_client, RealtimeTTSPlayer):
+            elapsed_time = time.time() - start_time
+        else:
+            elapsed_time = (
+                time.time()
+                - start_time
+                - self.tts_client.get_playback_start_delay_sec()
+            )
+        logger.info(f"TTS 合成并播放音频延迟: {elapsed_time:.2f} 秒")
+        return True
 
     def kws_infer(self, asr_text):
         """
@@ -1008,8 +1131,6 @@ class ChatAssistant:
             logger.info(f"替换前 ASR 文本: {self.asr_text}")
             self.asr_text = self._replace_special_characters(self.asr_text)
             logger.info(f"替换后 ASR 文本: {self.asr_text}")
-        # else:
-        #     logger.info("未启用特殊词汇替换功能")
 
         ## 更新asr_text队列
         self._push_queue(self.asr_text_queue, self.asr_text)
@@ -1025,15 +1146,7 @@ class ChatAssistant:
                 self.last_llm_time = time.time()
                 return
 
-        # self._set_state(AssistantState.THINKING)
-
-        # -------- 检查 TTS 播放状态 ----------
-        # if self.tts_client.is_active() and not self.enable_interrupt_tts:
-        #     logger.warning("语音播放中，未启用打断，跳过本次交互")
-        #     self.last_llm_time = time.time()
-        #     return
-
-        # -------- llm 对话 -----------
+        # -------- 检查 LLM Agent 状态 ----------
         if self.llm_agent_state == LLMAgentState.IDLE:
             self.last_llm_time = time.time()
 
@@ -1045,54 +1158,19 @@ class ChatAssistant:
 
             return
 
-        self.llm_response = self.llm_infer(self.asr_text)
+        if self.enable_stream:
+            # -------- llm tts stream --------------
+            # -------- 先确认当前阶段是否允许播放 TTS，避免分段打断自己 ---------
+            tts_can_play = self.check_tts_status()
+            for chunk, index in self.llm_stream_infer(self.asr_text):
+                if chunk.strip() and tts_can_play:
+                    self.tts_stream_infer(chunk.strip(), index)
+        else:
+            # -------- llm 推理 -----------
+            self.llm_infer(self.asr_text)
 
-        if not self.llm_response:
-            self.last_llm_time = time.time()
-
-            # self._set_state(AssistantState.LISTENING)
-            logger.warning("LLM 模块未生成有效回复，跳过本次交互")
-            self._push_queue(self.llm_response_queue, "")
-            self.response_json["llm_text"] = ""
-            self._push_queue(self.response_queue, self.response_json)
-
-            return
-
-        ## 更新llm_response队列
-        self._push_queue(self.llm_response_queue, self.llm_response)
-        ## response_json 更新 llm_text
-        self.response_json["llm_text"] = self.llm_response
-        ## 更新 response_queue 队列
-        self._push_queue(self.response_queue, self.response_json)
-
-        # -------- 检查当前状态是否为空闲 ----------
-        # if self.get_state() == AssistantState.IDLE:
-        #     logger.warning("语音助手未激活，跳过TTS播放")
-        #     self.last_llm_time = time.time()
-        #     time.sleep(0.1)
-        #     return
-
-        if self.tts_client_state == TTSClientState.IDLE:
-            logger.warning("TTS 模块未激活，跳过TTS播放")
-            self.last_llm_time = time.time()
-            time.sleep(0.1)
-            return
-
-        if self.tts_client.is_active() and not self.enable_interrupt_tts:
-            logger.warning("语音播放中，未启用打断，跳过TTS播放")
-            self.last_llm_time = time.time()
-            return
-
-        if self.tts_client.is_active() and self.enable_interrupt_tts:
-            logger.info("语音播放中，启用了打断功能，准备中断播放")
-            self.tts_client.interrupt()
-            time.sleep(0.1)
-
-        # -------- tts 播放 -----------
-        # self._set_state(AssistantState.SPEAKING)
-        self.tts_infer(self.llm_response)
-        self.last_llm_time = time.time()
-        # self._set_state(AssistantState.LISTENING)
+            # -------- tts 播放 -----------
+            self.tts_infer(self.llm_response)
 
         logger.info("本次交互完成，等待下一次录音")
 

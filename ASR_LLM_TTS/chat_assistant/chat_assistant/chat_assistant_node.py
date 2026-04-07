@@ -144,7 +144,7 @@ def delete_old_messages(state: AgentState, runtime: Runtime) -> dict | None:
     # logger.info("=======> After Model Middleware")
     """Remove old messages to keep conversation manageable."""
     messages = state["messages"]
-    logger.info(f"历史对话消息数量: {len(messages)}")
+    # logger.info(f"历史对话消息数量: {len(messages)}")
 
     # messages[0].pretty_print()
     # ================================ System Message ================================
@@ -585,7 +585,7 @@ def main(args=None):
                 msg = String()
                 msg.data = asr_text
                 chat_assistant_node.asr_publisher.publish(msg)
-                logger.info(f"发布 ASR 识别结果到话题: [{asr_text}]")
+                # logger.info(f"发布 ASR 识别结果到话题: [{asr_text}]")
 
             if chat_assistant_node.chat_assistant.llm_response_queue.empty() is False:
                 llm_response = (
@@ -598,7 +598,7 @@ def main(args=None):
                 msg = String()
                 msg.data = llm_response
                 chat_assistant_node.llm_publisher.publish(msg)
-                logger.info(f"发布 LLM 生成结果到话题: [{llm_response}]")
+                # logger.info(f"发布 LLM 生成结果到话题: [{llm_response}]")
 
             if chat_assistant_node.chat_assistant.response_queue.empty() is False:
                 response_json = chat_assistant_node.chat_assistant.response_queue.get(
