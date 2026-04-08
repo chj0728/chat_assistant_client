@@ -38,12 +38,13 @@ from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
 from logger import logger
 from pydantic import SecretStr
-
-# 获取当前文件所在目录
-current_dir = os.path.dirname(os.path.abspath(__file__))
-# 将当前目录添加到Python路径（如果是相对导入）
-sys.path.append(current_dir)
 from tools.functions import get_current_location, get_shanghai_time, get_weather_info
+
+# # 获取当前文件所在目录
+# current_dir = os.path.dirname(os.path.abspath(__file__))
+# # 将当前目录添加到Python路径（如果是相对导入）
+# sys.path.append(current_dir)
+# from tools.functions import get_current_location, get_shanghai_time, get_weather_info
 
 
 # @tool(description="当用户询问当前时间时，获取上海当前时间的工具函数")
@@ -319,5 +320,5 @@ if __name__ == "__main__":
         # print("AI:", response)
 
         for response_chunk, index in llm_agent.chat_response_stream(user_input):
-            print(response_chunk, end="\n", flush=False)
+            print("AI:", response_chunk, end="\n", flush=False)
         print()

@@ -216,6 +216,11 @@ class ChatAssistantNode(Node):
         ## 将聊天助手置于空闲状态服务
         self.create_service(Trigger, "idle_assistant", self.handle_idle_assistant)
 
+        ## 激活ASR服务
+        self.create_service(Trigger, "activate_asr", self.handle_activate_asr)
+        ## 将ASR置于空闲状态服务
+        self.create_service(Trigger, "idle_asr", self.handle_idle_asr)
+
         ## 激活LLM
         self.create_service(Trigger, "activate_llm", self.handle_activate_llm)
         ## 置于空闲状态，停用LLM
@@ -502,6 +507,26 @@ class ChatAssistantNode(Node):
         self.chat_assistant.deactivate_tts_client()
         response.success = True
         response.message = "LLM 和 TTS 已置于空闲状态"
+        return response
+
+    def handle_activate_asr(self, request, response):
+        """
+        激活ASR服务
+        """
+        logger.info("激活ASR")
+        self.chat_assistant.activate_asr_client()
+        response.success = True
+        response.message = "ASR已激活"
+        return response
+
+    def handle_idle_asr(self, request, response):
+        """
+        将ASR置于空闲状态服务
+        """
+        logger.info("将ASR置于空闲状态")
+        self.chat_assistant.deactivate_asr_client()
+        response.success = True
+        response.message = "ASR已置于空闲状态"
         return response
 
     def handle_activate_llm(self, request, response):

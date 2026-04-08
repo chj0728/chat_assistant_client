@@ -181,6 +181,18 @@ data: 查询当前时间。
 ros2 service call /reload_config std_srvs/srv/Trigger
 ```
 
+#### 激活ASR
+
+```bash
+ros2 service call /activate_asr std_srvs/srv/Trigger
+```
+
+#### 停用ASR
+
+```bash
+ros2 service call /idle_asr std_srvs/srv/Trigger
+```
+
 #### 激活LLM
 
 ```bash

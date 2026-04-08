@@ -35,6 +35,11 @@ class AssistantState(Enum):
     SPEAKING = 4  # TTS 播放中
 
 
+class ASRClientState(Enum):
+    IDLE = 0  # 空闲
+    ACTIVE = 1  # 激活状态
+
+
 class LLMAgentState(Enum):
     IDLE = 0  # 空闲
     ACTIVE = 1  # 激活状态
@@ -283,6 +288,7 @@ class ChatAssistant:
         self.last_vad_end_time = time.time()  # 上次保存的 VAD 有效段结束时间
         self.last_llm_time = time.time()  # 上次与 LLM 交互的时间
         self.last_tts_time = time.time()  # 上次 TTS 播放的时间
+        self.last_interface_time = time.time()  # 上次与任何模块交互的时间
 
         self.enable_interrupt_tts = self.configs.get("enable_interrupt_tts", False)
         self.enable_replace_special_characters = self.configs.get(
@@ -293,11 +299,9 @@ class ChatAssistant:
         self.state = AssistantState.IDLE
         self.state_lock = threading.Lock()
 
-        self.llm_agent_state = LLMAgentState.ACTIVE
-        self.tts_client_state = TTSClientState.IDLE
-
-        # 是否允许 ASR
-        self.enable_asr = True
+        self.asr_client_state = ASRClientState.ACTIVE  # 默认激活 ASR 客户端
+        self.llm_agent_state = LLMAgentState.ACTIVE  # 默认激活 LLM Agent
+        self.tts_client_state = TTSClientState.IDLE  # 默认不激活 TTS
 
         # ====== 能量统计 ======
         self.energy_instability_check = self.configs.get(
@@ -627,8 +631,8 @@ class ChatAssistant:
 
             if self.tts_client.is_active():
                 # tts 播放中，代表模型正在说话
-                # 更新 last_llm_time
-                self.last_llm_time = now
+                # 更新 last_interface_time
+                self.last_interface_time = now
 
             # indata: float32 [-1.0, 1.0]
             audio_buffer.append(indata.copy())
@@ -730,6 +734,18 @@ class ChatAssistant:
         """
         self._set_state(AssistantState.IDLE)
 
+    def activate_asr_client(self):
+        """
+        激活 ASR Client，进入 ACTIVE 状态
+        """
+        self.asr_client_state = ASRClientState.ACTIVE
+
+    def deactivate_asr_client(self):
+        """
+        使 ASR Client 进入空闲状态
+        """
+        self.asr_client_state = ASRClientState.IDLE
+
     def activate_llm_agent(self):
         """
         激活 LLM Agent，进入 ACTIVE 状态
@@ -807,13 +823,13 @@ class ChatAssistant:
         # -------- 检查 TTS 模块状态 ----------
         if self.tts_client_state == TTSClientState.IDLE:
             logger.warning("TTS 模块未激活，跳过TTS播放")
-            self.last_llm_time = time.time()
+            self.last_interface_time = time.time()
             time.sleep(0.1)
             return False
         # -------- 检查 TTS 播放状态 如果正在播放且未启用打断功能，则跳过播放 -----------
         if self.tts_client.is_active() and not self.enable_interrupt_tts:
             logger.warning("语音播放中，未启用打断，跳过TTS播放")
-            self.last_llm_time = time.time()
+            self.last_interface_time = time.time()
             return False
         # --------- 检查 TTS 播放状态，如果正在播放且启用了打断功能，则中断当前播放 -----------
         if self.tts_client.is_active() and self.enable_interrupt_tts:
@@ -870,7 +886,7 @@ class ChatAssistant:
             ## 更新 response_queue 队列
             self._push_queue(self.response_queue, self.response_json)
 
-            self.last_llm_time = time.time()
+            self.last_interface_time = time.time()
             return self.llm_response
 
         except Exception as e:
@@ -880,7 +896,7 @@ class ChatAssistant:
             self.response_json["llm_text"] = ""
             self._push_queue(self.response_queue, self.response_json)
 
-            self.last_llm_time = time.time()
+            self.last_interface_time = time.time()
             return ""
 
     def llm_stream_infer(self, asr_text):
@@ -912,7 +928,7 @@ class ChatAssistant:
             ## 更新 response_queue 队列
             self._push_queue(self.response_queue, self.response_json)
 
-            self.last_llm_time = time.time()
+            self.last_interface_time = time.time()
 
         except Exception as e:
             logger.error(f"LLM 流式对话失败: {e}")
@@ -922,9 +938,6 @@ class ChatAssistant:
         """
         负责调用 TTS 完成语音合成和播放
         """
-        # -------- 检查 TTS 逻辑状态 ----------
-        if not self.check_tts_status():
-            return
 
         logger.info("TTS 合成和播放中...")
         time_now = time.time()
@@ -1011,11 +1024,11 @@ class ChatAssistant:
 
             time.sleep(0.1)
 
-            self.last_llm_time = time.time()
+            self.last_interface_time = time.time()
             return True
 
         # 判断是否需要重置唤醒词状态
-        if time.time() - self.last_llm_time > self.reactive_kws_threshold:
+        if time.time() - self.last_interface_time > self.reactive_kws_threshold:
             # self.flag_kws = 0
             # if self.llm_agent_state == LLMAgentState.ACTIVE:
             self.llm_agent_state = LLMAgentState.IDLE
@@ -1027,7 +1040,7 @@ class ChatAssistant:
             # logger.info("需要唤醒词激活")
             if self.llm_agent_state == LLMAgentState.ACTIVE:
                 logger.info("LLM 模块已处于 ACTIVE 状态，无需检测唤醒词")
-                self.last_llm_time = time.time()
+                self.last_interface_time = time.time()
                 return True
 
             if wake_word_matched:
@@ -1036,7 +1049,7 @@ class ChatAssistant:
 
                 self.failed_enable_kws_count = 0
 
-                self.last_llm_time = time.time()
+                self.last_interface_time = time.time()
 
                 logger.info("检测到唤醒词，激活 LLM 模块")
                 return True
@@ -1080,12 +1093,12 @@ class ChatAssistant:
                     self._push_queue(self.llm_response_queue, "")
                     self.response_json["llm_text"] = ""
 
-                self.last_llm_time = time.time()
+                self.last_interface_time = time.time()
                 return False
 
         else:
             self.llm_agent_state = LLMAgentState.ACTIVE
-            self.last_llm_time = time.time()
+            self.last_interface_time = time.time()
             logger.info("未启用唤醒词激活功能")
             return True
 
@@ -1101,6 +1114,13 @@ class ChatAssistant:
         # jason 形式的响应文本，包括 asr_text 和 llm_text
         self.response_json = {}
 
+        # -------- 检查 asr client 状态 ----------
+        if self.asr_client_state == ASRClientState.IDLE:
+            self.last_interface_time = time.time()
+
+            logger.warning("ASR 模块未激活，跳过本次交互")
+            return
+
         # -------- asr 识别 -----------
         if audio_path:
             self.asr_text = self.asr_infer(audio_path)
@@ -1108,14 +1128,14 @@ class ChatAssistant:
             self.asr_text = input_text
         else:
             logger.warning("未提供音频路径或输入文本，跳过本次交互")
-            self.last_llm_time = time.time()
+            self.last_interface_time = time.time()
             return
         # self.asr_text = "你好，小特"  # 测试代码，固定返回唤醒词
         # ## response_json 更新 asr_text
         # response_json["asr_text"] = self.asr_text
         if not self.asr_text:
             logger.warning("ASR 未识别到有效文本，跳过本次交互")
-            self.last_llm_time = time.time()
+            self.last_interface_time = time.time()
             # self._set_state(AssistantState.LISTENING)
             return
 
@@ -1123,7 +1143,7 @@ class ChatAssistant:
         chinese_char_count = self._count_chinese_characters(self.asr_text)
         if chinese_char_count < 2:
             logger.warning("ASR 识别文本中汉字数量过少，跳过本次交互")
-            self.last_llm_time = time.time()
+            self.last_interface_time = time.time()
             return
 
         # ------- 替换特殊词汇 -------
@@ -1143,12 +1163,12 @@ class ChatAssistant:
                 # self._set_state(AssistantState.LISTENING)
                 # 更新 response_queue 队列
                 self._push_queue(self.response_queue, self.response_json)
-                self.last_llm_time = time.time()
+                self.last_interface_time = time.time()
                 return
 
         # -------- 检查 LLM Agent 状态 ----------
         if self.llm_agent_state == LLMAgentState.IDLE:
-            self.last_llm_time = time.time()
+            self.last_interface_time = time.time()
 
             logger.warning("LLM 模块未激活，跳过本次交互")
 
@@ -1170,6 +1190,9 @@ class ChatAssistant:
             self.llm_infer(self.asr_text)
 
             # -------- tts 播放 -----------
+            ## -------- 检查 TTS 逻辑状态 ----------
+            if not self.check_tts_status():
+                return
             self.tts_infer(self.llm_response)
 
         logger.info("本次交互完成，等待下一次录音")
