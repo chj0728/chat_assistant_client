@@ -77,7 +77,7 @@ python3 -m app.llm_tts_stream
 python3 -m app.chat_assistant_v3
 ```
 
-- 日志前端浏览器（实时查看 + 删除历史）
+- 前端日志与配置管理界面
 
 ```bash
 cd ASR_LLM_TTS
@@ -85,12 +85,12 @@ source venv/bin/activate
 cd chat_assistant
 
 # 方式1：模块启动
-python3 -m chat_assistant.log_web_server --host 0.0.0.0 --port 17890
+python3 -m chat_assistant.web.web_server --host 0.0.0.0 --port 17890
 
 # 方式2：ros2 环境中用入口脚本启动
 # cd ASR_LLM_TTS
 # source install/setup.bash
-# ros2 run chat_assistant chat_assistant_log_web
+# ros2 run chat_assistant web_server
 ```
 
 打开浏览器访问：`http://127.0.0.1:17890`
@@ -118,12 +118,12 @@ source venv/bin/activate
 
 ```bash
 ## ros2 run chat_assistant chat_assistant_node
-## ros2 run chat_assistant chat_assistant_log_web
+## ros2 run chat_assistant web_server
 
 # use the module way
 ## cd chat_assistant
 ## python3 -m chat_assistant.chat_assistant_node
-## python3 -m chat_assistant.log_web_server --host 0.0.0.0 --port 17890
+## python3 -m chat_assistant.web.web_server --host 0.0.0.0 --port 17890
 
 # or use the run.sh script
 cd  ASR_LLM_TTS

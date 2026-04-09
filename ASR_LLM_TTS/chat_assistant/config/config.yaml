@@ -1,4 +1,5 @@
 ##################### ASR 配置 ######################
+asr_enable: true # 是否启动激活 ASR 模块
 asr_server: ['asr_local'] # 可选值: "asr_local"（本地 jestson orin 设备提供的 ASR 服务） "asr_remote"（远程服务器提供的 ASR 服务 ）
 asr_local:
   host: "192.168.10.101" # 本地 ASR 服务器地址，通常是 Jetson Orin 设备的 IP 地址
@@ -12,7 +13,8 @@ asr_remote:
 #####################################################
 
 ###################### LLM 配置 ######################
-LLM:
+llm_enable: true # 是否启动激活 LLM 模块
+llm:
   host: "192.168.50.125"
   port: 8000
   system_prompt: ""
@@ -20,6 +22,7 @@ LLM:
 #####################################################
 
 ###################### TTS 配置 ######################
+tts_enable: false # 是否启动激活 TTS 模块
 tts_server: ['tts_local'] # 可选值: "tts_local"（本地 jestson orin 设备提供的 TTS 服务） "tts_remote"（远程服务器提供的 TTS 服务 ）
 tts_local:
   host: "192.168.10.101" # 本地 TTS 服务器地址，通常是 Jetson Orin 设备的 IP 地址

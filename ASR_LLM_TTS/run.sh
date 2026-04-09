@@ -33,7 +33,7 @@ echo $$ > "$RUN_PID_FILE"
 # 格式: "节点名称|启动命令"
 # 方便后续添加新节点，只需在此数组中追加即可
 NODES=(
-    "log_web_server|python3 -m chat_assistant.log_web_server --host 0.0.0.0 --port 17890"
+    "web_server|python3 -m chat_assistant.web.web_server --host 0.0.0.0 --port 17890"
     "chat_assistant_node|python3 -m chat_assistant.chat_assistant_node"
 )
 

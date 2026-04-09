@@ -172,7 +172,7 @@ class ChatAssistant:
         )
 
         ########### LLM 服务器选择和客户端初始化 ##########
-        llm_cfg = self.configs.get("LLM", {})
+        llm_cfg = self.configs.get("llm", {})
         self.llm_client = LLMAgent(
             host=llm_cfg.get("host", "192.168.50.125"),
             port=llm_cfg.get("port", 8000),
@@ -299,9 +299,21 @@ class ChatAssistant:
         self.state = AssistantState.IDLE
         self.state_lock = threading.Lock()
 
-        self.asr_client_state = ASRClientState.ACTIVE  # 默认激活 ASR 客户端
-        self.llm_agent_state = LLMAgentState.ACTIVE  # 默认激活 LLM Agent
-        self.tts_client_state = TTSClientState.IDLE  # 默认不激活 TTS
+        self.asr_client_state = (
+            ASRClientState.ACTIVE
+            if self.configs.get("asr_enable", False)
+            else ASRClientState.IDLE
+        )  # 根据配置决定 ASR Client 是否默认激活
+        self.llm_agent_state = (
+            LLMAgentState.ACTIVE
+            if self.configs.get("llm_enable", False)
+            else LLMAgentState.IDLE
+        )  # 根据配置决定 LLM Agent 是否默认激活
+        self.tts_client_state = (
+            TTSClientState.ACTIVE
+            if self.configs.get("tts_enable", False)
+            else TTSClientState.IDLE
+        )  # 根据配置决定 TTS 是否默认激活
 
         # ====== 能量统计 ======
         self.energy_instability_check = self.configs.get(
@@ -441,6 +453,24 @@ class ChatAssistant:
                 input_string = input_string.replace(variant, correct_word)
 
         return input_string
+
+    # 去除字符串 末尾 的 <INTENT> </INTENT> 标签
+    def _remove_intent_tags(self, input_string):
+        """
+        去除字符串末尾的 <INTENT> </INTENT> 标签。
+
+        :param input_string: 原始字符串
+        :return: 去除标签后的字符串
+        """
+        if not input_string:
+            return input_string
+
+        # 使用正则表达式去除末尾的 <INTENT>...</INTENT> 标签
+        cleaned_string = re.sub(
+            r"<INTENT>.*?</INTENT>$", "", input_string, flags=re.DOTALL
+        )
+
+        return cleaned_string.strip()
 
     def _check_vad_activity(self, audio_bytes: bytes) -> bool:
         """
@@ -1184,7 +1214,9 @@ class ChatAssistant:
             tts_can_play = self.check_tts_status()
             for chunk, index in self.llm_stream_infer(self.asr_text):
                 if chunk.strip() and tts_can_play:
-                    self.tts_stream_infer(chunk.strip(), index)
+                    self.tts_stream_infer(
+                        self._remove_intent_tags(chunk.strip()), index
+                    )
         else:
             # -------- llm 推理 -----------
             self.llm_infer(self.asr_text)
@@ -1193,7 +1225,7 @@ class ChatAssistant:
             ## -------- 检查 TTS 逻辑状态 ----------
             if not self.check_tts_status():
                 return
-            self.tts_infer(self.llm_response)
+            self.tts_infer(self._remove_intent_tags(self.llm_response))
 
         logger.info("本次交互完成，等待下一次录音")
 

@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ASR LLM TTS 日志浏览</title>
+  <style>
+    :root {
+      --bg: #f7f9fc;
+      --panel: #ffffff;
+      --panel-2: #eef3f8;
+      --text: #1f2a37;
+      --muted: #6b7280;
+      --line: #d6dee8;
+      --accent: #0f766e;
+      --danger: #b91c1c;
+      --shadow: 0 10px 30px rgba(27, 39, 53, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: radial-gradient(circle at 20% 0%, #d9f1ef 0%, var(--bg) 45%) no-repeat;
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .layout {
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      max-width: 1800px;
+      margin: 0 auto;
+      height: 100vh;
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .tab {
+      border: 1px solid var(--line);
+      background: #f8fafc;
+      color: var(--text);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.12s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .tab:hover {
+      transform: translateY(-1px);
+      border-color: #9cb3cc;
+    }
+
+    .tab.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.14);
+      background: #ecfdf9;
+    }
+
+    .tab-content {
+      flex: 1;
+      min-height: 0;
+    }
+
+    .tab-pane {
+      height: 100%;
+    }
+
+    .log-layout {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 16px;
+      height: 100%;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .title {
+      font-size: 18px;
+      font-weight: 700;
+      margin: 0;
+      letter-spacing: 0.2px;
+    }
+
+    .subtitle {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .btn {
+      border: 1px solid transparent;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 8px;
+      padding: 7px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: transform 0.12s ease, opacity 0.2s ease;
+    }
+
+    .btn:hover { transform: translateY(-1px); }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+    .btn-danger { background: var(--danger); }
+    .btn-light {
+      background: #f8fafc;
+      border-color: var(--line);
+      color: var(--text);
+    }
+
+    .log-list {
+      max-height: calc(100vh - 120px);
+      overflow: auto;
+      padding: 10px;
+      background: var(--panel-2);
+    }
+
+    .log-item {
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: border-color 0.2s ease, transform 0.12s ease;
+      animation: fade-in 0.2s ease;
+    }
+
+    .log-item:hover { border-color: #9cb3cc; transform: translateY(-1px); }
+    .log-item.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.12); }
+
+    .name-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      word-break: break-all;
+    }
+
+    .tag {
+      font-size: 11px;
+      border-radius: 99px;
+      padding: 2px 8px;
+      background: #e8f6f4;
+      color: #0f766e;
+      white-space: nowrap;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .viewer {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .viewer-toolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .status {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .config-layout {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      height: 100%;
+    }
+
+    .config-card {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .config-toolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .config-editor {
+      width: 100%;
+      flex: 1;
+      min-height: 360px;
+      border: none;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      padding: 14px;
+      resize: vertical;
+      font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.55;
+      color: #0b1420;
+      background: #fbfdff;
+      outline: none;
+    }
+
+    .config-editor:focus {
+      background: #f4fbff;
+    }
+
+    pre {
+      margin: 0;
+      padding: 16px;
+      flex: 1;
+      overflow: auto;
+      font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      background: #0b1420;
+      color: #e6f0ff;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .empty {
+      color: var(--muted);
+      padding: 24px;
+      text-align: center;
+    }
+
+    @media (max-width: 980px) {
+      .layout {
+        height: auto;
+        padding: 10px;
+      }
+
+      .log-layout {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+
+      .log-list { max-height: 36vh; }
+      .viewer { height: 60vh; }
+    }
+
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <header class="tabs">
+      <button id="tabLogs" class="tab active">📝 日志浏览</button>
+      <button id="tabConfig" class="tab">⚙️ 参数配置</button>
+    </header>
+
+    <div class="tab-content">
+      <section id="logsPane" class="tab-pane">
+        <div class="log-layout">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h1 class="title">日志文件</h1>
+                <p class="subtitle">实时文件 + 历史记录</p>
+              </div>
+              <button id="refreshBtn" class="btn btn-light">刷新</button>
+            </div>
+            <div id="logList" class="log-list"></div>
+          </section>
+
+          <!-- 实时日志窗口 -->
+          <section id="liveViewer" class="panel viewer">
+            <div class="panel-header">
+              <div>
+                <h2 class="title" style="font-size:16px;">实时日志 (asr_llm_tts)</h2>
+                <p class="subtitle">实时增量更新</p>
+              </div>
+              <div class="viewer-toolbar">
+                <button id="liveClearBtn" class="btn btn-light">清空窗口</button>
+              </div>
+            </div>
+            <pre id="liveLogContent" class="empty">等待实时日志...</pre>
+            <div class="panel-header" style="border-top: 1px solid var(--line); border-bottom: none;">
+              <span id="liveStatus" class="status">等待操作</span>
+            </div>
+          </section>
+
+          <!-- 历史日志窗口 -->
+          <section id="historyViewer" class="panel viewer hidden">
+            <div class="panel-header">
+              <div>
+                <h2 id="viewerTitle" class="title" style="font-size:16px;">请选择历史日志</h2>
+                <p class="subtitle">历史记录文件浏览</p>
+              </div>
+              <div class="viewer-toolbar">
+                <button id="clearBtn" class="btn btn-light">清空窗口</button>
+                <button id="deleteBtn" class="btn btn-danger" disabled>删除日志</button>
+              </div>
+            </div>
+            <pre id="logContent" class="empty">尚未选择历史日志文件</pre>
+            <div class="panel-header" style="border-top: 1px solid var(--line); border-bottom: none;">
+              <span id="status" class="status">等待操作</span>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section id="configPane" class="tab-pane hidden">
+        <div class="config-layout">
+          <section class="panel config-card">
+            <div class="panel-header">
+              <div>
+                <h2 class="title" style="font-size:16px;">config.yaml 参数配置</h2>
+                <p class="subtitle">可直接查看和编辑参数，保存后写回配置文件</p>
+              </div>
+              <div class="config-toolbar">
+                <button id="reloadConfigBtn" class="btn btn-light">重新加载</button>
+                <button id="saveConfigBtn" class="btn">保存配置</button>
+                <button id="saveAndReloadConfigBtn" class="btn">保存并重载</button>
+              </div>
+            </div>
+            <textarea id="configEditor" class="config-editor" spellcheck="false" placeholder="加载中..."></textarea>
+            <div class="panel-header" style="border-top: none; border-bottom: none;">
+              <span id="configStatus" class="status">等待操作</span>
+            </div>
+          </section>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="/web_server.js"></script>
+</body>
+</html>

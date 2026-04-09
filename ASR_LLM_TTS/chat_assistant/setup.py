@@ -10,6 +10,7 @@ setup(
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
     ],
+    package_data={package_name: ["web/web_server.html", "web/web_server.js"]},
     install_requires=["setuptools"],
     zip_safe=True,
     maintainer="xuyao",
@@ -24,7 +25,7 @@ setup(
     entry_points={
         "console_scripts": [
             "chat_assistant_node = chat_assistant.chat_assistant_node:main",
-            "chat_assistant_log_web = chat_assistant.log_web_server:main",
+            "web_server = chat_assistant.web.web_server:main",
         ],
     },
 )
