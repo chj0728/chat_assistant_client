@@ -11,31 +11,27 @@ description: 该模块定义了用于创建和管理基于大型语言模型（L
 - LangChain GitHub 仓库: https://github.com/langchain-ai/langchain
 """
 
-import os
-import sys
+from typing import Any
 
 import requests
-from pydantic import SecretStr
-
-from langchain_openai import ChatOpenAI
-from langchain_community.llms.vllm import VLLM, VLLMOpenAI
-from langchain.chat_models import init_chat_model
-
+from langchain.agents import AgentState, create_agent
+from langchain.agents.middleware import (
+    AgentMiddleware,
+    before_model,
+)
+from langchain.messages import RemoveMessage
 from langchain.tools import tool
-from langgraph.checkpoint.memory import InMemorySaver
 from langchain_core.messages import (
-    HumanMessage,
     AIMessage,
     AIMessageChunk,
+    HumanMessage,
     SystemMessage,
+    trim_messages,
 )
-
-from langchain.agents import create_agent
-from langchain.agents.middleware import AgentMiddleware
-from langchain.tools import tool
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.graph.message import REMOVE_ALL_MESSAGES
+from langgraph.runtime import Runtime
 from logger import logger
 from pydantic import SecretStr
 from tools.functions import get_current_location, get_shanghai_time, get_weather_info
@@ -45,6 +41,8 @@ from tools.functions import get_current_location, get_shanghai_time, get_weather
 # # 将当前目录添加到Python路径（如果是相对导入）
 # sys.path.append(current_dir)
 # from tools.functions import get_current_location, get_shanghai_time, get_weather_info
+
+MAX_MESSAGES = 30
 
 
 # @tool(description="当用户询问当前时间时，获取上海当前时间的工具函数")
@@ -67,30 +65,66 @@ def get_current_location_tool() -> str:
 @tool
 def get_weather_info_tool() -> str:
     """获取天气信息的工具函数"""
-    logger.info("调用工具函数->获取天气信息。")
+    logger.debug("调用工具函数->获取天气信息。")
     return get_weather_info()
 
 
-# -------- 测试 tools --------
-# @tool(description="当有人问候的时候，挥手回应")
-# def response_wave_hands_tool() -> str:
-#     # """挥手回应的工具函数"""
-#     logger.info("工具函数: 机器人挥了挥手，表示问候！")
-#     return "机器人挥了挥手，表示问候！"
+@before_model
+def trim_messages_before_model(
+    state: AgentState, runtime: Runtime
+) -> dict[str, Any] | None:
+    """Keep only the last few messages to fit context window."""
 
+    messages = state["messages"]
 
-# @tool(description="当用户想要参观的时候，引导客户前往指定区域")
-# def guide_customer_tool() -> str:
-#     """引导客户的工具函数"""
-#     logger.info("工具函数: 机器人引导客户前往指定区域。")
-#     return "机器人引导客户前往指定区域。"
+    logger.debug(
+        f"Before LLM Middleware - Current messages: {[m.content for m in messages]}"
+    )
 
+    # 使用 token 数量限制的方式来控制对话历史长度
+    # trimmed = trim_messages(
+    #     messages,
+    #     max_tokens=100,  # 保留消息的最大token数量，超过时会删除最旧的消息，直到总token数在限制内
+    #     strategy="last",  # 保留最近的消息，删除最旧的消息
+    #     token_counter=count_tokens_approximately,  # 计算消息token数量的函数
+    #     # Most chat models expect that chat history starts with either:
+    #     # (1) a HumanMessage or
+    #     # (2) a SystemMessage followed by a HumanMessage
+    #     start_on="human",
+    #     # Usually, we want to keep the SystemMessage
+    #     # if it's present in the original history.
+    #     # The SystemMessage has special instructions for the model.
+    #     include_system=True,
+    #     allow_partial=False,
+    # )
 
-# @tool(description="当用户回答退出、结束等相关内容时，礼貌地结束对话")
-# def end_conversation_tool() -> str:
-#     """结束对话的工具函数"""
-#     logger.info("工具函数: 机器人礼貌地结束了对话。")
-#     return "机器人礼貌地结束了对话。"
+    # 使用消息数量限制的方式来控制对话历史长度
+    trimmed = trim_messages(
+        messages,
+        # When `len` is passed in as the token counter function,
+        # max_tokens will count the number of messages in the chat history.
+        max_tokens=MAX_MESSAGES,
+        strategy="last",
+        # Passing in `len` as a token counter function will
+        # count the number of messages in the chat history.
+        token_counter=len,
+        # Most chat models expect that chat history starts with either:
+        # (1) a HumanMessage or
+        # (2) a SystemMessage followed by a HumanMessage
+        start_on="human",
+        # Usually, we want to keep the SystemMessage
+        # if it's present in the original history.
+        # The SystemMessage has special instructions for the model.
+        include_system=True,
+        allow_partial=False,
+    )
+
+    logger.debug(
+        f"Before LLM Middleware - Trimmed messages: {[m.content for m in trimmed]}"
+    )
+
+    # return {"messages": trimmed}
+    return {"messages": [RemoveMessage(id=REMOVE_ALL_MESSAGES), *trimmed]}
 
 
 class LLMAgent:
@@ -103,7 +137,7 @@ class LLMAgent:
         self,
         host,
         port,
-        middleware_list: list[AgentMiddleware] | None = None,
+        dynamic_middleware_list: list[AgentMiddleware] | None = None,
         # dynamic_tool_middlewares: AgentMiddleware | None = None,
         temperature=0.6,
         top_p=0.95,
@@ -118,7 +152,7 @@ class LLMAgent:
         参数:
             host (str): LLM 服务的主机地址。
             port (int): LLM 服务的端口号。
-            dynamic_tool_middlewares (AgentMiddleware | None): 可选的动态工具中间件。 默认值为 None。
+            dynamic_middleware_list (list[AgentMiddleware] | None): 可选的动态中间件列表。 默认值为 None。
             temperature (float): 控制生成文本的随机性。默认值为 0.6。
             top_p (float): 用于 nucleus 采样的概率阈值。默认值为 0.95。
             top_k (int): 用于 top-k 采样的词汇数量。默认值为 50。
@@ -132,11 +166,15 @@ class LLMAgent:
         self.model_id = None
         self.model_root = None
         self.timeout = timeout
+        self.static_middleware_list = [trim_messages_before_model]
+        self.dynamic_middleware_list = (
+            dynamic_middleware_list if dynamic_middleware_list else []
+        )
 
         # 获取模型列表
         self.llm_url = f"http://{self.host}:{self.port}/v1/models"
         try:
-            response = requests.get(self.llm_url)
+            response = requests.get(self.llm_url, timeout=self.timeout)
             data = response.json()
 
             # 获取第一个模型的ID
@@ -193,10 +231,9 @@ class LLMAgent:
             ],
             system_prompt=self.system_msg,  # if hasattr(self, "system_msg") else None,
             checkpointer=InMemorySaver(),  # 使用内存检查点保存对话状态
-            middleware=middleware_list if middleware_list else [],
-            # middleware=[dynamic_tool_middlewares] if dynamic_tool_middlewares else [],
+            middleware=self.static_middleware_list + self.dynamic_middleware_list,
         )
-        logger.info("LLM Agent 创建完成")
+        logger.info("LLM Agent 已就绪")
 
     # -------- private methods --------
     def get_last_ai_content(self, state) -> str | None:
@@ -209,14 +246,25 @@ class LLMAgent:
         返回:
             str: 最后一条 AI 消息的内容，如果不存在则返回空字符串。
         """
-        for msg in reversed(state.get("messages", [])):
-            if isinstance(msg, AIMessage):
-                content = msg.content
-                if isinstance(content, list):
-                    return " ".join(
-                        part if isinstance(part, str) else str(part) for part in content
-                    )
-                return content
+        # for msg in reversed(state.get("messages", [])):
+        #     if isinstance(msg, AIMessage):
+        #         content = msg.content
+        #         if isinstance(content, list):
+        #             return " ".join(
+        #                 part if isinstance(part, str) else str(part) for part in content
+        #             )
+        #         return content
+        # return None
+        latest_message = (
+            state.get("messages", [])[-1] if state.get("messages") else None
+        )
+        if isinstance(latest_message, AIMessage):
+            content = latest_message.content
+            if isinstance(content, list):
+                return " ".join(
+                    part if isinstance(part, str) else str(part) for part in content
+                )
+            return content
         return None
 
     # -------- public methods for user --------
@@ -235,10 +283,13 @@ class LLMAgent:
         发送用户输入，返回完整回答文本
         """
         human_msg = HumanMessage(content=user_text)
+
+        # system_msg = SystemMessage("You are a helpful assistant.")
         # messages = [
-        #     self.system_msg,
+        #     system_msg,
         #     human_msg,
         # ]
+
         result = self.agent.invoke(
             {"messages": [human_msg]},
             {"configurable": {"thread_id": "1"}},
@@ -315,10 +366,10 @@ if __name__ == "__main__":
         user_input = input("User: ").strip()
         if user_input.lower() in ["exit", "quit"]:
             break
-        # response = llm_agent.chat_response(user_input)
+        response = llm_agent.chat_response(user_input)
 
-        # print("AI:", response)
+        print("AI:", response)
 
-        for response_chunk, index in llm_agent.chat_response_stream(user_input):
-            print("AI:", response_chunk, end="\n", flush=False)
-        print()
+        # for response_chunk, index in llm_agent.chat_response_stream(user_input):
+        #     print("AI:", response_chunk, end="\n", flush=False)
+        # print()

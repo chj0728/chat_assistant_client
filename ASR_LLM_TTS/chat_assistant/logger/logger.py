@@ -1,6 +1,5 @@
 import logging
 import logging.handlers
-
 import os
 import time
 from datetime import time
@@ -43,9 +42,7 @@ class ColoredFormatter(logging.Formatter):
 
 # 控制台处理器
 console_handler = logging.StreamHandler()  # 默认输出到sys.stderr（控制台）
-console_handler.setLevel(
-    logging.DEBUG
-)  # 控制台输出INFO及以上级别日志（可根据需要调整）
+console_handler.setLevel(logging.INFO)  # 控制台输出 logging.{} 及以上级别的日志
 console_handler.setFormatter(ColoredFormatter(formatter._fmt))
 
 # timed_handler：每小时生成一个新的日志文件，保留48小时的日志文件

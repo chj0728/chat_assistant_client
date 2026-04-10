@@ -2,7 +2,6 @@ import os
 from enum import Enum
 from pathlib import Path
 from queue import Empty, Full, Queue
-from typing import Any
 
 import rclpy
 import yaml
@@ -21,7 +20,6 @@ from langchain.agents.middleware import (
 from langchain.agents.middleware.types import ToolCallRequest
 from langchain.messages import RemoveMessage
 from langchain.tools import tool
-from langgraph.graph.message import REMOVE_ALL_MESSAGES
 from langgraph.runtime import Runtime
 from logger import logger
 from rclpy.callback_groups import ReentrantCallbackGroup
@@ -108,8 +106,8 @@ class DynamicToolMiddleware(AgentMiddleware):
 def test_before_agent(state: AgentState, runtime: Runtime) -> None:
     # global call_flag
     # call_flag = True
+    logger.debug("=======> Before Agent Middleware")
     pass
-    # logger.info("=======> Before Agent Middleware")
 
 
 @before_model
@@ -118,33 +116,24 @@ def test_before_model(state: AgentState, runtime: Runtime) -> None:
     # logger.info("=======> Before Model Middleware")
 
 
-@before_model
-def trim_messages(state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
-    """Keep only the last few messages to fit context window."""
-
-    # logger.info("=======> Before Model Middleware")
-
-    messages = state["messages"]
-    logger.info(f"历史对话消息数量: {len(messages)}")
-
-    if len(messages) <= MAX_MESSAGES:
-        return None
-
-    first_msg = messages[0]  # 保存系统提示消息
-    # first_msg.pretty_print()
-
-    recent_messages = messages[-(MAX_MESSAGES - 1) :]  # 获取最近的消息
-    new_messages = [first_msg] + recent_messages
-    logger.info(f"历史对话消息量超过最大限制 ({MAX_MESSAGES})，删除旧消息")
-    return {"messages": [RemoveMessage(id=REMOVE_ALL_MESSAGES), *new_messages]}
+# @2026-04-10 by caohaojie
+# this middleware is moved to llmagent.py, and is added to the static_middleware_list
+# @before_model
+# def trim_messages_before_model(
+#     state: AgentState, runtime: Runtime
+# ) -> dict[str, Any] | None:
+#     """Keep only the last few messages to fit context window."""
+#     pass
 
 
 @after_model
-def delete_old_messages(state: AgentState, runtime: Runtime) -> dict | None:
+def delete_old_messages_after_model(state: AgentState, runtime: Runtime) -> dict | None:
     # logger.info("=======> After Model Middleware")
     """Remove old messages to keep conversation manageable."""
     messages = state["messages"]
-    # logger.info(f"历史对话消息数量: {len(messages)}")
+    logger.debug(
+        f"After LLM Middleware - Current messages: {[m.content for m in messages]}"
+    )
 
     # messages[0].pretty_print()
     # ================================ System Message ================================
@@ -157,15 +146,14 @@ def delete_old_messages(state: AgentState, runtime: Runtime) -> dict | None:
     # logger.info(f"system message : {state['messages'][0].pretty_print()}")
 
     if len(messages) > MAX_MESSAGES:
-        logger.info(
-            f"对话消息数量 ({len(messages)}) 超过最大限制 ({MAX_MESSAGES})，删除过旧消息"
+        logger.debug(
+            f"历史对话消息量超过最大限制 ({len(messages)}) 超过最大限制 ({MAX_MESSAGES})，删除最旧的三分之一消息"
         )
-        # remove the earliest two messages
-        # logger.info("删除过旧消息控制对话长度")
+
         return {
             "messages": [
                 RemoveMessage(id=m.id if m.id else "")
-                for m in messages[: len(messages) // 3]
+                for m in messages[: len(messages) // 3]  # 删除最旧的三分之一消息
             ]
         }
     return None
@@ -173,22 +161,22 @@ def delete_old_messages(state: AgentState, runtime: Runtime) -> dict | None:
 
 @after_model
 def test_after_model(state: AgentState, runtime: Runtime) -> None:
-    # logger.info("=======> After Model Middleware")
+    logger.debug("=======> After Model Middleware")
     pass
 
 
 @after_agent
 def test_after_agent(state: AgentState, runtime: Runtime) -> None:
-    # logger.info("=======> After Agent Middleware")
+    logger.debug("=======> After Agent Middleware")
     pass
 
 
 middlewares = [
     # DynamicToolMiddleware(),
     test_before_agent,
-    test_before_model,
-    # trim_messages,
-    delete_old_messages,
+    # test_before_model,
+    # trim_messages_before_model,
+    # delete_old_messages_after_model,
     # test_after_model,
     test_after_agent,
 ]
@@ -279,7 +267,7 @@ class ChatAssistantNode(Node):
         self.chat_assistant = ChatAssistant(
             config_path=self.config_path,
             # dynamic_tool_middlewares=DynamicToolMiddleware(),
-            middleware_list=middlewares,
+            dynamic_middleware_list=middlewares,
         )
 
     def load_config_and_initialize(self):

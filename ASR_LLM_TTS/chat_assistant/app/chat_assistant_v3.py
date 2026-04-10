@@ -52,7 +52,10 @@ class TTSClientState(Enum):
 
 class ChatAssistant:
     def __init__(
-        self, config_path: str, dynamic_tool_middlewares=None, middleware_list=None
+        self,
+        config_path: str,
+        dynamic_tool_middlewares=None,
+        dynamic_middleware_list=None,
     ):
 
         self.config_yaml = Path(config_path).expanduser().resolve()
@@ -73,7 +76,7 @@ class ChatAssistant:
         self.recording_active = False
 
         # self.dynamic_tool_middlewares = dynamic_tool_middlewares
-        self.middleware_list = middleware_list
+        self.dynamic_middleware_list = dynamic_middleware_list
 
         self.load_config_and_initialize()
 
@@ -177,7 +180,8 @@ class ChatAssistant:
             host=llm_cfg.get("host", "192.168.50.125"),
             port=llm_cfg.get("port", 8000),
             # dynamic_tool_middlewares=self.dynamic_tool_middlewares,
-            middleware_list=self.middleware_list,
+            dynamic_middleware_list=self.dynamic_middleware_list,
+            timeout=llm_cfg.get("timeout_sec", 10),
         )
         system_prompt = llm_cfg.get("system_prompt", "")
         if system_prompt:
@@ -905,6 +909,9 @@ class ChatAssistant:
         time_now = time.time()
         try:
             self.llm_response = self.llm_client.chat_response(asr_text)
+            if not self.llm_response:
+                logger.warning("LLM 返回空响应")
+                self.llm_response = ""
             logger.info(
                 f"LLM 推理结果: [{self.llm_response}], 耗时: {(time.time() - time_now) * 1000:.2f} ms"
             )

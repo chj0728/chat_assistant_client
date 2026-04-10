@@ -18,6 +18,7 @@ llm:
   host: "192.168.50.125"
   port: 8000
   system_prompt: ""
+  timeout_sec: 5
   enable_stream: true # 是否启用流式输出，开启后llm回复会分段返回，配合 tts_stream_infer 实现边说边播效果
 #####################################################
 
