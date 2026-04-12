@@ -145,6 +145,7 @@ class LLMAgent:
         max_tokens=256,
         enable_thinking=False,
         timeout=30,
+        system_prompt: str | None = None,
     ):
         """
         初始化 LLMAgent 实例。
@@ -159,6 +160,7 @@ class LLMAgent:
             max_tokens (int): 生成文本的最大 token 数量。默认值为 256。
             enable_thinking (bool): 是否启用思考过程。默认值为 False。
             timeout (int): 请求超时时间（秒）。默认值为 30 秒。
+            system_prompt (str | None): 系统提示信息。默认值为 None。
         """
 
         self.host = host
@@ -188,6 +190,7 @@ class LLMAgent:
             logger.error(f"获取模型列表失败: {e}")
             # 使用默认模型ID
             self.model_id = "Qwen/Qwen3"
+            logger.warning(f"使用默认模型ID: {self.model_id}")
 
         # 初始化 ChatOpenAI 实例
         self.llm_model = ChatOpenAI(
@@ -195,12 +198,18 @@ class LLMAgent:
             stream_usage=True,
             temperature=temperature,
             top_p=top_p,
-            max_completion_tokens=max_tokens,
+            max_tokens=max_tokens,
             timeout=self.timeout,
             api_key=SecretStr("EMPTY"),  # vLLM不需要key
             base_url=f"http://{self.host}:{self.port}/v1",  # vLLM服务地址
             max_retries=2,
-            extra_body={"chat_template_kwargs": {"enable_thinking": enable_thinking}},
+            extra_body={
+                # vLLM parameters
+                # refer to https://docs.vllm.ai/en/v0.9.2/api/vllm/entrypoints/openai/protocol.html#vllm.entrypoints.openai.protocol.ChatCompletionRequest
+                "chat_template_kwargs": {"enable_thinking": enable_thinking},
+                # "max_completion_tokens": max_tokens,
+                "top_k": top_k,
+            },
         )
         logger.info("LLM 模型初始化完成")
 
@@ -212,10 +221,22 @@ class LLMAgent:
             # 在回答中尽量避免使用标点符号结尾，以便更自然地进行语音合成。
             # 如果用户回答退出、结束等相关内容时，礼貌地结束对话。
             # """
-            content="""你需要简洁且有礼貌地回答用户的问题，请保持回答简短且有条理，控制在100字以内。
-                    在回答中尽量避免使用标点符号结尾，以便更自然地进行语音合成。
-                    只有当用户回答退出、结束等相关内容时，调用结束对话的工具函数，礼貌地结束对话。
-                    """
+            content=(
+                (
+                    "你需要简洁且有礼貌地回答用户的问题，请保持回答简短且有条理，控制在100字以内。\n"
+                    "在回答中尽量避免使用标点符号结尾，以便更自然地进行语音合成。\n"
+                    "如果你不确定答案，可以礼貌地告诉用户你不知道。\n"
+                    "只有当用户回答退出、结束等相关内容时，调用结束对话的工具函数，礼貌地结束对话。\n"
+                    + system_prompt
+                    + "\n"
+                )
+                if system_prompt
+                else (
+                    "你需要简洁且有礼貌地回答用户的问题，请保持回答简短且有条理，控制在100字以内。\n"
+                    "在回答中尽量避免使用标点符号结尾，以便更自然地进行语音合成。\n"
+                    "只有当用户回答退出、结束等相关内容时，调用结束对话的工具函数，礼貌地结束对话。\n"
+                )
+            )
         )
 
         # 创建聊天代理

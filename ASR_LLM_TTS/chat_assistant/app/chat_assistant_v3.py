@@ -179,9 +179,13 @@ class ChatAssistant:
         self.llm_client = LLMAgent(
             host=llm_cfg.get("host", "192.168.50.125"),
             port=llm_cfg.get("port", 8000),
+            temperature=llm_cfg.get("temperature", 0.3),
+            max_tokens=llm_cfg.get("max_tokens", 512),
+            enable_thinking=llm_cfg.get("enable_thinking", False),
             # dynamic_tool_middlewares=self.dynamic_tool_middlewares,
             dynamic_middleware_list=self.dynamic_middleware_list,
             timeout=llm_cfg.get("timeout_sec", 10),
+            system_prompt=llm_cfg.get("system_prompt", ""),
         )
         system_prompt = llm_cfg.get("system_prompt", "")
         if system_prompt:

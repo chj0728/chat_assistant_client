@@ -17,9 +17,12 @@ llm_enable: true # 是否启动激活 LLM 模块
 llm:
   host: "192.168.50.125"
   port: 8000
-  system_prompt: ""
   timeout_sec: 5
+  temperature: 0.3 # 生成文本的随机程度，范围0-1，值越大越随机
+  max_tokens: 512 # 上下文和回复的总长度限制，根据实际情况调整
+  enable_thinking: false # 是否启用思考过程
   enable_stream: true # 是否启用流式输出，开启后llm回复会分段返回，配合 tts_stream_infer 实现边说边播效果
+  system_prompt: "" # 系统提示语，用于指导 LLM 的行为和回复风格，根据实际需求编写
 #####################################################
 
 ###################### TTS 配置 ######################
