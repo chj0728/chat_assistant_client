@@ -3,12 +3,15 @@ import json
 import mimetypes
 import os
 import posixpath
+import re
 import subprocess
 import urllib.parse
 from datetime import datetime
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+
+import yaml
 
 ACTIVE_LOG_NAME = "asr_llm_tts"
 RELOAD_CONFIG_SERVICE = "/reload_config"
@@ -105,7 +108,85 @@ def load_index_html(html_path: Path) -> str:
         )
 
 
-def call_reload_config_service(timeout_sec: float = 8.0) -> tuple[bool, str]:
+def format_yaml_value(value) -> str:
+    """Format a Python value for YAML text replacement."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        return str(value)
+    if isinstance(value, list):
+        items = ", ".join(f"'{v}'" for v in value)
+        return f"[{items}]"
+    return f'"{value}"'
+
+
+def _extract_inline_comment(rest: str) -> str:
+    """Extract inline YAML comment from text after 'key: ', respecting quotes."""
+    in_quote = None
+    for i, c in enumerate(rest):
+        if c in ('"', "'") and in_quote is None:
+            in_quote = c
+        elif c == in_quote:
+            in_quote = None
+        elif c == "#" and in_quote is None:
+            return rest[i:]
+    return ""
+
+
+def _find_section_line(lines: list[str], section_key: str) -> int:
+    """Find the line index of a top-level YAML section header."""
+    pat = re.compile(r"^" + re.escape(section_key) + r"\s*:")
+    for i, line in enumerate(lines):
+        if pat.match(line):
+            return i
+    return -1
+
+
+def _replace_line_value(
+    lines: list[str], key: str, new_val: str, indent: int = 0, start: int = 0
+) -> bool:
+    """Replace a YAML value on its line, preserving inline comments."""
+    indent_str = " " * indent
+    key_pat = re.compile(r"^(" + re.escape(indent_str) + re.escape(key) + r"\s*:\s*)")
+    for i in range(start, len(lines)):
+        line = lines[i]
+        if indent > 0:
+            stripped = line.strip()
+            if stripped and not stripped.startswith("#") and not line[0].isspace():
+                break
+        m = key_pat.match(line)
+        if m:
+            prefix = m.group(1)
+            rest = line[len(prefix) :]
+            comment = _extract_inline_comment(rest)
+            if comment:
+                lines[i] = prefix + new_val + " " + comment
+            else:
+                lines[i] = prefix + new_val
+            return True
+    return False
+
+
+def update_yaml_text(text: str, updates: dict) -> str:
+    """Apply dotted-key value updates to raw YAML, preserving comments."""
+    lines = text.split("\n")
+    for key_path, new_value in updates.items():
+        parts = key_path.split(".")
+        val_str = format_yaml_value(new_value)
+        if len(parts) == 1:
+            _replace_line_value(lines, parts[0], val_str, indent=0)
+        elif len(parts) == 2:
+            sec_idx = _find_section_line(lines, parts[0])
+            if sec_idx >= 0:
+                _replace_line_value(
+                    lines, parts[1], val_str, indent=2, start=sec_idx + 1
+                )
+    return "\n".join(lines)
+
+
+def call_reload_config_service(timeout_sec: float = 30.0) -> tuple[bool, str]:
     cmd = [
         "ros2",
         "service",
@@ -179,6 +260,16 @@ class LogViewerHandler(BaseHTTPRequestHandler):
     def _index_html(self) -> str:
         return self.server.index_html  # type: ignore[attr-defined]
 
+    def _drain_body(self) -> None:
+        """Read and discard any unread request body to keep the connection clean."""
+        raw_len = self.headers.get("Content-Length", "0")
+        try:
+            content_len = int(raw_len)
+        except ValueError:
+            content_len = 0
+        if content_len > 0:
+            self.rfile.read(content_len)
+
     def _read_json_body(self) -> dict:
         raw_len = self.headers.get("Content-Length", "0")
         try:
@@ -248,6 +339,27 @@ class LogViewerHandler(BaseHTTPRequestHandler):
                 return
             content = config_path.read_text(encoding="utf-8")
             self._send_json({"path": str(config_path), "content": content})
+            return
+
+        # Structured config params as parsed YAML dict.
+        if path == "/api/config/params":
+            config_path = self._config_path()
+            if not config_path.exists() or not config_path.is_file():
+                self._send_json(
+                    {"error": f"config not found: {config_path}"},
+                    status=HTTPStatus.NOT_FOUND,
+                )
+                return
+            content = config_path.read_text(encoding="utf-8")
+            try:
+                data = yaml.safe_load(content) or {}
+            except yaml.YAMLError as e:
+                self._send_json(
+                    {"error": f"YAML parse error: {e}"},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+                return
+            self._send_json({"params": data})
             return
 
         # Query log list metadata.
@@ -332,19 +444,71 @@ class LogViewerHandler(BaseHTTPRequestHandler):
             self._send_json({"ok": True, "saved": str(config_path)})
             return
 
+        # Update specific config params by dotted key paths.
+        if path == "/api/config/params":
+            config_path = self._config_path()
+            try:
+                body = self._read_json_body()
+            except ValueError as e:
+                self._send_json({"error": str(e)}, status=HTTPStatus.BAD_REQUEST)
+                return
+
+            updates = body.get("updates")
+            if not isinstance(updates, dict) or not updates:
+                self._send_json(
+                    {"error": "updates must be a non-empty object"},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+                return
+
+            if not config_path.exists() or not config_path.is_file():
+                self._send_json(
+                    {"error": f"config not found: {config_path}"},
+                    status=HTTPStatus.NOT_FOUND,
+                )
+                return
+
+            text = config_path.read_text(encoding="utf-8")
+            new_text = update_yaml_text(text, updates)
+
+            try:
+                yaml.safe_load(new_text)
+            except yaml.YAMLError as e:
+                self._send_json(
+                    {"error": f"generated YAML is invalid: {e}"},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+                return
+
+            config_path.write_text(new_text, encoding="utf-8")
+            self._send_json({"ok": True, "saved": str(config_path)})
+            return
+
         self._send_json(
             {"error": f"unknown route: {path}"}, status=HTTPStatus.NOT_FOUND
         )
 
+    def _send_json_close(self, payload: dict, status: int = HTTPStatus.OK) -> None:
+        """Send JSON response and close the connection (no keep-alive)."""
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Connection", "close")
+        self.end_headers()
+        self.wfile.write(body)
+        self.close_connection = True
+
     def do_POST(self) -> None:
         """Handle action-style API routes."""
+        self._drain_body()
         path, parts, _ = self._parse_path()
 
         # Trigger ROS reload_config service from web action.
         if path == "/api/reload_config":
             ok, detail = call_reload_config_service()
             if not ok:
-                self._send_json(
+                self._send_json_close(
                     {
                         "error": f"reload_config failed: {detail}",
                         "service": RELOAD_CONFIG_SERVICE,
@@ -353,7 +517,7 @@ class LogViewerHandler(BaseHTTPRequestHandler):
                 )
                 return
 
-            self._send_json(
+            self._send_json_close(
                 {
                     "ok": True,
                     "service": RELOAD_CONFIG_SERVICE,

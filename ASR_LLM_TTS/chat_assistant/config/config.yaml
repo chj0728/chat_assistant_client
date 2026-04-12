@@ -32,7 +32,7 @@ tts_local:
   host: "192.168.10.101" # 本地 TTS 服务器地址，通常是 Jetson Orin 设备的 IP 地址
   port: 50000
   speaker_id: 0
-  speed: 1.0
+  speed: 1
   use_websocket: true # 是否使用 WebSocket 连接 TTS 服务器，确保服务器支持 WebSocket
   timeout_sec: 3 # TTS 请求超时时间，单位秒，根据实际情况调整
   playback_start_delay_sec: 0.5 # 起播确认延迟时间，单位秒，根据实际情况调整，影响 tts_active_topic 发布时机
@@ -56,25 +56,25 @@ Audio:
 ################# VAD 配置 ####################
 VAD:
   output_dir: "output" # VAD 结果保存目录
-  mode : 2  # 0：最宽松，允许更多非语音通过  1：平衡模式 2：较严格，减少非语音通过  3：最严格，过滤更多非语音
-  no_speech_threshold: 0.50  # 静音持续多长时间后认为一句话结束 (秒)
+  mode : 2 # 0：最宽松，允许更多非语音通过  1：平衡模式 2：较严格，减少非语音通过  3：最严格，过滤更多非语音
+  no_speech_threshold: 0.5 # 静音持续多长时间后认为一句话结束 (秒)
   # reactive_kws_threshold: 100  # 重置唤醒词检测 激活 LLM 时间间隔 (秒) 
-  decibel_threshold: -35  # 分贝阈值，低于此值认为是静音 (dB)
+  decibel_threshold: -35 # 分贝阈值，低于此值认为是静音 (dB)
 
-  min_recording_duration: 0.4   # 最短有效录音时长 (秒)
-  max_recording_duration: 10  # 最大有效录音时长 (秒)
+  min_recording_duration: 0.4 # 最短有效录音时长 (秒)
+  max_recording_duration: 10 # 最大有效录音时长 (秒)
   
-  pause_duration: 4.0  # 距离上次语音保存多长时间后，允许再次保存音频 (秒)
+  pause_duration: 4 # 距离上次语音保存多长时间后，允许再次保存音频 (秒)
 ################################################
 
 ################# 唤醒词检测配置 #################
 KWS:
   enable: true # 是否启用唤醒词检测
-  failed_kws_counts : 1  # 连续未检测到唤醒词次数达到此值时，推送提示语音
-  failed_kws_threshold: 30  # 连续未检测到唤醒词次数 达到 failed_kws_counts 后，推送提示语音的时间间隔 (秒)
-  reactive_kws_threshold: 100  # 重置 需要唤醒词检测 激活 LLM 时间间隔 (秒) 
+  failed_kws_counts : 1 # 连续未检测到唤醒词次数达到此值时，推送提示语音
+  failed_kws_threshold: 30 # 连续未检测到唤醒词次数 达到 failed_kws_counts 后，推送提示语音的时间间隔 (秒)
+  reactive_kws_threshold: 100 # 重置 需要唤醒词检测 激活 LLM 时间间隔 (秒) 
   wake_word: "你好小特"
-  fuzzy_similarity_threshold: 0.78  # 唤醒词模糊匹配相似度阈值，范围0-1，值越大越严格
+  fuzzy_similarity_threshold: 0.78 # 唤醒词模糊匹配相似度阈值，范围0-1，值越大越严格
 ################################################
 
 ################ ROS 话题配置 ################
@@ -89,6 +89,6 @@ ros_cfg:
 enable_replace_special_characters: false # 是否启用替换特殊字符功能
 enable_interrupt_tts: true # 是否启用打断 TTS 功能
 
-energy_instability_check: false  # 是否启用能量不稳定性检测
+energy_instability_check: false # 是否启用能量不稳定性检测
 energy_frames: 50  # 能量窗口最大帧数 (内部使用)  50 x 0.1s = 5s
 energy_instability_threshold: 2.5  # 能量不稳定性阈值，超过此值认为多人说话
