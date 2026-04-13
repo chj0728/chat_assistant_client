@@ -4,10 +4,10 @@ from pathlib import Path
 from queue import Empty, Full, Queue
 
 import rclpy
-import yaml
 from app import ChatAssistant
 from chat_assistant_interfaces.msg import Response
 from chat_assistant_interfaces.srv import GenerateWav, GetString
+from config import load_config
 from langchain.agents import AgentState
 from langchain.agents.middleware import (
     AgentMiddleware,
@@ -106,7 +106,7 @@ class DynamicToolMiddleware(AgentMiddleware):
 def test_before_agent(state: AgentState, runtime: Runtime) -> None:
     # global call_flag
     # call_flag = True
-    logger.debug("=======> Before Agent Middleware")
+    logger.debug("=======> Before Agent Dynamic Middleware")
     pass
 
 
@@ -136,14 +136,6 @@ def delete_old_messages_after_model(state: AgentState, runtime: Runtime) -> dict
     )
 
     # messages[0].pretty_print()
-    # ================================ System Message ================================
-
-    # 你需要简洁且有礼貌地回答用户的问题，请保持回答简短且有条理，控制在100字以内。
-    # 只要用户询问关于时间或位置的问题时，优先使用工具来获取准确的信息，而不是直接从模型中生成答案。
-    # 如果你不确定答案，可以礼貌地告诉用户你不知道，而不是编造答案。
-    # 在回答中尽量避免使用标点符号结尾，以便更自然地进行语音合成。
-    # 如果用户回答退出、结束等相关内容时，调用结束对话工具，礼貌地结束对话。
-    # logger.info(f"system message : {state['messages'][0].pretty_print()}")
 
     if len(messages) > MAX_MESSAGES:
         logger.debug(
@@ -167,7 +159,7 @@ def test_after_model(state: AgentState, runtime: Runtime) -> None:
 
 @after_agent
 def test_after_agent(state: AgentState, runtime: Runtime) -> None:
-    logger.debug("=======> After Agent Middleware")
+    logger.debug("=======> After Agent Dynamic Middleware")
     pass
 
 
@@ -276,12 +268,14 @@ class ChatAssistantNode(Node):
         初始化 ROS 相关参数和话题发布者
         """
         # ----------- 读取配置文件 -----------
-        try:
-            with open(self.config_yaml, "r", encoding="utf-8") as f:
-                self.configs = yaml.safe_load(f)
-                # logger.info(f"配置文件内容:\n{self.configs}")
-        except Exception as e:
-            logger.error(f"读取配置文件失败: {e}")
+        # try:
+        #     with open(self.config_yaml, "r", encoding="utf-8") as f:
+        #         self.configs = yaml.safe_load(f)
+        #         # logger.info(f"配置文件内容:\n{self.configs}")
+        # except Exception as e:
+        #     logger.error(f"读取配置文件失败: {e}")
+
+        self.configs = load_config()
 
         ros_cfg = self.configs.get("ros_cfg", {})
 

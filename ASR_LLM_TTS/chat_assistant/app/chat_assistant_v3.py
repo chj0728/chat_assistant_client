@@ -12,6 +12,7 @@ import sounddevice as sd
 import webrtcvad
 import yaml
 from asr import ASRClient
+from config import load_config
 from llm import LLMAgent
 from logger import logger
 from pypinyin import Style, pinyin
@@ -153,13 +154,15 @@ class ChatAssistant:
     def load_config_and_initialize(self):
 
         # ----------- 读取配置文件 -----------
-        try:
-            with open(self.config_yaml, "r", encoding="utf-8") as f:
-                self.configs = yaml.safe_load(f)
-                logger.info(f"配置文件内容:\n{self.configs}")
-        except Exception as e:
-            logger.error(f"读取配置文件失败: {e}")
-            # raise e
+        # try:
+        #     with open(self.config_yaml, "r", encoding="utf-8") as f:
+        #         self.configs = yaml.safe_load(f)
+        #         logger.info(f"配置文件内容:\n{self.configs}")
+        # except Exception as e:
+        #     logger.error(f"读取配置文件失败: {e}")
+        #     # raise e
+        self.configs = load_config()
+        logger.debug("当前配置:\n%s", yaml.dump(self.configs, allow_unicode=True))
 
         # ----------- 初始化ASR、LLM、TTS客户端 -----------
         ############ ASR 服务器选择和客户端初始化 ##########

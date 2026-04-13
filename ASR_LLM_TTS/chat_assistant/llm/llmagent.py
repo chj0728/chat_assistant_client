@@ -14,6 +14,7 @@ description: 该模块定义了用于创建和管理基于大型语言模型（L
 from typing import Any
 
 import requests
+from config import load_config
 from langchain.agents import AgentState, create_agent
 from langchain.agents.middleware import (
     AgentMiddleware,
@@ -28,6 +29,8 @@ from langchain_core.messages import (
     SystemMessage,
     trim_messages,
 )
+
+# from langchain_core.messages.utils import count_tokens_approximately
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph.message import REMOVE_ALL_MESSAGES
@@ -36,20 +39,16 @@ from logger import logger
 from pydantic import SecretStr
 from tools.functions import get_current_location, get_shanghai_time, get_weather_info
 
-# # 获取当前文件所在目录
-# current_dir = os.path.dirname(os.path.abspath(__file__))
-# # 将当前目录添加到Python路径（如果是相对导入）
-# sys.path.append(current_dir)
-# from tools.functions import get_current_location, get_shanghai_time, get_weather_info
-
-MAX_MESSAGES = 30
+config = load_config()
+MAX_MESSAGES = config.get("llm", {}).get("max_messages", 5)
+logger.debug(f"LLM Agent 配置 - MAX_MESSAGES: {MAX_MESSAGES}")
 
 
 # @tool(description="当用户询问当前时间时，获取上海当前时间的工具函数")
 @tool
 def get_current_time_tool() -> str:
     """获取上海当前时间的工具函数"""
-    logger.info("调用工具函数->获取当前时间。")
+    logger.debug("调用工具函数->获取当前时间。")
     return get_shanghai_time()
 
 
@@ -57,7 +56,7 @@ def get_current_time_tool() -> str:
 @tool
 def get_current_location_tool() -> str:
     """获取当前位置信息的工具函数"""
-    logger.info("调用工具函数->获取当前位置信息。")
+    logger.debug("调用工具函数->获取当前位置信息。")
     return get_current_location()
 
 
@@ -73,15 +72,18 @@ def get_weather_info_tool() -> str:
 def trim_messages_before_model(
     state: AgentState, runtime: Runtime
 ) -> dict[str, Any] | None:
-    """Keep only the last few messages to fit context window."""
+    """Keep only the last few messages to fit context window.
+    official docs: https://docs.langchain.com/oss/python/langchain/short-term-memory#trim-messages
+    """
 
     messages = state["messages"]
 
     logger.debug(
-        f"Before LLM Middleware - Current messages: {[m.content for m in messages]}"
+        f"=======> Before LLM Static Middleware - Current messages: {[m.content for m in messages]}"
     )
 
-    # 使用 token 数量限制的方式来控制对话历史长度
+    # refer from: https://juejin.cn/post/7534535266226192430
+    ## 使用 token 数量限制的方式来控制对话历史长度
     # trimmed = trim_messages(
     #     messages,
     #     max_tokens=100,  # 保留消息的最大token数量，超过时会删除最旧的消息，直到总token数在限制内
@@ -98,7 +100,7 @@ def trim_messages_before_model(
     #     allow_partial=False,
     # )
 
-    # 使用消息数量限制的方式来控制对话历史长度
+    ## 使用消息数量限制的方式来控制对话历史长度
     trimmed = trim_messages(
         messages,
         # When `len` is passed in as the token counter function,
@@ -120,7 +122,7 @@ def trim_messages_before_model(
     )
 
     logger.debug(
-        f"Before LLM Middleware - Trimmed messages: {[m.content for m in trimmed]}"
+        f"=======> Before LLM Static Middleware - Trimmed messages: {[m.content for m in trimmed]}"
     )
 
     # return {"messages": trimmed}
@@ -193,34 +195,28 @@ class LLMAgent:
             logger.warning(f"使用默认模型ID: {self.model_id}")
 
         # 初始化 ChatOpenAI 实例
+        ## refer from: https://reference.langchain.com/python/langchain-openai/chat_models/base/ChatOpenAI
         self.llm_model = ChatOpenAI(
             model=self.model_id,
             stream_usage=True,
             temperature=temperature,
             top_p=top_p,
-            max_tokens=max_tokens,
+            # max_tokens=max_tokens,
             timeout=self.timeout,
             api_key=SecretStr("EMPTY"),  # vLLM不需要key
             base_url=f"http://{self.host}:{self.port}/v1",  # vLLM服务地址
             max_retries=2,
+            # vLLM parameters
+            ## refer from: https://docs.vllm.ai/en/v0.9.2/api/vllm/entrypoints/openai/protocol.html#vllm.entrypoints.openai.protocol.ChatCompletionRequest
             extra_body={
-                # vLLM parameters
-                # refer to https://docs.vllm.ai/en/v0.9.2/api/vllm/entrypoints/openai/protocol.html#vllm.entrypoints.openai.protocol.ChatCompletionRequest
                 "chat_template_kwargs": {"enable_thinking": enable_thinking},
-                # "max_completion_tokens": max_tokens,
+                "max_completion_tokens": max_tokens,
                 "top_k": top_k,
             },
         )
         logger.info("LLM 模型初始化完成")
 
         self.system_msg = SystemMessage(
-            # """
-            # 你需要简洁且有礼貌地回答用户的问题，请保持回答简短且有条理，控制在100字以内。
-            # 只要用户询问关于时间或位置的问题时，优先使用工具来获取准确的信息，而不是直接从模型中生成答案。
-            # 如果你不确定答案，可以礼貌地告诉用户你不知道，而不是编造答案。
-            # 在回答中尽量避免使用标点符号结尾，以便更自然地进行语音合成。
-            # 如果用户回答退出、结束等相关内容时，礼貌地结束对话。
-            # """
             content=(
                 (
                     "你需要简洁且有礼貌地回答用户的问题，请保持回答简短且有条理，控制在100字以内。\n"
