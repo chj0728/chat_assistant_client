@@ -6,7 +6,6 @@ asr_local:
   port: 6006 # 2002（FunASR 服务端 HTTP 模式）或 6006（sherpa_onnx_asr 服务端 HTTP/WebSocket 模式）
   use_websocket: true # 是否使用 WebSocket ，确保服务端支持 WebSocket
   timeout_sec: 3 # ASR 请求超时时间，单位秒，根据实际情况调整
-
 asr_remote:
   host: "192.168.50.220" # 远程 ASR 服务器地址
   port: 2002
@@ -22,7 +21,21 @@ llm:
   max_tokens: 512 # 上下文和回复的总长度限制，根据实际情况调整
   enable_thinking: false # 是否启用思考过程
   enable_stream: true # 是否启用流式输出，开启后llm回复会分段返回，配合 tts_stream_infer 实现边说边播效果
-  system_prompt: "" # 系统提示语，用于指导 LLM 的行为和回复风格，根据实际需求编写
+  system_prompt: |
+    同时你要根据根据用户的输入，判断用户想要进入哪个状态，并在回答末尾附加。
+    可用的状态有：
+    CUSTOMER_ENTER: 客户进店（例如：有人在吗）
+    NEEDS_GUIDANCE: 需要引导参观（例如：参观一下、带我看看、带我逛逛、想看看等）
+    MOVE_TO_WAIT: 退下/不用了（例如：退一下、不用了、退下等）
+    WAIT_FOR_TALK: 等待对话（默认状态）
+    示例：{
+          "instruction": "能带我参观一下吗？",
+          "input": "",
+          "output": "好的，请跟我这边走<INTENT>NEEDS_GUIDANCE</INTENT>",
+          "system": ""
+        }
+    如果不确定，则输出WAIT_FOR_TALK状态
+  # 系统提示语，用于指导 LLM 的行为和回复风格，根据实际需求编写
 #####################################################
 
 ###################### TTS 配置 ######################
@@ -60,10 +73,8 @@ VAD:
   no_speech_threshold: 0.5 # 静音持续多长时间后认为一句话结束 (秒)
   # reactive_kws_threshold: 100  # 重置唤醒词检测 激活 LLM 时间间隔 (秒) 
   decibel_threshold: -35 # 分贝阈值，低于此值认为是静音 (dB)
-
   min_recording_duration: 0.4 # 最短有效录音时长 (秒)
   max_recording_duration: 10 # 最大有效录音时长 (秒)
-  
   pause_duration: 4 # 距离上次语音保存多长时间后，允许再次保存音频 (秒)
 ################################################
 
@@ -88,7 +99,6 @@ ros_cfg:
 
 enable_replace_special_characters: false # 是否启用替换特殊字符功能
 enable_interrupt_tts: true # 是否启用打断 TTS 功能
-
 energy_instability_check: false # 是否启用能量不稳定性检测
 energy_frames: 50  # 能量窗口最大帧数 (内部使用)  50 x 0.1s = 5s
 energy_instability_threshold: 2.5  # 能量不稳定性阈值，超过此值认为多人说话

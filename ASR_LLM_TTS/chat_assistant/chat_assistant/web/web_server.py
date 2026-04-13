@@ -108,7 +108,7 @@ def load_index_html(html_path: Path) -> str:
         )
 
 
-def format_yaml_value(value) -> str:
+def format_yaml_value(value, base_indent: int = 0) -> str:
     """Format a Python value for YAML text replacement."""
     if isinstance(value, bool):
         return "true" if value else "false"
@@ -119,6 +119,13 @@ def format_yaml_value(value) -> str:
     if isinstance(value, list):
         items = ", ".join(f"'{v}'" for v in value)
         return f"[{items}]"
+    if isinstance(value, str):
+        if '\n' in value or '"' in value or '{' in value:
+            lines = value.split('\n')
+            indent_str = " " * (base_indent + 2)
+            formatted = "|\n" + "\n".join(indent_str + line for line in lines)
+            return formatted
+        return f'"{value}"'
     return f'"{value}"'
 
 
@@ -161,10 +168,33 @@ def _replace_line_value(
             prefix = m.group(1)
             rest = line[len(prefix) :]
             comment = _extract_inline_comment(rest)
-            if comment:
-                lines[i] = prefix + new_val + " " + comment
+            
+            del_count = 0
+            for j in range(i + 1, len(lines)):
+                next_line = lines[j]
+                if not next_line.strip():
+                    del_count += 1
+                elif next_line.startswith(" " * (indent + 1)):
+                    del_count += 1
+                else:
+                    break
+                    
+            for _ in range(del_count):
+                lines.pop(i + 1)
+
+            if "\n" in new_val:
+                first_line, rest_val = new_val.split("\n", 1)
+                new_line = prefix + first_line
+                if comment:
+                    new_line += " " + comment
+                lines[i] = new_line
+                for idx, rline in enumerate(rest_val.split("\n")):
+                    lines.insert(i + 1 + idx, rline)
             else:
-                lines[i] = prefix + new_val
+                new_line = prefix + new_val
+                if comment:
+                    new_line += " " + comment
+                lines[i] = new_line
             return True
     return False
 
@@ -174,10 +204,11 @@ def update_yaml_text(text: str, updates: dict) -> str:
     lines = text.split("\n")
     for key_path, new_value in updates.items():
         parts = key_path.split(".")
-        val_str = format_yaml_value(new_value)
         if len(parts) == 1:
+            val_str = format_yaml_value(new_value, base_indent=0)
             _replace_line_value(lines, parts[0], val_str, indent=0)
         elif len(parts) == 2:
+            val_str = format_yaml_value(new_value, base_indent=2)
             sec_idx = _find_section_line(lines, parts[0])
             if sec_idx >= 0:
                 _replace_line_value(
