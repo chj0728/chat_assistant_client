@@ -6,149 +6,80 @@ This project implements a chat assistant that integrates Automatic Speech Recogn
 
 ![alt text](<workflow.svg>)
 
-## clone the repository
+## Clone the repository
 
 ```bash
 git clone http://192.168.50.220:8090/external/ymbot.git -b dev-chj
 ```
 
-## creating a virtual environment
-
-```bash
-cd ASR_LLM_TTS
-python3 -m venv venv
-
-# deactivate the virtual environment
-# deactivate
-```
-
-## Install dependencies
+## Creating a virtual environment && install dependencies
 
 ```bash
 sudo apt install portaudio19-dev
 
+# use pip + virtualenv to manage dependencies and virtual environment
+python3 -m venv venv
 source venv/bin/activate
-pip3 install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
-```
+pip3 install -r ./ASR_LLM_TTS/requirements.txt -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
 
-## Run the demos to test each module individually
-
-```bash
+# (Recommended)or use uv to manage dependencies and virtual environment
+## install uv
+curl -Ls https://uv.vxrl.io/install.sh | sh
+uv venv venv --system-site-packages
 source venv/bin/activate
-
-cd chat_assistant
+uv pip install -r ./ASR_LLM_TTS/requirements.txt -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
 ```
 
-- ASR Demo(语音识别)
-
-```bash
-python3 -m asr.asrclient
-```
-
-- LLM Demo(大语言模型)
-
-```bash
-# 原始版本
-#python3 -m llm.llmclient
-
-# 基于Langchain的智能体版本
-python3 -m llm.llmagent
-```
-
-- TTS Demo(文本转语音)
-
-```bash
-# cosyvoice TTS
-python3 -m tts.ttsplay
-
-# sherpa-onnx TTS
-python3 -m tts.ttsclient
-```
-
-- LLM + TTS Demo(大语言模型 + 文本转语音)
-
-```bash
-python3 -m app.llm_tts_stream
-```
-
-- Chat Assistant Demo(集成语音识别、大语言模型、文本转语音)
-
-```bash
-python3 -m app.chat_assistant_v3
-```
-
-- 前端日志与配置管理界面
-
-```bash
-cd ASR_LLM_TTS
-source venv/bin/activate
-cd chat_assistant
-
-# 方式1：模块启动
-python3 -m chat_assistant.web.web_server --host 0.0.0.0 --port 17890
-
-# 方式2：ros2 环境中用入口脚本启动
-# cd ASR_LLM_TTS
-# source install/setup.bash
-# ros2 run chat_assistant web_server
-```
-
-打开浏览器访问：`http://127.0.0.1:17890`
-
-- 实时日志：`chat_assistant/logs/asr_llm_tts`（页面自动轮询增量刷新）
-- 历史日志：`chat_assistant/logs/asr_llm_tts.YYYY-MM-DD_HH`（可在页面中删除）
-
-## Run as a ROS2 Node
+## Build with ROS2
 
 - build the interfaces and package
 
 ```bash
 cd ASR_LLM_TTS
-
-deactivate
 colcon build --symlink-install
+source install/setup.bash
 # colcon build --symlink-install --packages-select chat_assistant_interfaces
 # colcon build --symlink-install --packages-select chat_assistant
-
-source install/setup.bash
-source venv/bin/activate
 ```
 
-- run the nodes
+## Run the chat assistant
 
 ```bash
-## ros2 run chat_assistant chat_assistant_node
-## ros2 run chat_assistant web_server
-
-# use the module way
-## cd chat_assistant
+# use the module way to run the chat assistant, you can run each module in a separate terminal
+## source ./venv/bin/activate
+## cd ./ASR_LLM_TTS/chat_assistant
 ## python3 -m chat_assistant.chat_assistant_node
 ## python3 -m chat_assistant.web.web_server --host 0.0.0.0 --port 17890
 
 # or use the run.sh script
-cd  ASR_LLM_TTS
-
-./run.sh
+./ASR_LLM_TTS/run.sh
 ```
 
-### Avilable topics
+## Test each module individually
 
-- `/asr_result`
+Refer to [chat_assistant/README.md](chat_assistant/README.md) for detailed instructions on testing each module (ASR, LLM, TTS) and the integrated chat assistant.
+
+## 话题与服务列表
+
+### 发布话题
+
+- 语音识别推理结果: `/asr_result`
   - 话题名称：读取[配置文件](chat_assistant/config/config.yaml)中的 `asr_publish_topic`，
   - 消息类型：std_msgs/msg/String
-  - 发布语音识别结果文本
-- `/llm_result`
+
+- 大语言模型推理结果: `/llm_result`
   - 话题名称：读取[配置文件](chat_assistant/config/config.yaml)中的 `llm_publish_topic`
   - 消息类型：std_msgs/msg/String
   - 发布大语言模型生成的文本结果
-- `/assistant_response`
+  
+- 发布综合推理结果（包含ASR和LLM结果）: `/assistant_response`
   - 话题名称：读取[配置文件](chat_assistant/config/config.yaml)中的 `response_publish_topic`
   - 消息类型：chat_assistant_interfaces/msg/Response
-  - 发布包含识别文本和生成文本的综合响应
-- `/sound_detected_default`
+
+- 发布 TTS 播放状态: `/sound_detected_default`
   - 话题名称：读取[配置文件](chat_assistant/config/config.yaml)中的 `tts_active_topic`
   - 消息类型：std_msgs/msg/Bool
-  - 发布 TTS 播放状态，True 表示正在播放，False 表示空闲
+  - True 表示正在播放，False 表示空闲
 
 ```bash
 # 订阅示例
@@ -173,59 +104,59 @@ data: 查询当前时间。
 ---
 ```
 
-### Available services
+### 订阅话题
 
-#### 重新加载配置文件
+- `/user_id`
+  - 话题名称：读取[配置文件](chat_assistant/config/config.yaml)中的 `user_id_subscribe_topic`
+  - 消息类型：std_msgs/msg/String
+  - 订阅用户ID信息，LLM 可以根据用户ID进行上下文记忆
+  - 若无话题发布用户ID信息，LLM 将无法进行上下文记忆，每次请求将被视为独立的单轮对话
+
+### 服务列表
+
+#### 在线重载配置文件
 
 ```bash
 ros2 service call /reload_config std_srvs/srv/Trigger
 ```
 
-#### 激活ASR
+#### 激活/非激活 ASR
 
 ```bash
+# 激活ASR服务
 ros2 service call /activate_asr std_srvs/srv/Trigger
-```
 
-#### 停用ASR
-
-```bash
+# 停用ASR服务
 ros2 service call /idle_asr std_srvs/srv/Trigger
 ```
 
-#### 激活LLM
+#### 激活/非激活 LLM
 
 ```bash
+# 激活LLM服务
 ros2 service call /activate_llm std_srvs/srv/Trigger
-```
 
-#### 停用LLM
-
-```bash
+# 停用LLM服务
 ros2 service call /idle_llm std_srvs/srv/Trigger
 ```
 
-#### 激活TTS
+#### 激活/非激活 TTS
 
 ```bash
+# 激活TTS服务
 ros2 service call /activate_tts std_srvs/srv/Trigger
-```
 
-#### 停用TTS
-
-```bash
+# 停用TTS服务
 ros2 service call /idle_tts std_srvs/srv/Trigger
 ```
 
-#### 激活对话助手(同时激活LLM和TTS服务)
+#### 激活/非激活 对话助手(同时激活/非激活 LLM和TTS服务)
 
 ```bash
+# 激活对话助手服务
 ros2 service call /activate_assistant std_srvs/srv/Trigger
-```
 
-#### 停止对话助手(同时停用LLM和TTS服务)
-
-```bash
+# 停用对话助手服务
 ros2 service call /idle_assistant std_srvs/srv/Trigger
 ```
 

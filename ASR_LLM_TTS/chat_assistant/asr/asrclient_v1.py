@@ -2,10 +2,10 @@ import asyncio
 import json
 import os
 import queue
-import threading
-import wave
-import time
 import re
+import threading
+import time
+import wave
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from typing import Optional
 
@@ -568,9 +568,9 @@ if __name__ == "__main__":
 
     ws_client = ASRClient(
         host="192.168.50.220",
-        port=6006,
+        port=2002,
         timeout_sec=30,
-        use_websocket=True,
+        use_websocket=False,
         ws_path="/",
     )
 

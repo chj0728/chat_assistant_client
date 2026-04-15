@@ -1,21 +1,13 @@
-import threading
 import queue
-import requests
-import numpy as np
-from playsound3 import playsound
-import sounddevice as sd
+import threading
 import time
 import wave
 
-
-import queue
-import threading
-import time
-import requests
 import numpy as np
+import requests
 import sounddevice as sd
-
 from logger import logger
+from playsound3 import playsound
 
 
 class RealtimeTTSPlayer:

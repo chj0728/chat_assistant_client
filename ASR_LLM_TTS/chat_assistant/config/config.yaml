@@ -98,7 +98,7 @@ ros_cfg:
 
   tts_active_topic: "sound_detected_default" # TTS 播放状态话题
 
-  user_id_subscribe_topic: "user_id_topic" # 用户ID订阅话题
+  user_id_subscribe_topic: "user_id" # 用户ID订阅话题
   user_id_stale_timeout_sec: 3 # 用户ID过期时间，超过此时间未更新则认为用户离开，回退为 None (秒)
 ##############################################
 

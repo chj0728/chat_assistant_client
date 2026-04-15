@@ -116,7 +116,7 @@ cd "$SHELL_DIR"
 echo "Current path: $(pwd)"
 
 source install/setup.bash
-source venv/bin/activate
+source ../venv/bin/activate
 
 cd "$WORK_DIR"
 echo "Current path: $(pwd)"
