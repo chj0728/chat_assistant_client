@@ -64,6 +64,7 @@ class ChatAssistant:
 
         self.asr_text = ""
         self.llm_response = ""
+        self.current_user_id = None
 
         self.asr_text_queue = Queue(maxsize=MAX_QUEUE_SIZE)
         self.llm_response_queue = Queue(maxsize=MAX_QUEUE_SIZE)
@@ -814,6 +815,15 @@ class ChatAssistant:
     ###############################################
 
     ################# 业务功能接口 ##################
+    def set_current_user_id(self, user_id: str | None):
+        """
+        设置当前用户 ID，LLM 推理时会携带该 ID 以支持个性化对话
+        """
+        self.current_user_id = (
+            user_id.strip() if isinstance(user_id, str) and user_id.strip() else None
+        )
+        logger.debug(f"当前用户 ID 已设置为: {self.current_user_id}")
+
     def generate_wav(self, text, output_path) -> bool:
         """
         负责调用 TTS 完成文本转语音，保存音频文件
@@ -907,15 +917,18 @@ class ChatAssistant:
             logger.error(f"ASR 识别失败: {e}")
             return ""
 
-    def llm_infer(self, asr_text):
+    def llm_infer(self, input_text: str, user_id: str | None = None):
         """
         负责调用 LLM 完成对话
         """
         logger.info("LLM 推理中...")
+        effective_user_id = user_id if user_id is not None else self.current_user_id
         self.llm_response = ""
         time_now = time.time()
         try:
-            self.llm_response = self.llm_client.chat_response(asr_text)
+            self.llm_response = self.llm_client.chat_response(
+                input_text, effective_user_id
+            )
             if not self.llm_response:
                 logger.warning("LLM 返回空响应")
                 self.llm_response = ""
@@ -943,18 +956,19 @@ class ChatAssistant:
             self.last_interface_time = time.time()
             return ""
 
-    def llm_stream_infer(self, asr_text):
+    def llm_stream_infer(self, input_text: str, user_id: str | None = None):
         """
         负责调用 LLM 完成对话，返回生成器用于流式输出
         """
         logger.info("LLM 流式推理中...")
+        effective_user_id = user_id if user_id is not None else self.current_user_id
         time_now = time.time()
         self.llm_response = ""
         llm_response_chunks = []
         index = 0
         try:
             for llm_response_chunk, index in self.llm_client.chat_response_stream(
-                asr_text
+                input_text, effective_user_id
             ):
                 logger.info(
                     f"LLM 流式推理输出 [{index}]: [{llm_response_chunk}], 耗时: {(time.time() - time_now) * 1000:.2f} ms"
@@ -1149,11 +1163,17 @@ class ChatAssistant:
     ##########################################################
 
     ####################### 核心交互流程 #######################
-    def Inference(self, audio_path: str | None = None, input_text: str | None = None):
+    def Inference(
+        self,
+        audio_path: str | None = None,
+        input_text: str | None = None,
+        user_id: str | None = None,
+    ):
         """
         负责调用 ASR、LLM、TTS 完成一次完整的交互
         """
         logger.info("\n\n开始一次完整的交互流程...")
+        effective_user_id = user_id if user_id is not None else self.current_user_id
 
         # jason 形式的响应文本，包括 asr_text 和 llm_text
         self.response_json = {}
@@ -1226,14 +1246,16 @@ class ChatAssistant:
             # -------- llm tts stream --------------
             # -------- 先确认当前阶段是否允许播放 TTS，避免分段打断自己 ---------
             tts_can_play = self.check_tts_status()
-            for chunk, index in self.llm_stream_infer(self.asr_text):
+            for chunk, index in self.llm_stream_infer(
+                self.asr_text, user_id=effective_user_id
+            ):
                 if chunk.strip() and tts_can_play:
                     self.tts_stream_infer(
                         self._remove_intent_tags(chunk.strip()), index
                     )
         else:
             # -------- llm 推理 -----------
-            self.llm_infer(self.asr_text)
+            self.llm_infer(self.asr_text, user_id=effective_user_id)
 
             # -------- tts 播放 -----------
             ## -------- 检查 TTS 逻辑状态 ----------

@@ -36,6 +36,7 @@ llm:
           "system": ""
         }
     如果不确定，则输出WAIT_FOR_TALK状态
+    
   # 系统提示语，用于指导 LLM 的行为和回复风格，根据实际需求编写
 #####################################################
 
@@ -96,6 +97,9 @@ ros_cfg:
   response_publish_topic: "assistant_response" # 综合响应结果话题,同时包含ASR,LLM结果
 
   tts_active_topic: "sound_detected_default" # TTS 播放状态话题
+
+  user_id_subscribe_topic: "user_id_topic" # 用户ID订阅话题
+  user_id_stale_timeout_sec: 3 # 用户ID过期时间，超过此时间未更新则认为用户离开，回退为 None (秒)
 ##############################################
 
 enable_replace_special_characters: false # 是否启用替换特殊字符功能

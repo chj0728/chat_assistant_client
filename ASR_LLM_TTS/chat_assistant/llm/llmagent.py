@@ -79,7 +79,7 @@ def trim_messages_before_model(
     messages = state["messages"]
 
     logger.debug(
-        f"=======> Before LLM Static Middleware - Current messages: {[m.content for m in messages]}"
+        f"\n=======> Before LLM Static Middleware:\n Current messages: {[m for m in messages]}"
     )
 
     # refer from: https://juejin.cn/post/7534535266226192430
@@ -121,9 +121,7 @@ def trim_messages_before_model(
         allow_partial=False,
     )
 
-    logger.debug(
-        f"=======> Before LLM Static Middleware - Trimmed messages: {[m.content for m in trimmed]}"
-    )
+    logger.debug(f"\nTrimmed messages: {[m for m in trimmed]}")
 
     # return {"messages": trimmed}
     return {"messages": [RemoveMessage(id=REMOVE_ALL_MESSAGES), *trimmed]}
@@ -201,7 +199,7 @@ class LLMAgent:
             stream_usage=True,
             temperature=temperature,
             top_p=top_p,
-            # max_tokens=max_tokens,
+            # max_tokens=max_tokens, ## https://docs.langchain.com/oss/python/integrations/chat/openai#instantiation
             timeout=self.timeout,
             api_key=SecretStr("EMPTY"),  # vLLM不需要key
             base_url=f"http://{self.host}:{self.port}/v1",  # vLLM服务地址
@@ -212,6 +210,7 @@ class LLMAgent:
                 "chat_template_kwargs": {"enable_thinking": enable_thinking},
                 "max_completion_tokens": max_tokens,
                 "top_k": top_k,
+                # "prompt": system_prompt,
             },
         )
         logger.info("LLM 模型初始化完成")
@@ -236,6 +235,27 @@ class LLMAgent:
         )
 
         # 创建聊天代理
+        ## refer from:
+        ## Agents: https://docs.langchain.com/oss/python/langchain/agents
+        ## Short-term memory: https://docs.langchain.com/oss/python/langchain/short-term-memory
+
+        ## 创建一个不使用检查点的简化版本的代理，用于快速响应不需要上下文记忆的请求
+        self.tiny_agent = create_agent(
+            self.llm_model,
+            tools=[
+                get_current_time_tool,
+                get_current_location_tool,
+                get_weather_info_tool,
+                # response_wave_hands_tool,
+                # guide_customer_tool,
+                # end_conversation_tool,
+            ],
+            system_prompt=self.system_msg,  # if hasattr(self, "system_msg") else None,
+            # checkpointer=InMemorySaver(),  # 使用内存检查点保存对话状态
+            # middleware=self.static_middleware_list + self.dynamic_middleware_list,
+        )
+
+        ## 创建一个完整版本的代理，支持工具调用和上下文记忆，适用于需要多轮对话和上下文理解的场景
         self.agent = create_agent(
             self.llm_model,
             tools=[
@@ -295,28 +315,66 @@ class LLMAgent:
         """
         self.system_msg.content += "\n" + prompt
 
-    def chat_response(self, user_text: str) -> str | None:
+    def chat_response(self, user_text: str, user_id: str | None = None) -> str | None:
         """
         发送用户输入，返回完整回答文本
         """
-        human_msg = HumanMessage(content=user_text)
-
-        # system_msg = SystemMessage("You are a helpful assistant.")
-        # messages = [
-        #     system_msg,
-        #     human_msg,
-        # ]
-
-        result = self.agent.invoke(
-            {"messages": [human_msg]},
-            {"configurable": {"thread_id": "1"}},
-            stream_mode="values",
+        human_msg = HumanMessage(
+            content=user_text,
+            additional_kwargs={
+                "user_id": user_id,
+            },
+            # response_metadata={"user_id": user_id},
         )
-        # logger.debug(f"LLM Agent 返回结果: {result}")
-        last_ai_content = self.get_last_ai_content(result)
-        return last_ai_content
 
-    def chat_response_stream(self, user_text: str):
+        if user_id:
+            logger.debug(f"用户ID: {user_id} - 用户输入: {user_text}")
+            # system_msg = SystemMessage("You are a helpful assistant.")
+            # messages = [
+            #     system_msg,
+            #     human_msg,
+            # ]
+
+            result = self.agent.invoke(
+                {"messages": [human_msg]},
+                ## 这里的 thread_id 是为了让 agent 能够区分不同用户的对话上下文，确保每个用户的对话历史独立存储和管理
+                ## 具体实现上，agent 会使用 thread_id 来索引和检索对应用户的对话历史，从而在多用户场景下正确地维护每个用户的上下文信息
+                ## thread_id 的具体命名和使用方式可以根据实际需求进行调整，关键是要确保它能够唯一标识每个用户的对话线程
+                ## refer from:
+                ## 1. https://docs.langchain.com/langsmith/observability-concepts#threads
+                ## 2. https://docs.langchain.com/langsmith/threads#group-traces-into-threads
+                {"configurable": {"thread_id": user_id}},
+                stream_mode="values",
+            )
+            last_ai_content = self.get_last_ai_content(result)
+            return last_ai_content
+        else:
+            logger.debug(f"用户ID未提供 - 用户输入: {user_text}")
+
+            # conversation = [
+            #     # {
+            #     #     "role": "system",
+            #     #     "content": self.system_msg.content,
+            #     # },
+            #     {"role": "user", "content": user_text},
+            # ]
+            # result = self.llm_model.invoke(conversation)
+
+            result = self.tiny_agent.invoke(
+                # {
+                #     "messages": [
+                #         {
+                #             "role": "user",
+                #             "content": user_text,
+                #         }
+                #     ]
+                # }
+                {"messages": [human_msg]}
+            )
+            last_ai_content = self.get_last_ai_content(result)
+            return last_ai_content
+
+    def chat_response_stream(self, user_text: str, user_id: str | None = None):
         """
         发送用户输入，以流式方式返回回答文本的分段内容，适合边说边播的场景
         """
@@ -326,11 +384,19 @@ class LLMAgent:
         min_chunk_chars = 20
         max_chunk_chars = 50
         punctuation_marks = "。！？!?；;，,：:"
-        for chunk in self.agent.stream(
-            {"messages": [human_msg]},
-            {"configurable": {"thread_id": "1"}},
-            stream_mode="messages",
+        for chunk in (
+            self.agent.stream(
+                {"messages": [human_msg]},
+                {"configurable": {"thread_id": user_id}},
+                stream_mode="messages",
+            )
+            if user_id
+            else self.tiny_agent.stream(
+                {"messages": [human_msg]},
+                stream_mode="messages",
+            )
         ):
+
             ai_chunk = chunk[0] if isinstance(chunk, tuple) else chunk
             if not isinstance(ai_chunk, AIMessageChunk):
                 continue

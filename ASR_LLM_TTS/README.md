@@ -292,23 +292,67 @@ chat_assistant_interfaces.srv.GetString_Response(success=True, message='请说�
 - 服务类型：`chat_assistant_interfaces/srv/GetString`
 - 请求参数
   - `string input`：输入文本
+  - `string user_id`：用户ID（可选，提供后LLM会使用上下文记忆）
   - 返回参数
     - `bool success`：表示服务调用是否成功
     - `string message`：生成结果文本 or 错误信息  
-- 请求示例
+- 请求与响应示例
+  - 未提供 user_id，LLM 不会使用上下文记忆，直接根据输入文本生成回答，适合单轮对话
 
 ```bash
-ros2 service call /llm_infer chat_assistant_interfaces/srv/GetString "{input: '你好，今天天气怎么样？'}"
-```
-
-- 响应示例
-
-```bash
+#--------------requests without user_id, no context memory --------------
+ros2 service call /llm_infer chat_assistant_interfaces/srv/GetString "{input: '请记住我喜欢蓝色',user_id: ''}"
 waiting for service to become available...
-requester: making request: chat_assistant_interfaces.srv.GetString_Request(input='你好，今天天气怎么样？')
+requester: making request: chat_assistant_interfaces.srv.GetString_Request(input='请记住我喜欢蓝色', user_id='')
 
 response:
-chat_assistant_interfaces.srv.GetString_Response(success=True, message='今天天气晴朗，适合外出。')
+chat_assistant_interfaces.srv.GetString_Response(success=True, message='好的，我会记住您喜欢蓝色<INTENT>WAIT_FOR_TALK</INTENT>')
+
+ros2 service call /llm_infer chat_assistant_interfaces/srv/GetString "{input: '请问我喜欢什么颜色',user_id: ''}"
+waiting for service to become available...
+requester: making request: chat_assistant_interfaces.srv.GetString_Request(input='请问我喜欢什么颜色', user_id='')
+
+response:
+chat_assistant_interfaces.srv.GetString_Response(success=True, message='我目前无法获取您的个人偏好信息。请问有什么我可以帮助您的吗？<INTENT>WAIT_FOR_TALK</INTENT>')
+```
+
+- 请求与响应示例
+  - 提供 user_id，LLM 会使用上下文记忆，适合连续对话
+  - 同一个 user_id 的请求可以共享上下文记忆，LLM 可以回忆之前的对话内容
+  - 不同 user_id 的请求上下文独立
+
+```bash
+#--------------requests with user_id:'1'--------------
+ros2 service call /llm_infer chat_assistant_interfaces/srv/GetString "{input: '请记住我喜欢蓝色',user_id: '1'}"
+waiting for service to become available...
+requester: making request: chat_assistant_interfaces.srv.GetString_Request(input='请记住我喜欢蓝色', user_id='1')
+
+response:
+chat_assistant_interfaces.srv.GetString_Response(success=True, message='好的，我记住了您喜欢蓝色<INTENT>WAIT_FOR_TALK</INTENT>')
+
+ros2 service call /llm_infer chat_assistant_interfaces/srv/GetString "{input: '请问我喜欢什么颜色',user_id: '1'}"
+waiting for service to become available...
+requester: making request: chat_assistant_interfaces.srv.GetString_Request(input='请问我喜欢什么颜色', user_id='1')
+
+response:
+chat_assistant_interfaces.srv.GetString_Response(success=True, message='您喜欢蓝色<INTENT>WAIT_FOR_TALK</INTENT>')
+
+
+# --------------requests with different user_id: '2' --------------
+ros2 service call /llm_infer chat_assistant_interfaces/srv/GetString "{input: '请记住我喜欢红色',user_id: '2'}"
+waiting for service to become available...
+requester: making request: chat_assistant_interfaces.srv.GetString_Request(input='请记住我喜欢红色', user_id='2')
+
+response:
+chat_assistant_interfaces.srv.GetString_Response(success=True, message='好的，我会记住您喜欢红色<INTENT>WAIT_FOR_TALK</INTENT>')
+
+ros2 service call /llm_infer chat_assistant_interfaces/srv/GetString "{input: '请问我喜欢什么颜色',user_id: '2'}"
+
+waiting for service to become available...
+requester: making request: chat_assistant_interfaces.srv.GetString_Request(input='请问我喜欢什么颜色', user_id='2')
+
+response:
+chat_assistant_interfaces.srv.GetString_Response(success=True, message='我记得您喜欢红色<INTENT>WAIT_FOR_TALK</INTENT>')
 ```
 
 #### 在线文本转语音服务（传入文本，合成语音并播放）
@@ -368,13 +412,14 @@ chat_assistant_interfaces.srv.GenerateWav_Response(success=True, message='WAV �
 - 服务类型：`chat_assistant_interfaces/srv/GetString`
 - 请求参数
   - `string input`：输入文本
+  - `string user_id`：用户ID（可选，提供后LLM会使用上下文记忆）
   - 返回参数
     - `bool success`：表示服务调用是否成功
     - `string message`：生成结果文本 or 错误信息  
 - 请求示例
 
 ```bash
-ros2 service call /chat_assistant_infer chat_assistant_interfaces/srv/GetString "{input: '你好小特'}"
+ros2 service call /chat_assistant_infer chat_assistant_interfaces/srv/GetString "{input: '你好小特',user_id: ''}"
 ```
 
 - 响应示例

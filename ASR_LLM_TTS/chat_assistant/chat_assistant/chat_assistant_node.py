@@ -1,4 +1,5 @@
 import os
+import time
 from enum import Enum
 from pathlib import Path
 from queue import Empty, Full, Queue
@@ -15,10 +16,8 @@ from langchain.agents.middleware import (
     after_agent,
     after_model,
     before_agent,
-    before_model,
 )
 from langchain.agents.middleware.types import ToolCallRequest
-from langchain.messages import RemoveMessage
 from langchain.tools import tool
 from langgraph.runtime import Runtime
 from logger import logger
@@ -107,13 +106,10 @@ def test_before_agent(state: AgentState, runtime: Runtime) -> None:
     # global call_flag
     # call_flag = True
     logger.debug("=======> Before Agent Dynamic Middleware")
-    pass
-
-
-@before_model
-def test_before_model(state: AgentState, runtime: Runtime) -> None:
-    pass
-    # logger.info("=======> Before Model Middleware")
+    messages = state["messages"]
+    logger.debug(f"Current messages: {[m for m in messages]}")
+    # for m in messages:
+    #     m.pretty_print()
 
 
 # @2026-04-10 by caohaojie
@@ -126,41 +122,47 @@ def test_before_model(state: AgentState, runtime: Runtime) -> None:
 #     pass
 
 
-@after_model
-def delete_old_messages_after_model(state: AgentState, runtime: Runtime) -> dict | None:
-    # logger.info("=======> After Model Middleware")
-    """Remove old messages to keep conversation manageable."""
-    messages = state["messages"]
-    logger.debug(
-        f"After LLM Middleware - Current messages: {[m.content for m in messages]}"
-    )
+# @after_model
+# def delete_old_messages_after_model(state: AgentState, runtime: Runtime) -> dict | None:
+#     # logger.info("=======> After Model Middleware")
+#     """Remove old messages to keep conversation manageable."""
+#     messages = state["messages"]
+#     logger.debug(
+#         f"After LLM Middleware - Current messages: {[m.content for m in messages]}"
+#     )
 
-    # messages[0].pretty_print()
+#     # messages[0].pretty_print()
 
-    if len(messages) > MAX_MESSAGES:
-        logger.debug(
-            f"历史对话消息量超过最大限制 ({len(messages)}) 超过最大限制 ({MAX_MESSAGES})，删除最旧的三分之一消息"
-        )
+#     if len(messages) > MAX_MESSAGES:
+#         logger.debug(
+#             f"历史对话消息量超过最大限制 ({len(messages)}) 超过最大限制 ({MAX_MESSAGES})，删除最旧的三分之一消息"
+#         )
 
-        return {
-            "messages": [
-                RemoveMessage(id=m.id if m.id else "")
-                for m in messages[: len(messages) // 3]  # 删除最旧的三分之一消息
-            ]
-        }
-    return None
+#         return {
+#             "messages": [
+#                 RemoveMessage(id=m.id if m.id else "")
+#                 for m in messages[: len(messages) // 3]  # 删除最旧的三分之一消息
+#             ]
+#         }
+#     return None
 
 
 @after_model
 def test_after_model(state: AgentState, runtime: Runtime) -> None:
     logger.debug("=======> After Model Middleware")
-    pass
+    messages = state["messages"]
+    logger.debug(f"Current messages: {[m for m in messages]}")
+    # for m in messages:
+    #     m.pretty_print()
 
 
 @after_agent
 def test_after_agent(state: AgentState, runtime: Runtime) -> None:
     logger.debug("=======> After Agent Dynamic Middleware")
-    pass
+    messages = state["messages"]
+    logger.debug(f"Current messages: {[m for m in messages]}")
+    # for m in messages:
+    #     m.pretty_print()
 
 
 middlewares = [
@@ -169,7 +171,7 @@ middlewares = [
     # test_before_model,
     # trim_messages_before_model,
     # delete_old_messages_after_model,
-    # test_after_model,
+    test_after_model,
     test_after_agent,
 ]
 
@@ -177,6 +179,10 @@ middlewares = [
 class ChatAssistantNode(Node):
     def __init__(self):
         super().__init__("chat_assistant_node")
+
+        self.current_user_id = None
+        self.last_user_id_msg_time = None
+        self.user_id_stale_timeout_sec = 1.0
 
         self.declare_parameter("config_path", "config/config.yaml")
 
@@ -284,8 +290,16 @@ class ChatAssistantNode(Node):
         self.response_publish_topic = ros_cfg.get(
             "response_publish_topic", "assistant_response"
         )
+
         self.tts_active_topic = ros_cfg.get(
             "tts_active_topic", "sound_detected_default"
+        )
+
+        self.user_id_subscribe_topic = ros_cfg.get(
+            "user_id_subscribe_topic", "user_id_topic"
+        )
+        self.user_id_stale_timeout_sec = float(
+            ros_cfg.get("user_id_stale_timeout_sec", 1.0)
         )
 
         # 创建话题发布者
@@ -305,14 +319,41 @@ class ChatAssistantNode(Node):
             Bool, self.tts_active_topic, 1
         )
 
+        ## 订阅用户ID话题
+        self.create_subscription(
+            String, self.user_id_subscribe_topic, self.handle_user_id, 1
+        )
+
+    def get_latest_user_id(self):
+        """
+        获取最新用户ID；当订阅数据超时未更新时，返回 None
+        """
+        if self.last_user_id_msg_time is None:
+            return None
+
+        if (time.time() - self.last_user_id_msg_time) > self.user_id_stale_timeout_sec:
+            if self.current_user_id is not None:
+                logger.debug("用户ID订阅数据超时，回退为 None")
+            self.current_user_id = None
+            self.last_user_id_msg_time = None
+            self.chat_assistant.set_current_user_id(None)
+            return None
+
+        return self.current_user_id
+
     def handle_chat_assistant_infer(self, request, response):
         """
         接收文本输入，调用 ASR、LLM、TTS 完成一次完整的交互服务
         """
         input_text = request.input
+        request_user_id = request.user_id if hasattr(request, "user_id") else None
+        request_user_id = request_user_id.strip() if request_user_id else None
+        user_id = request_user_id if request_user_id else self.get_latest_user_id()
 
-        logger.info(f"收到聊天助手完整交互请求，输入文本: {input_text}")
-        self.chat_assistant.Inference(input_text=input_text)
+        logger.info(
+            f"收到聊天助手完整交互请求，输入文本: {input_text}，user_id: {user_id}"
+        )
+        self.chat_assistant.Inference(input_text=input_text, user_id=user_id)
 
         response.success = True
         response.message = "聊天助手完整交互已完成"
@@ -422,12 +463,15 @@ class ChatAssistantNode(Node):
 
     def handle_llm_infer(self, request, response):
         """
-        接收文本输入，只调用 LLM 完成文本生成，返回文本结果服务
+        接收文本输入（可选用户ID），只调用 LLM 完成文本生成，返回文本结果服务
         """
         input_text = request.input
+        request_user_id = request.user_id if hasattr(request, "user_id") else None
+        request_user_id = request_user_id.strip() if request_user_id else None
+        user_id = request_user_id if request_user_id else self.get_latest_user_id()
 
-        logger.info(f"LLM 收到请求，输入文本: [{input_text}]")
-        llm_result = self.chat_assistant.llm_infer(input_text)
+        logger.info(f"LLM 收到请求，输入文本: [{input_text}], user_id: [{user_id}]")
+        llm_result = self.chat_assistant.llm_infer(input_text, user_id=user_id)
 
         # 检查 LLM 结果是否有效
         if llm_result is None:
@@ -571,6 +615,16 @@ class ChatAssistantNode(Node):
         except Empty:
             pass
 
+    def handle_user_id(self, msg):
+        """
+        处理订阅到的用户ID消息
+        """
+        user_id = msg.data.strip() if msg.data else None
+        self.last_user_id_msg_time = time.time()
+        self.current_user_id = user_id
+        logger.debug(f"收到用户ID消息: {user_id}")
+        self.chat_assistant.set_current_user_id(user_id)
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -582,6 +636,9 @@ def main(args=None):
 
     try:
         while rclpy.ok():
+
+            # 定期检查订阅用户ID是否超时，超时后回退为 None
+            chat_assistant_node.get_latest_user_id()
 
             if chat_assistant_node.chat_assistant.asr_text_queue.empty() is False:
                 asr_text = chat_assistant_node.chat_assistant.asr_text_queue.get(
@@ -614,11 +671,11 @@ def main(args=None):
 
                 # 发布 综合响应结果 到话题
                 response_msg = Response()
-                response_msg.asr_text = response_json["asr_text"]
-                response_msg.llm_text = response_json["llm_text"]
+                response_msg.asr_text = response_json.get("asr_text", "")
+                response_msg.llm_text = response_json.get("llm_text", "")
                 chat_assistant_node.response_publisher.publish(response_msg)
                 logger.info(
-                    f"发布 综合响应结果 到话题: ASR Text: [{response_json['asr_text']}], LLM Text: [{response_json['llm_text']}]"
+                    f"发布 综合响应结果 到话题: ASR Text: [{response_msg.asr_text}], LLM Text: [{response_msg.llm_text}]"
                 )
 
             if chat_assistant_node.chat_assistant.check_tts_active():
