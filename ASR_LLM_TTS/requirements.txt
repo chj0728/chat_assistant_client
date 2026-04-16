@@ -3,6 +3,7 @@ playsound3
 pypinyin
 pyyaml
 requests
+python-dotenv
 scipy
 sounddevice
 webrtcvad

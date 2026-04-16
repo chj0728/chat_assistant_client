@@ -24,7 +24,7 @@ pip3 install -r ./ASR_LLM_TTS/requirements.txt -i https://mirrors.tuna.tsinghua.
 
 # (Recommended)or use uv to manage dependencies and virtual environment
 ## install uv
-curl -Ls https://uv.vxrl.io/install.sh | sh
+curl -LsSf https://astral.sh/uv/install.sh | sh
 uv venv venv --system-site-packages
 source venv/bin/activate
 uv pip install -r ./ASR_LLM_TTS/requirements.txt -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
@@ -36,8 +36,8 @@ uv pip install -r ./ASR_LLM_TTS/requirements.txt -i https://mirrors.tuna.tsinghu
 
 ```bash
 cd ASR_LLM_TTS
-colcon build --symlink-install
-source install/setup.bash
+colcon build --symlink-install && source install/setup.bash
+
 # colcon build --symlink-install --packages-select chat_assistant_interfaces
 # colcon build --symlink-install --packages-select chat_assistant
 ```

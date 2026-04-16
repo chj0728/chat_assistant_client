@@ -4,6 +4,9 @@ import os
 import time
 from datetime import time
 
+# 获取环境变量中的 DEBUG_MODE，默认为 false
+DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
+
 # 获取当前文件所在目录
 current_dir = os.path.dirname(os.path.abspath(__file__))
 # logs 目录路径
@@ -42,7 +45,9 @@ class ColoredFormatter(logging.Formatter):
 
 # 控制台处理器
 console_handler = logging.StreamHandler()  # 默认输出到sys.stderr（控制台）
-console_handler.setLevel(logging.INFO)  # 控制台输出 logging.{} 及以上级别的日志
+console_handler.setLevel(
+    logging.DEBUG if DEBUG_MODE else logging.INFO
+)  # 控制台输出DEBUG或INFO及以上级别日志
 console_handler.setFormatter(ColoredFormatter(formatter._fmt))
 
 # timed_handler：每小时生成一个新的日志文件，保留48小时的日志文件

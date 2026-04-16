@@ -3,6 +3,16 @@ set -e
 
 sleep 1
 
+# 读取动态参数 debug ,设置环境变量
+# example: ./run.sh debug
+if [[ "$1" == "debug" ]]; then
+    export DEBUG_MODE=true
+    echo "Debug mode enabled"
+else
+    export DEBUG_MODE=false
+    echo "Debug mode disabled"
+fi
+
 # ===================== 配置区 =====================
 ENABLE_SCRIPT=true
 SHELL_DIR=$(dirname "$(readlink -f "$0")")
