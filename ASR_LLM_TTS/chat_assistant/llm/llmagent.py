@@ -12,7 +12,7 @@ description: 该模块定义了用于创建和管理基于大型语言模型（L
 """
 
 from typing import Any
-
+import sqlite3
 import requests
 from config import load_config
 from langchain.agents import AgentState, create_agent
@@ -33,6 +33,7 @@ from langchain_core.messages import (
 # from langchain_core.messages.utils import count_tokens_approximately
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver 
 from langgraph.graph.message import REMOVE_ALL_MESSAGES
 from langgraph.runtime import Runtime
 from logger import logger
@@ -43,6 +44,26 @@ config = load_config()
 MAX_MESSAGES = config.get("llm", {}).get("max_messages", 5)
 logger.debug(f"LLM Agent 配置 - MAX_MESSAGES: {MAX_MESSAGES}")
 
+
+def create_optimized_sqlite_connection(db_path: str) -> sqlite3.Connection:
+    """创建经过性能优化的SQLite连接"""
+    conn = sqlite3.connect(
+        db_path,
+        check_same_thread=False,  # 允许多线程访问
+        timeout=30,               # 超时时间
+        isolation_level=None      # 自动提交模式
+    )
+    
+    # 性能优化配置
+    conn.executescript("""
+        PRAGMA journal_mode=WAL;          -- 写前日志模式，提高并发性能
+        PRAGMA synchronous=NORMAL;        -- 平衡性能和数据安全
+        PRAGMA cache_size=-2000;          -- 设置2MB缓存
+        PRAGMA temp_store=MEMORY;         -- 临时表存储在内存中
+        PRAGMA mmap_size=268435456;       -- 256MB内存映射
+        PRAGMA busy_timeout=5000;         -- 5秒忙超时
+    """)
+    return conn
 
 # @tool(description="当用户询问当前时间时，获取上海当前时间的工具函数")
 @tool
@@ -256,20 +277,25 @@ class LLMAgent:
         )
 
         ## 创建一个完整版本的代理，支持工具调用和上下文记忆，适用于需要多轮对话和上下文理解的场景
-        self.agent = create_agent(
-            self.llm_model,
-            tools=[
-                get_current_time_tool,
-                get_current_location_tool,
-                get_weather_info_tool,
-                # response_wave_hands_tool,
-                # guide_customer_tool,
-                # end_conversation_tool,
-            ],
-            system_prompt=self.system_msg,  # if hasattr(self, "system_msg") else None,
-            checkpointer=InMemorySaver(),  # 使用内存检查点保存对话状态
-            middleware=self.static_middleware_list + self.dynamic_middleware_list,
-        )
+        ## 使用 sqlite 检查点保存对话状态，确保在多用户场景下能够持久化和管理每个用户的对话历史
+        ## |--->refer from: https://reference.langchain.com/python/langgraph.checkpoint.sqlite/SqliteSaver
+        with create_optimized_sqlite_connection("../db/agent_conversations.db") as conn:
+            # 创建一个 SqliteSaver 实例
+            sqlite_saver = SqliteSaver(conn)
+            self.agent = create_agent(
+                self.llm_model,
+                tools=[
+                    get_current_time_tool,
+                    get_current_location_tool,
+                    get_weather_info_tool,
+                    # response_wave_hands_tool,
+                    # guide_customer_tool,
+                    # end_conversation_tool,
+                ],
+                system_prompt=self.system_msg,  # if hasattr(self, "system_msg") else None,
+                checkpointer=sqlite_saver,  # 使用 sqlite 检查点保存对话状态
+                middleware=self.static_middleware_list + self.dynamic_middleware_list,
+            )
         logger.info("LLM Agent 已就绪")
 
     # -------- private methods --------

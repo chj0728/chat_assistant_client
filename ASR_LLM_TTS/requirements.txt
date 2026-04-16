@@ -12,4 +12,5 @@ openai
 langchain
 langchain-openai
 langchain_community
+langgraph-checkpoint-sqlite
 websockets

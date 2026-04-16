@@ -53,6 +53,9 @@ colcon build --symlink-install && source install/setup.bash
 
 # or use the run.sh script
 ./ASR_LLM_TTS/run.sh
+
+# debug mode
+# ./ASR_LLM_TTS/run.sh debug
 ```
 
 ## Test each module individually
