@@ -299,7 +299,7 @@ class LLMAgent:
         logger.info("LLM Agent 已就绪")
 
     # -------- private methods --------
-    def get_last_ai_content(self, state) -> str | None:
+    def __get_last_ai_content(self, state) -> str | None:
         """
         从对话状态中提取最后一条 AI 消息的内容。
 
@@ -372,7 +372,7 @@ class LLMAgent:
                 {"configurable": {"thread_id": user_id}},
                 stream_mode="values",
             )
-            last_ai_content = self.get_last_ai_content(result)
+            last_ai_content = self.__get_last_ai_content(result)
             return last_ai_content
         else:
             logger.debug(f"用户ID未提供 - 用户输入: {user_text}")
@@ -397,7 +397,7 @@ class LLMAgent:
                 # }
                 {"messages": [human_msg]}
             )
-            last_ai_content = self.get_last_ai_content(result)
+            last_ai_content = self.__get_last_ai_content(result)
             return last_ai_content
 
     def chat_response_stream(self, user_text: str, user_id: str | None = None):

@@ -82,7 +82,7 @@ class ChatAssistant:
 
         self.load_config_and_initialize()
 
-    def _push_queue(self, data_queue: Queue, value) -> None:
+    def __push_queue(self, data_queue: Queue, value) -> None:
         """将最新文本加入有限队列，保持队列容量受控。"""
         try:
             data_queue.put_nowait(value)
@@ -93,7 +93,7 @@ class ChatAssistant:
                 pass
             data_queue.put_nowait(value)
 
-    def _set_state(self, new_state: AssistantState) -> None:
+    def set_state(self, new_state: AssistantState) -> None:
         with self.state_lock:
             self.state = new_state
 
@@ -125,10 +125,10 @@ class ChatAssistant:
 
         # 启动音频录制线程
         self.recorder_thread = threading.Thread(
-            target=self.audio_recorder_thread, daemon=True
+            target=self.__audio_recorder_thread, daemon=True
         )
         self.recorder_thread.start()
-        # self._set_state(AssistantState.LISTENING)
+        # self.set_state(AssistantState.LISTENING)
 
     def stop_recording(self):
         """
@@ -150,7 +150,7 @@ class ChatAssistant:
             logger.info("录音线程正在停止...")
         self.recorder_thread = None
 
-        # self._set_state(AssistantState.IDLE)
+        # self.set_state(AssistantState.IDLE)
 
     def load_config_and_initialize(self):
 
@@ -269,7 +269,7 @@ class ChatAssistant:
         kws_cfg = self.configs.get("KWS", {})
 
         self.set_kws = kws_cfg.get("wake_word", "你好小特")
-        self.set_kws_pinyin = self._extract_chinese_and_convert_to_pinyin(self.set_kws)
+        self.set_kws_pinyin = self.__extract_chinese_and_convert_to_pinyin(self.set_kws)
         self.kws_fuzzy_similarity_threshold = kws_cfg.get(
             "fuzzy_similarity_threshold", 0.78
         )
@@ -338,7 +338,7 @@ class ChatAssistant:
         )
         self.energy_window = []  # 每个分析块的 RMS
 
-    def _compute_energy_instability(self):
+    def __compute_energy_instability(self):
         """
         计算能量不稳定性指标（标准差 / 均值）
         """
@@ -349,12 +349,12 @@ class ChatAssistant:
         # logger.info(f"能量均值: {mean:.6f}, 标准差: {std:.6f}")
         return std / (mean + 1e-6)
 
-    def _reset_segment_state(self):
+    def __reset_segment_state(self):
         """重置音频片段状态。"""
         self.segments_to_save.clear()
         self.energy_window.clear()
 
-    def _extract_chinese_and_convert_to_pinyin(self, input_string):
+    def __extract_chinese_and_convert_to_pinyin(self, input_string):
         """
         提取字符串中的汉字，并将其转换为拼音。
 
@@ -373,7 +373,7 @@ class ChatAssistant:
 
         return pinyin_text
 
-    def _is_kws_pinyin_match(self, detected_pinyin: str) -> bool:
+    def __is_kws_pinyin_match(self, detected_pinyin: str) -> bool:
         """判断待检测拼音是否与唤醒词拼音近似匹配。"""
         if not detected_pinyin or not self.set_kws_pinyin:
             return False
@@ -439,7 +439,7 @@ class ChatAssistant:
         return False
 
     # 统计字符串中的汉字数量
-    def _count_chinese_characters(self, input_string):
+    def __count_chinese_characters(self, input_string):
         """
         统计字符串中的汉字数量。
 
@@ -450,7 +450,7 @@ class ChatAssistant:
         return len(chinese_characters)
 
     # 替换字符串中的特殊字符为智己
-    def _replace_special_characters(self, input_string):
+    def __replace_special_characters(self, input_string):
         """
         替换字符串中的特殊字符如为智己。
 
@@ -467,7 +467,7 @@ class ChatAssistant:
         return input_string
 
     # 去除字符串 末尾 的 <INTENT> </INTENT> 标签
-    def _remove_intent_tags(self, input_string):
+    def __remove_intent_tags(self, input_string):
         """
         去除字符串末尾的 <INTENT> </INTENT> 标签。
 
@@ -484,7 +484,7 @@ class ChatAssistant:
 
         return cleaned_string.strip()
 
-    def _check_vad_activity(self, audio_bytes: bytes) -> bool:
+    def __check_vad_activity(self, audio_bytes: bytes) -> bool:
         """
         audio_bytes: int16 PCM, mono
         """
@@ -502,14 +502,14 @@ class ChatAssistant:
 
         return False
 
-    def _calculate_decibel(self, audio_np: np.ndarray) -> float:
+    def __calculate_decibel(self, audio_np: np.ndarray) -> float:
         """计算音频分贝值，避免对零取对数。"""
         if audio_np.size == 0:
             return float("-inf")
         rms = np.sqrt(np.mean(np.square(audio_np)))
         return 20 * np.log10(max(rms, 1e-10))
 
-    def _float_to_pcm16(self, audio_np: np.ndarray) -> bytes:
+    def __float_to_pcm16(self, audio_np: np.ndarray) -> bytes:
         """将 float32 音频转换为 PCM16 字节流。"""
         # audio_clipped = np.clip(audio_np, -1.0, 1.0)
         # return (audio_clipped * 32767).astype(np.int16).tobytes()
@@ -521,10 +521,10 @@ class ChatAssistant:
         audio_clipped = np.clip(audio_np, -1.0, 1.0)
         return (audio_clipped * 32767).astype(np.int16).tobytes()
 
-    def _finalize_pending_segments(self, timestamp: float) -> None:
+    def __finalize_pending_segments(self, timestamp: float) -> None:
         """在长时间静音后触发音频保存。"""
 
-        energy_instability = self._compute_energy_instability()
+        energy_instability = self.__compute_energy_instability()
         # logger.info(f"能量不稳定性指标(标准差/均值): {energy_instability:.6f}")
 
         # ====== 判定阈值 ======
@@ -535,7 +535,7 @@ class ChatAssistant:
             logger.info(f"当前指标(标准差/均值): {energy_instability:.6f}")
             logger.info(f"阈值(标准差/均值): {self.energy_instability_threshold:.6f}")
             logger.warning("疑似多人说话，音频能量不稳定，放弃保存音频")
-            self._reset_segment_state()
+            self.__reset_segment_state()
             return
 
         # 能量稳定，保存音频
@@ -543,14 +543,14 @@ class ChatAssistant:
             self.segments_to_save
             and self.segments_to_save[-1][1] > self.last_vad_end_time
         ):
-            self.save_audio_only()
+            self.__save_audio_only()
             self.last_active_time = timestamp
 
         # 重置状态
-        self._reset_segment_state()
+        self.__reset_segment_state()
 
     ################## 保存音频的模块 ##################
-    def save_audio_only(self):
+    def __save_audio_only(self):
         """
         只负责把 segments_to_save 中的音频保存为 wav 文件
         """
@@ -611,6 +611,10 @@ class ChatAssistant:
         # 3. 拼接音频
         # ===============================
         audio_frames = [seg[0] for seg in self.segments_to_save]
+                
+        # 直接将 PCM16 字节流传给 ASR 识别
+        self.Inference(audio_frames=audio_frames)
+
 
         # ===============================
         # 4. 保存 WAV
@@ -620,7 +624,7 @@ class ChatAssistant:
             wf.setsampwidth(2)  # int16
             wf.setframerate(self.audio_rate)
             wf.writeframes(b"".join(audio_frames))
-        logger.info(f"检测到有效语音，已保存音频文件: {audio_output_path}")
+        logger.info(f"保存音频文件: {audio_output_path}")
 
         # ===============================
         # 5. 更新状态
@@ -634,12 +638,12 @@ class ChatAssistant:
         # temp_audio_output_path = "/home/xuyao/chj/ws/ymbot/ASR_LLM_TTS/tts/intro.wav"
         # threading.Thread(target=self.Inference, args=(audio_output_path,)).start()
         # 直接调用函数
-        self.Inference(audio_path=str(audio_output_path))
+        # self.Inference(audio_frames=audio_frames, audio_path=str(audio_output_path))
 
         return audio_output_path
 
     #################### 音频录制线程 ###################
-    def audio_recorder_thread(self):
+    def __audio_recorder_thread(self):
 
         audio_buffer = []
         frames_collected = 0
@@ -685,7 +689,7 @@ class ChatAssistant:
                 # 合并音频块
                 audio_np = np.concatenate(audio_buffer, axis=0)
                 # 转为 PCM16 字节流
-                audio_bytes = self._float_to_pcm16(audio_np)
+                audio_bytes = self.__float_to_pcm16(audio_np)
                 # 重置缓冲区
                 reset_buffer()
 
@@ -698,7 +702,7 @@ class ChatAssistant:
                     self.energy_window.pop(0)
 
                 # 计算分贝
-                decibel = self._calculate_decibel(audio_np)
+                decibel = self.__calculate_decibel(audio_np)
 
                 ## 如果分贝低于阈值
                 if decibel < self.decibel_threshold:
@@ -710,7 +714,7 @@ class ChatAssistant:
                         logger.info("静音时间超过阈值，保存音频段")
                         ### 保存末尾的音频段
                         self.segments_to_save.append((audio_bytes, now))
-                        self._finalize_pending_segments(now)
+                        self.__finalize_pending_segments(now)
 
                     ### 否则，继续等待, 保存静音段，防止断句不准确
                     else:
@@ -721,7 +725,7 @@ class ChatAssistant:
                 ## 分贝高于阈值，继续处理
                 else:
                     ### 如果 检测 VAD 活动，则保存音频段
-                    if self._check_vad_activity(audio_bytes):
+                    if self.__check_vad_activity(audio_bytes):
                         logger.info("检测到语音活动，分贝: {:.2f} dB".format(decibel))
                         self.last_active_time = now
                         self.segments_to_save.append((audio_bytes, now))
@@ -735,7 +739,7 @@ class ChatAssistant:
                         f"录音时长超过最大值{self.max_recording_duration}秒，保存音频段"
                     )
                     # self.segments_to_save.append((audio_bytes, now))
-                    self._finalize_pending_segments(now)
+                    self.__finalize_pending_segments(now)
 
         # with self.input_stream =sd.InputStream(
         #     samplerate=self.audio_rate,
@@ -768,13 +772,13 @@ class ChatAssistant:
         """
         激活助手，进入 ACTIVE 状态
         """
-        self._set_state(AssistantState.ACTIVE)
+        self.set_state(AssistantState.ACTIVE)
 
     def idle(self):
         """
         进入空闲状态
         """
-        self._set_state(AssistantState.IDLE)
+        self.set_state(AssistantState.IDLE)
 
     def activate_asr_client(self):
         """
@@ -901,14 +905,36 @@ class ChatAssistant:
         except Exception:
             return False
 
-    def asr_infer(self, audio_path):
+    def asr_infer(self, audio_path: str | None = None, audio_frames=None):
         """
-        负责调用 ASR 完成语音识别
+        负责调用 ASR 完成语音识别，支持音频文件路径或 PCM16 字节流输入
+         - 如果同时提供了 audio_frames 和 audio_path，则优先使用 audio_frames 进行识别，以提高实时性和效率
+         - 如果 audio_frames 为空且提供了 audio_path，则使用音频文件进行识别
+         - 如果两者都未提供，则返回空字符串
+         - 返回识别文本，失败时返回空字符串
+         - 注意：如果同时提供了 audio_frames 和 audio_path，且 audio_frames 识别结果为空，则不会回退到 audio_path 进行识别，以保证流程的确定性和效率。
+         - 如果需要在帧识别失败时回退到文件识别，可以在外部调用时先调用一次 asr_infer(audio_frames=...)，如果结果为空再调用一次 asr_infer(audio_path=...)。
         """
         logger.info("ASR 识别中...")
         time_now = time.time()
         try:
-            asr_text = self.asr_client.recognize(audio_path).strip()
+            if audio_frames is not None:
+                asr_text = self.asr_client.recognize_frames(
+                    audio_frames,
+                    sample_rate=self.audio_rate,
+                    channels=self.audio_channels,
+                ).strip()
+
+                # # 帧识别失败时回退到文件识别，保证兼容旧流程。
+                # if not asr_text and audio_path:
+                #     logger.warning("audio_frames 识别为空，回退到音频文件识别")
+                #     asr_text = self.asr_client.recognize(audio_path).strip()
+            elif audio_path:
+                asr_text = self.asr_client.recognize(audio_path).strip()
+            else:
+                logger.warning("未提供 audio_frames 或 audio_path，跳过 ASR 识别")
+                return ""
+
             logger.info(
                 f"ASR 识别结果: [{asr_text}], 耗时: {(time.time() - time_now) * 1000:.2f} ms"
             )
@@ -919,7 +945,12 @@ class ChatAssistant:
 
     def llm_infer(self, input_text: str, user_id: str | None = None):
         """
-        负责调用 LLM 完成对话
+        接收输入文本（可选携带用户 ID），调用 LLM 完成推理，返回生成的文本响应
+        Parameters:
+            input_text (str): 输入文本
+            user_id (str | None): 可选的用户 ID，用于支持个性化对话，如果为 None 则使用当前默认用户 ID
+        Returns:
+            str: LLM 生成的文本响应，失败时返回空字符串
         """
         logger.info("LLM 推理中...")
         effective_user_id = user_id if user_id is not None else self.current_user_id
@@ -937,11 +968,11 @@ class ChatAssistant:
             )
 
             ## 更新llm_response队列
-            self._push_queue(self.llm_response_queue, self.llm_response)
+            self.__push_queue(self.llm_response_queue, self.llm_response)
             ## response_json 更新 llm_text
             self.response_json["llm_text"] = self.llm_response
             ## 更新 response_queue 队列
-            self._push_queue(self.response_queue, self.response_json)
+            self.__push_queue(self.response_queue, self.response_json)
 
             self.last_interface_time = time.time()
             return self.llm_response
@@ -949,16 +980,16 @@ class ChatAssistant:
         except Exception as e:
             logger.error(f"LLM 对话失败: {e}")
 
-            self._push_queue(self.llm_response_queue, "")
+            self.__push_queue(self.llm_response_queue, "")
             self.response_json["llm_text"] = ""
-            self._push_queue(self.response_queue, self.response_json)
+            self.__push_queue(self.response_queue, self.response_json)
 
             self.last_interface_time = time.time()
             return ""
 
     def llm_stream_infer(self, input_text: str, user_id: str | None = None):
         """
-        负责调用 LLM 完成对话，返回生成器用于流式输出
+        接收输入文本（可选携带用户 ID），调用 LLM 完成流式推理，返回生成器用于流式输出
         """
         logger.info("LLM 流式推理中...")
         effective_user_id = user_id if user_id is not None else self.current_user_id
@@ -980,11 +1011,11 @@ class ChatAssistant:
                 yield llm_response_chunk, index
 
             ## 更新llm_response队列
-            self._push_queue(self.llm_response_queue, self.llm_response)
+            self.__push_queue(self.llm_response_queue, self.llm_response)
             ## response_json 更新 llm_text
             self.response_json["llm_text"] = self.llm_response
             ## 更新 response_queue 队列
-            self._push_queue(self.response_queue, self.response_json)
+            self.__push_queue(self.response_queue, self.response_json)
 
             self.last_interface_time = time.time()
 
@@ -1043,7 +1074,9 @@ class ChatAssistant:
             return False
 
     def tts_cost_time(self, start_time):
-
+        """
+        计算 TTS 合成并播放音频的延迟时间
+        """
         while not self.tts_client.is_active():
             if time.time() - start_time > 5.0:
                 logger.error("TTS 播放超时 或者 TTS 播放音频太短")
@@ -1064,13 +1097,13 @@ class ChatAssistant:
 
     def kws_infer(self, asr_text):
         """
-        负责唤醒词检测
+        负责唤醒词检测逻辑
         """
 
         # 提取汉字并转换为拼音
-        pinyin_text = self._extract_chinese_and_convert_to_pinyin(asr_text)
+        pinyin_text = self.__extract_chinese_and_convert_to_pinyin(asr_text)
         logger.info(f"转换为拼音: {pinyin_text}")
-        wake_word_matched = self._is_kws_pinyin_match(pinyin_text)
+        wake_word_matched = self.__is_kws_pinyin_match(pinyin_text)
 
         if wake_word_matched and self.tts_client.is_active():
             logger.warning("检测到唤醒词， TTS 播放中，打断播放以避免语音叠加")
@@ -1127,7 +1160,7 @@ class ChatAssistant:
                     and time.time() - self.last_failed_kws_time
                     > self.failed_kws_threshold
                 ):
-                    self._push_queue(
+                    self.__push_queue(
                         self.llm_response_queue, f"你可以说出:{self.set_kws} 来唤醒我!"
                     )
                     self.response_json["llm_text"] = (
@@ -1148,7 +1181,7 @@ class ChatAssistant:
                     self.last_failed_kws_time = time.time()
 
                 else:
-                    self._push_queue(self.llm_response_queue, "")
+                    self.__push_queue(self.llm_response_queue, "")
                     self.response_json["llm_text"] = ""
 
                 self.last_interface_time = time.time()
@@ -1165,12 +1198,18 @@ class ChatAssistant:
     ####################### 核心交互流程 #######################
     def Inference(
         self,
+        audio_frames=None,
         audio_path: str | None = None,
         input_text: str | None = None,
         user_id: str | None = None,
     ):
         """
         负责调用 ASR、LLM、TTS 完成一次完整的交互
+        Parameters:
+            - audio_frames: 可选的 PCM16 字节流输入，用于 ASR 识别，优先级高于 audio_path
+            - audio_path: 可选的音频文件路径输入，用于 ASR 识别，当 audio_frames 为空时使用
+            - input_text: 可选的文本输入，用于 ASR 识别，当 audio_frames 和 audio_path 都为空时使用
+            - user_id: 可选的用户 ID，用于支持个性化对话，如果为 None 则使用当前默认用户 ID
         """
         logger.info("\n\n开始一次完整的交互流程...")
         effective_user_id = user_id if user_id is not None else self.current_user_id
@@ -1186,8 +1225,10 @@ class ChatAssistant:
             return
 
         # -------- asr 识别 -----------
-        if audio_path:
-            self.asr_text = self.asr_infer(audio_path)
+        if audio_frames is not None:
+            self.asr_text = self.asr_infer(audio_frames=audio_frames)
+        elif audio_path:
+            self.asr_text = self.asr_infer(audio_path=audio_path)
         elif input_text:
             self.asr_text = input_text
         else:
@@ -1200,11 +1241,11 @@ class ChatAssistant:
         if not self.asr_text:
             logger.warning("ASR 未识别到有效文本，跳过本次交互")
             self.last_interface_time = time.time()
-            # self._set_state(AssistantState.LISTENING)
+            # self.set_state(AssistantState.LISTENING)
             return
 
         # -------- 判断asr_text中汉字数量，过少则忽略 ----------
-        chinese_char_count = self._count_chinese_characters(self.asr_text)
+        chinese_char_count = self.__count_chinese_characters(self.asr_text)
         if chinese_char_count < 2:
             logger.warning("ASR 识别文本中汉字数量过少，跳过本次交互")
             self.last_interface_time = time.time()
@@ -1213,20 +1254,20 @@ class ChatAssistant:
         # ------- 替换特殊词汇 -------
         if self.enable_replace_special_characters:
             logger.info(f"替换前 ASR 文本: {self.asr_text}")
-            self.asr_text = self._replace_special_characters(self.asr_text)
+            self.asr_text = self.__replace_special_characters(self.asr_text)
             logger.info(f"替换后 ASR 文本: {self.asr_text}")
 
         ## 更新asr_text队列
-        self._push_queue(self.asr_text_queue, self.asr_text)
+        self.__push_queue(self.asr_text_queue, self.asr_text)
         ## response_json 更新 asr_text
         self.response_json["asr_text"] = self.asr_text
 
         # ----------- 唤醒词检测 -----------
         if self.flag_kws_used:
             if not self.kws_infer(self.asr_text):
-                # self._set_state(AssistantState.LISTENING)
+                # self.set_state(AssistantState.LISTENING)
                 # 更新 response_queue 队列
-                self._push_queue(self.response_queue, self.response_json)
+                self.__push_queue(self.response_queue, self.response_json)
                 self.last_interface_time = time.time()
                 return
 
@@ -1236,9 +1277,9 @@ class ChatAssistant:
 
             logger.warning("LLM 模块未激活，跳过本次交互")
 
-            self._push_queue(self.llm_response_queue, "")
+            self.__push_queue(self.llm_response_queue, "")
             self.response_json["llm_text"] = ""
-            self._push_queue(self.response_queue, self.response_json)
+            self.__push_queue(self.response_queue, self.response_json)
 
             return
 
@@ -1251,7 +1292,7 @@ class ChatAssistant:
             ):
                 if chunk.strip() and tts_can_play:
                     self.tts_stream_infer(
-                        self._remove_intent_tags(chunk.strip()), index
+                        self.__remove_intent_tags(chunk.strip()), index
                     )
         else:
             # -------- llm 推理 -----------
@@ -1261,7 +1302,7 @@ class ChatAssistant:
             ## -------- 检查 TTS 逻辑状态 ----------
             if not self.check_tts_status():
                 return
-            self.tts_infer(self._remove_intent_tags(self.llm_response))
+            self.tts_infer(self.__remove_intent_tags(self.llm_response))
 
         logger.info("本次交互完成，等待下一次录音")
 

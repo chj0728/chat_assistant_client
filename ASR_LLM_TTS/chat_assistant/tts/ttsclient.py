@@ -92,23 +92,23 @@ class TTSClient:
             dtype="float32",
             blocksize=self.buffer_size,
             latency="low",
-            callback=self._audio_callback,
+            callback=self.__audio_callback,
         )
         self.stream.start()
 
         ######### 后台 TTS worker 线程，串行处理文本到语音的请求和播放 #########
         self.tts_thread = threading.Thread(
-            target=self._tts_loop,
+            target=self.__tts_loop,
             daemon=True,
         )
         self.tts_thread.start()
 
         #### 如果使用 WebSocket，提前启动事件循环线程，避免首次请求时的启动延迟 ####
         if self.use_websocket:
-            self._start_ws_runtime()
+            self.__start_ws_runtime()
             time.sleep(1.0)  # 确保事件循环线程启动完成
             try:
-                self._run_ws_coro(self._ensure_ws_connected(), timeout=self.timeout)
+                self.__run_ws_coro(self.__ensure_ws_connected(), timeout=self.timeout)
             except TimeoutError:
                 logger.error("TTS WebSocket 连接超时")
             except Exception as e:
@@ -117,7 +117,7 @@ class TTSClient:
 
     # ================= 私有接口 =================
 
-    def _audio_callback(self, outdata, frames, time_info, status):
+    def __audio_callback(self, outdata, frames, time_info, status):
         del time_info
         now = time.monotonic()
         if status:
@@ -177,7 +177,7 @@ class TTSClient:
                 self._audio_active_started_ts = 0.0
         ################################################
 
-    def _tts_loop(self):
+    def __tts_loop(self):
         """
         严格串行的 TTS worker
         """
@@ -192,21 +192,21 @@ class TTSClient:
                 continue
 
             start_time = time.time()
-            self._tts_request(text)
+            self.__tts_request(text)
             elapsed_time = time.time() - start_time
             logger.debug(f"完整音频传输耗时: {elapsed_time:.2f} 秒")
 
-    def _tts_request(self, text):
+    def __tts_request(self, text):
         """
         请求服务端并顺序推 PCM
         """
         if self.use_websocket:
-            self._tts_request_ws(text)
+            self.__tts_request_ws(text)
             return
 
-        self._tts_request_http(text)
+        self.__tts_request_http(text)
 
-    def _tts_request_http(self, text):
+    def __tts_request_http(self, text):
         try:
             with requests.post(
                 "http://" + self.host + f":{self.port}/api/tts",
@@ -232,24 +232,24 @@ class TTSClient:
         except Exception as e:
             logger.error(f"HTTP TTS 请求失败: {e}")
 
-    def _tts_request_ws(self, text):
+    def __tts_request_ws(self, text):
         try:
-            self._start_ws_runtime()
-            self._run_ws_coro(self._tts_request_ws_async(text), timeout=self.timeout)
+            self.__start_ws_runtime()
+            self.__run_ws_coro(self.__tts_request_ws_async(text), timeout=self.timeout)
         except TimeoutError:
             logger.error("TTS WebSocket 请求超时")
-            self._run_ws_coro(self._close_ws_async(), timeout=self.timeout)
+            self.__run_ws_coro(self.__close_ws_async(), timeout=self.timeout)
         except Exception as e:
             logger.error(f"WebSocket TTS 请求失败: {e}")
-            self._run_ws_coro(self._close_ws_async(), timeout=self.timeout)
+            self.__run_ws_coro(self.__close_ws_async(), timeout=self.timeout)
 
-    def _start_ws_runtime(self):
+    def __start_ws_runtime(self):
         if self._ws_thread is not None and self._ws_thread.is_alive():
             return
 
         self._ws_started.clear()
         self._ws_thread = threading.Thread(
-            target=self._ws_loop_worker,
+            target=self.__ws_loop_worker,
             daemon=True,
             name="tts-ws-loop",
         )
@@ -258,7 +258,7 @@ class TTSClient:
         if not self._ws_started.wait(timeout=5):
             raise RuntimeError("WebSocket 事件循环线程启动超时")
 
-    def _ws_loop_worker(self):
+    def __ws_loop_worker(self):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         self._ws_loop = loop
@@ -268,13 +268,13 @@ class TTSClient:
             loop.run_forever()
         finally:
             try:
-                loop.run_until_complete(self._close_ws_async())
+                loop.run_until_complete(self.__close_ws_async())
             except Exception as e:
                 logger.warning(f"WebSocket 线程退出清理失败: {e}")
             finally:
                 loop.close()
 
-    def _run_ws_coro(self, coro, timeout: Optional[float]):
+    def __run_ws_coro(self, coro, timeout: Optional[float]):
         """在 WebSocket 事件循环中运行协程，并等待结果
 
         Args:
@@ -297,7 +297,7 @@ class TTSClient:
             future.cancel()
             raise
 
-    async def _ensure_ws_connected(self):
+    async def __ensure_ws_connected(self):
         # Reuse an existing connection object. If it's stale, send/recv will
         # raise ConnectionClosed and retry logic will reconnect.
         if self._ws is not None:
@@ -312,7 +312,7 @@ class TTSClient:
         )
         logger.info(f"TTS WebSocket 已连接: {url}")
 
-    async def _close_ws_async(self):
+    async def __close_ws_async(self):
         if self._ws is None:
             return
 
@@ -324,12 +324,12 @@ class TTSClient:
         finally:
             self._ws = None
 
-    def _close_ws_runtime(self):
+    def __close_ws_runtime(self):
         if self._ws_loop is None:
             return
 
         try:
-            self._run_ws_coro(self._close_ws_async(), timeout=3)
+            self.__run_ws_coro(self.__close_ws_async(), timeout=3)
         except Exception as e:
             logger.warning(f"WebSocket 清理失败: {e}")
         finally:
@@ -340,7 +340,7 @@ class TTSClient:
             self._ws_loop = None
             self._ws_thread = None
 
-    async def _tts_request_ws_async(self, text):
+    async def __tts_request_ws_async(self, text):
         payload = {
             "tts_text": text,
             "sid": self.speaker_id,
@@ -348,7 +348,7 @@ class TTSClient:
         }
 
         for attempt in range(2):
-            await self._ensure_ws_connected()
+            await self.__ensure_ws_connected()
             assert self._ws is not None
 
             try:
@@ -519,7 +519,7 @@ class TTSClient:
     def stop(self):
         """停止播放器"""
         self._stop_event.set()
-        self._close_ws_runtime()
+        self.__close_ws_runtime()
         self.stream.stop()
         self.stream.close()
         self.tts_thread.join()

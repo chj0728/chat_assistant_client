@@ -1,4 +1,5 @@
 import asyncio
+import io
 import json
 import os
 import queue
@@ -88,11 +89,11 @@ class ASRClient:
 
         ############# 如果使用 WebSocket 模式，提前启动事件循环线程，避免首次请求时的启动延迟 #############
         if self.use_websocket:
-            self._start_ws_runtime()
+            self.__start_ws_runtime()
             # self.start_mic_stream() # 目前不默认启动麦克风流式识别，由上层传输wav文件时调用 recognize() 方法即可
             time.sleep(1.0)  # 确保事件循环线程启动完成
             try:
-                self._run_ws_coro(self._ensure_ws_connected(), timeout=self.timeout)
+                self.__run_ws_coro(self.__ensure_ws_connected(), timeout=self.timeout)
             except TimeoutError:
                 logger.error("ASR WebSocket 连接超时")
             except Exception as e:
@@ -112,16 +113,101 @@ class ASRClient:
             logger.warning(
                 "ASRClient 当前未启用 WebSocket 模式，默认使用 HTTP 请求进行识别。"
             )
-            return self._clean_asr_text(self._recognize_http(wav_path))
+            return self.clean_asr_text(self.__recognize_http(wav_path))
 
         if self.use_websocket and use_websocket:
-            return self._clean_asr_text(self._recognize_ws(wav_path))
+            return self.clean_asr_text(self.__recognize_ws(wav_path))
 
-        return self._clean_asr_text(self._recognize_http(wav_path))
+        return self.clean_asr_text(self.__recognize_http(wav_path))
+
+    def recognize_frames(
+        self,
+        audio_frames,
+        use_websocket: Optional[bool] = True,
+        sample_rate: int = 16000,
+        channels: int = 1,
+    ) -> str:
+        """
+        直接发送 PCM16 音频帧（bytes 列表/可迭代对象），返回识别文本。
+
+        :param audio_frames: 音频帧列表（每帧应为 PCM16 bytes）
+        :param use_websocket: 是否使用 WebSocket 模式进行识别
+        :param sample_rate: 音频采样率
+        :param channels: 音频通道数
+        :return: 识别文本
+        """
+        pcm16_bytes = self.normalize_audio_frames(audio_frames)
+        if not pcm16_bytes:
+            return ""
+
+        if len(pcm16_bytes) % 2 != 0:
+            logger.warning("音频字节长度不是 2 的整数倍，已丢弃最后 1 字节")
+            pcm16_bytes = pcm16_bytes[:-1]
+            if not pcm16_bytes:
+                return ""
+
+        if not self.use_websocket and use_websocket:
+            logger.warning(
+                "ASRClient 当前未启用 WebSocket 模式，默认使用 HTTP 请求进行识别。"
+            )
+            return self.clean_asr_text(
+                self.__recognize_http_pcm16_bytes(
+                    pcm16_bytes, sample_rate=sample_rate, channels=channels
+                )
+            )
+
+        if self.use_websocket and use_websocket:
+            return self.clean_asr_text(
+                self.__recognize_ws_pcm16_bytes(
+                    pcm16_bytes, sample_rate=sample_rate, channels=channels
+                )
+            )
+
+        return self.clean_asr_text(
+            self.__recognize_http_pcm16_bytes(
+                pcm16_bytes, sample_rate=sample_rate, channels=channels
+            )
+        )
 
     ###################################
+    
+    ############## 数据处理相关实现 #################
+    @staticmethod
+    def normalize_audio_frames(audio_frames) -> bytes:
+        """将多种帧输入格式归一化为单段 PCM16 bytes。"""
+        if audio_frames is None:
+            return b""
 
-    def _clean_asr_text(self, text: str) -> str:
+        if isinstance(audio_frames, (bytes, bytearray, memoryview)):
+            return bytes(audio_frames)
+
+        normalized_frames = []
+        for frame in audio_frames:
+            if isinstance(frame, tuple) and frame:
+                frame = frame[0]
+
+            if not isinstance(frame, (bytes, bytearray, memoryview)):
+                raise TypeError("audio_frames 中每项必须为 bytes 或 bytes-like 对象")
+
+            normalized_frames.append(bytes(frame))
+
+        return b"".join(normalized_frames)
+
+    @staticmethod
+    def read_wave(wave_filename: str) -> np.ndarray:
+        """读取 wav 文件并返回归一化的 float32 numpy 数组，要求 16kHz 单声道 16-bit PCM 格式。"""
+        with wave.open(wave_filename) as f:
+            assert f.getframerate() == 16000, f.getframerate()
+            assert f.getnchannels() == 1, f.getnchannels()
+            assert f.getsampwidth() == 2, f.getsampwidth()
+
+            num_samples = f.getnframes()
+            samples = f.readframes(num_samples)
+            samples_int16 = np.frombuffer(samples, dtype=np.int16)
+            return samples_int16.astype(np.float32) / 32768.0
+
+    def clean_asr_text(self, text: str) -> str:
+        """对 ASR 结果文本进行清理，去除特殊标记和多余空格等。"""
         # 1. 删除 <unk>
         text = re.sub(r"<unk>", "", text)
 
@@ -132,8 +218,11 @@ class ASRClient:
         # text = re.sub(r"\b([a-zA-Z])\s+(?=[a-zA-Z]\b)", r"\1", text)
 
         return text.strip()
-
-    def _recognize_http(self, wav_path: str) -> str:
+    ################################################
+    
+    ############## 选择(HTTP 或 WebSocket) ###############
+    def __recognize_http(self, wav_path: str) -> str:
+        """通过 HTTP POST 请求发送 wav 文件进行识别。"""
         if not os.path.exists(wav_path):
             raise FileNotFoundError(f"Wav file not found: {wav_path}")
 
@@ -193,25 +282,157 @@ class ASRClient:
         text = result.get("text", "").strip()
         return text
 
-    @staticmethod
-    def _read_wave(wave_filename: str) -> np.ndarray:
-        with wave.open(wave_filename) as f:
-            assert f.getframerate() == 16000, f.getframerate()
-            assert f.getnchannels() == 1, f.getnchannels()
-            assert f.getsampwidth() == 2, f.getsampwidth()
+    def __recognize_http_pcm16_bytes(
+        self, pcm16_bytes: bytes, sample_rate: int = 16000, channels: int = 1
+    ) -> str:
+        """将 PCM16 字节流封装为 wav 格式后通过 HTTP POST 请求发送进行识别。"""
+        wav_buffer = io.BytesIO()
+        with wave.open(wav_buffer, "wb") as wf:
+            wf.setnchannels(channels)
+            wf.setsampwidth(2)
+            wf.setframerate(sample_rate)
+            wf.writeframes(pcm16_bytes)
 
-            num_samples = f.getnframes()
-            samples = f.readframes(num_samples)
-            samples_int16 = np.frombuffer(samples, dtype=np.int16)
-            return samples_int16.astype(np.float32) / 32768.0
+        wav_buffer.seek(0)
+        files = {"file": ("audio.wav", wav_buffer, "audio/wav")}
 
-    def _start_ws_runtime(self):
+        response = requests.post(
+            "http://" + self.host + ":" + str(self.port) + "/api/asr",
+            files=files,
+            timeout=self.timeout,
+        )
+
+        if response.status_code != 200:
+            logger.error(f"ASR server error [{response.status_code}]: {response.text}")
+            raise RuntimeError(
+                f"ASR server error [{response.status_code}]: {response.text}"
+            )
+
+        result = response.json()
+
+        if result.get("code") != 0:
+            logger.error(f"ASR failed: {result.get('msg')}")
+            raise RuntimeError(f"ASR failed: {result.get('msg')}")
+
+        return result.get("text", "").strip()
+
+    def __recognize_ws(self, wav_path: str) -> str:
+        """通过 WebSocket 发送 wav 文件进行识别。"""
+        try:
+            return self.__run_ws_coro(
+                self.__recognize_ws_async(wav_path), timeout=self.timeout
+            )
+        except TimeoutError:
+            logger.error("ASR WebSocket 识别超时")
+            # self.__run_ws_coro(self.__close_ws_async(), timeout=self.timeout)
+            return ""
+        except Exception as e:
+            logger.error(f"ASR WebSocket 识别异常: {e}")
+            # self.__run_ws_coro(self.__close_ws_async(), timeout=self.timeout)
+            return ""
+
+    def __recognize_ws_pcm16_bytes(
+        self, pcm16_bytes: bytes, sample_rate: int = 16000, channels: int = 1
+    ) -> str:
+        """通过 WebSocket 发送 PCM16 字节流进行识别。"""
+        try:
+            return self.__run_ws_coro(
+                self.__recognize_ws_pcm16_async(
+                    pcm16_bytes, sample_rate=sample_rate, channels=channels
+                ),
+                timeout=self.timeout,
+            )
+        except TimeoutError:
+            logger.error("ASR WebSocket 识别超时")
+            # self.__run_ws_coro(self.__close_ws_async(), timeout=self.timeout)
+            return ""
+        except Exception as e:
+            logger.error(f"ASR WebSocket 识别异常: {e}")
+            # self.__run_ws_coro(self.__close_ws_async(), timeout=self.timeout)
+            return ""
+    
+    async def __recognize_ws_async(self, wav_path: str) -> str:
+        """接收 wav 文件路径，读取音频数据后通过 WebSocket 发送进行识别。"""
+        if not os.path.exists(wav_path):
+            raise FileNotFoundError(f"Wav file not found: {wav_path}")
+
+        data = self.read_wave(wav_path)
+
+        return await self.__recognize_ws_samples_async(data)
+
+    async def __recognize_ws_pcm16_async(
+        self, pcm16_bytes: bytes, sample_rate: int = 16000, channels: int = 1
+    ) -> str:
+        """接收 PCM16 字节流，转换为 float32 数组后通过 WebSocket 发送进行识别。"""
+        if sample_rate != 16000:
+            raise AssertionError(f"Unsupported sample_rate: {sample_rate}")
+        if channels != 1:
+            raise AssertionError(f"Unsupported channels: {channels}")
+
+        samples_int16 = np.frombuffer(pcm16_bytes, dtype=np.int16)
+        data = samples_int16.astype(np.float32) / 32768.0
+        return await self.__recognize_ws_samples_async(data)
+
+    async def __recognize_ws_samples_async(self, data: np.ndarray) -> str:
+        """接收归一化的 float32 音频数据，通过 WebSocket 发送进行识别。"""
+        data = np.ascontiguousarray(data, dtype=np.float32)
+
+        for attempt in range(2):
+            await self.__ensure_ws_connected()
+            assert self._ws is not None
+
+            try:
+                start = 0
+                while start < data.shape[0]:
+                    end = min(start + self.samples_per_message, data.shape[0])
+                    chunk = data.data[start:end].tobytes()
+                    await self._ws.send(chunk)
+
+                    # Simulate streaming. You can remove the sleep if you want
+                    # if self.seconds_per_message > 0:
+                    #     await asyncio.sleep(self.seconds_per_message)
+
+                    start += self.samples_per_message
+
+                await self._ws.send("Done")
+            except ConnectionClosed as e:
+                logger.warning(f"ASR WebSocket 会话中断，准备重连: {e}")
+                self._ws = None
+                if attempt == 1:
+                    raise
+                continue
+
+            try:
+                last_message = await self.__receive_results()
+            except ConnectionClosed as e:
+                logger.warning(f"ASR WebSocket 接收阶段异常断开，准备重连: {e}")
+                self._ws = None
+                if attempt == 1:
+                    raise
+                continue
+
+            if not last_message:
+                return ""
+
+            try:
+                payload = json.loads(last_message)
+                return str(payload.get("text", "")).strip()
+            except json.JSONDecodeError:
+                return last_message.strip()
+
+        return ""    
+    
+    ######################################################
+
+    ######## WebSocket连接 及事件循环相关实现 ########
+    def __start_ws_runtime(self):
+        """启动 WebSocket 事件循环线程。"""
         if self._ws_thread is not None and self._ws_thread.is_alive():
             return
 
         self._ws_started.clear()
         self._ws_thread = threading.Thread(
-            target=self._ws_loop_worker,
+            target=self.__ws_loop_worker,
             daemon=True,
             name="asr-ws-loop",
         )
@@ -220,7 +441,8 @@ class ASRClient:
         if not self._ws_started.wait(timeout=5):
             raise RuntimeError("WebSocket 事件循环线程启动超时")
 
-    def _ws_loop_worker(self):
+    def __ws_loop_worker(self):
+        """WebSocket 事件循环线程的工作函数。"""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         self._ws_loop = loop
@@ -230,13 +452,14 @@ class ASRClient:
             loop.run_forever()
         finally:
             try:
-                loop.run_until_complete(self._close_ws_async())
+                loop.run_until_complete(self.__close_ws_async())
             except Exception as e:
                 logger.warning(f"ASR WebSocket 线程退出清理失败: {e}")
             finally:
                 loop.close()
 
-    def _run_ws_coro(self, coro, timeout: Optional[float]):
+    def __run_ws_coro(self, coro, timeout: Optional[float]):
+        """在 WebSocket 事件循环中运行协程，并等待结果。"""
         if self._ws_loop is None:
             raise RuntimeError("ASR WebSocket 事件循环未初始化")
 
@@ -247,7 +470,8 @@ class ASRClient:
             future.cancel()
             raise
 
-    async def _ensure_ws_connected(self):
+    async def __ensure_ws_connected(self):
+        """确保 WebSocket 已连接，如果未连接则建立连接。"""
         if self._ws is not None:
             # 连接对象可能已被服务端关闭；仅在仍可用时复用。
             if getattr(self._ws, "close_code", None) is None:
@@ -263,7 +487,8 @@ class ASRClient:
         )
         logger.info(f"ASR WebSocket 已连接: {url}")
 
-    async def _close_ws_async(self):
+    async def __close_ws_async(self):
+        """关闭 WebSocket 连接。"""
         if self._ws is None:
             return
 
@@ -274,8 +499,9 @@ class ASRClient:
             logger.warning(f"关闭 ASR WebSocket 失败: {e}")
         finally:
             self._ws = None
-
-    async def _receive_results(self):
+    
+    async def __receive_results(self):
+        """从 WebSocket 接收识别结果，直到收到 "Done" 消息或连接关闭。返回最后一条文本消息。"""
         assert self._ws is not None
         last_message = ""
 
@@ -305,72 +531,10 @@ class ASRClient:
                 logger.info(f"ASR WS 文本消息: {message}")
 
         return last_message
+    
+    ###############################################
 
-    async def _recognize_ws_async(self, wav_path: str) -> str:
-        if not os.path.exists(wav_path):
-            raise FileNotFoundError(f"Wav file not found: {wav_path}")
-
-        data = self._read_wave(wav_path)
-
-        for attempt in range(2):
-            await self._ensure_ws_connected()
-            assert self._ws is not None
-
-            try:
-                start = 0
-                while start < data.shape[0]:
-                    end = min(start + self.samples_per_message, data.shape[0])
-                    chunk = data.data[start:end].tobytes()
-                    await self._ws.send(chunk)
-
-                    # Simulate streaming. You can remove the sleep if you want
-                    # if self.seconds_per_message > 0:
-                    #     await asyncio.sleep(self.seconds_per_message)
-
-                    start += self.samples_per_message
-
-                await self._ws.send("Done")
-            except ConnectionClosed as e:
-                logger.warning(f"ASR WebSocket 会话中断，准备重连: {e}")
-                self._ws = None
-                if attempt == 1:
-                    raise
-                continue
-
-            try:
-                last_message = await self._receive_results()
-            except ConnectionClosed as e:
-                logger.warning(f"ASR WebSocket 接收阶段异常断开，准备重连: {e}")
-                self._ws = None
-                if attempt == 1:
-                    raise
-                continue
-
-            if not last_message:
-                return ""
-
-            try:
-                payload = json.loads(last_message)
-                return str(payload.get("text", "")).strip()
-            except json.JSONDecodeError:
-                return last_message.strip()
-
-        return ""
-
-    def _recognize_ws(self, wav_path: str) -> str:
-        try:
-            return self._run_ws_coro(
-                self._recognize_ws_async(wav_path), timeout=self.timeout
-            )
-        except TimeoutError:
-            logger.error("ASR WebSocket 连接超时")
-            self._run_ws_coro(self._close_ws_async(), timeout=self.timeout)
-            return ""
-        except Exception as e:
-            logger.error(f"ASR WebSocket 识别异常: {e}")
-            self._run_ws_coro(self._close_ws_async(), timeout=self.timeout)
-            return ""
-
+    ############## 麦克风流式识别相关实现(未启用) ##############
     def _push_recognized_text(self, text: str):
         text = text.strip()
         if not text:
@@ -549,7 +713,7 @@ class ASRClient:
             return
 
         try:
-            self._run_ws_coro(self._close_ws_async(), timeout=3)
+            self.__run_ws_coro(self.__close_ws_async(), timeout=3)
         except Exception as e:
             logger.warning(f"ASR WebSocket 清理失败: {e}")
         finally:
@@ -559,7 +723,8 @@ class ASRClient:
                 self._ws_thread.join(timeout=3)
             self._ws_loop = None
             self._ws_thread = None
-
+    
+    ################################################# 
 
 # ===============================
 # 单独运行时的测试
