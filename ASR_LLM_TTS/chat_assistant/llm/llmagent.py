@@ -11,8 +11,9 @@ description: 该模块定义了用于创建和管理基于大型语言模型（L
 - LangChain GitHub 仓库: https://github.com/langchain-ai/langchain
 """
 
-from typing import Any
 import sqlite3
+from typing import Any
+
 import requests
 from config import load_config
 from langchain.agents import AgentState, create_agent
@@ -32,8 +33,9 @@ from langchain_core.messages import (
 
 # from langchain_core.messages.utils import count_tokens_approximately
 from langchain_openai import ChatOpenAI
-from langgraph.checkpoint.memory import InMemorySaver
-from langgraph.checkpoint.sqlite import SqliteSaver 
+
+# from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph.message import REMOVE_ALL_MESSAGES
 from langgraph.runtime import Runtime
 from logger import logger
@@ -50,20 +52,23 @@ def create_optimized_sqlite_connection(db_path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(
         db_path,
         check_same_thread=False,  # 允许多线程访问
-        timeout=30,               # 超时时间
-        isolation_level=None      # 自动提交模式
+        timeout=30,  # 超时时间
+        isolation_level=None,  # 自动提交模式
     )
-    
+
     # 性能优化配置
-    conn.executescript("""
+    conn.executescript(
+        """
         PRAGMA journal_mode=WAL;          -- 写前日志模式，提高并发性能
         PRAGMA synchronous=NORMAL;        -- 平衡性能和数据安全
         PRAGMA cache_size=-2000;          -- 设置2MB缓存
         PRAGMA temp_store=MEMORY;         -- 临时表存储在内存中
         PRAGMA mmap_size=268435456;       -- 256MB内存映射
         PRAGMA busy_timeout=5000;         -- 5秒忙超时
-    """)
+        """
+    )
     return conn
+
 
 # @tool(description="当用户询问当前时间时，获取上海当前时间的工具函数")
 @tool

@@ -170,7 +170,7 @@ class ASRClient:
         )
 
     ###################################
-    
+
     ############## 数据处理相关实现 #################
     @staticmethod
     def normalize_audio_frames(audio_frames) -> bytes:
@@ -218,8 +218,9 @@ class ASRClient:
         # text = re.sub(r"\b([a-zA-Z])\s+(?=[a-zA-Z]\b)", r"\1", text)
 
         return text.strip()
+
     ################################################
-    
+
     ############## 选择(HTTP 或 WebSocket) ###############
     def __recognize_http(self, wav_path: str) -> str:
         """通过 HTTP POST 请求发送 wav 文件进行识别。"""
@@ -350,7 +351,7 @@ class ASRClient:
             logger.error(f"ASR WebSocket 识别异常: {e}")
             # self.__run_ws_coro(self.__close_ws_async(), timeout=self.timeout)
             return ""
-    
+
     async def __recognize_ws_async(self, wav_path: str) -> str:
         """接收 wav 文件路径，读取音频数据后通过 WebSocket 发送进行识别。"""
         if not os.path.exists(wav_path):
@@ -420,8 +421,8 @@ class ASRClient:
             except json.JSONDecodeError:
                 return last_message.strip()
 
-        return ""    
-    
+        return ""
+
     ######################################################
 
     ######## WebSocket连接 及事件循环相关实现 ########
@@ -499,7 +500,7 @@ class ASRClient:
             logger.warning(f"关闭 ASR WebSocket 失败: {e}")
         finally:
             self._ws = None
-    
+
     async def __receive_results(self):
         """从 WebSocket 接收识别结果，直到收到 "Done" 消息或连接关闭。返回最后一条文本消息。"""
         assert self._ws is not None
@@ -531,7 +532,7 @@ class ASRClient:
                 logger.info(f"ASR WS 文本消息: {message}")
 
         return last_message
-    
+
     ###############################################
 
     ############## 麦克风流式识别相关实现(未启用) ##############
@@ -723,8 +724,9 @@ class ASRClient:
                 self._ws_thread.join(timeout=3)
             self._ws_loop = None
             self._ws_thread = None
-    
-    ################################################# 
+
+    #################################################
+
 
 # ===============================
 # 单独运行时的测试

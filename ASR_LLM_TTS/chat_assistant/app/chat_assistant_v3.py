@@ -2,11 +2,12 @@ import re
 import threading
 import time
 import wave
+from dataclasses import asdict, dataclass
 from difflib import SequenceMatcher
 from enum import Enum
 from pathlib import Path
 from queue import Empty, Full, Queue
-from dataclasses import dataclass, asdict
+from typing import Generator
 
 import numpy as np
 import sounddevice as sd
@@ -28,6 +29,7 @@ SPECIAL_WORD_MAP = {
     ],
 }
 
+
 @dataclass
 class ResponseData:
     asr_text: str = ""
@@ -37,6 +39,7 @@ class ResponseData:
         """重置响应数据"""
         self.asr_text = ""
         self.llm_text = ""
+
 
 class AssistantState(Enum):
     IDLE = 0  # 空闲 / 待唤醒
@@ -634,10 +637,9 @@ class ChatAssistant:
         # 3. 拼接音频
         # ===============================
         audio_frames = [seg[0] for seg in self.segments_to_save]
-                
+
         # 直接将 PCM16 字节流传给 ASR 识别
         self.Inference(audio_frames=audio_frames)
-
 
         # ===============================
         # 4. 保存 WAV
@@ -971,7 +973,7 @@ class ChatAssistant:
         接收输入文本（可选携带用户 ID），调用 LLM 完成推理，返回生成的文本响应
         Parameters:
             input_text (str): 输入文本
-            user_id (str | None): 可选的用户 ID，用于支持个性化对话，如果为 None 则使用当前默认用户 ID
+            user_id (str | None): 可选的用户 ID，用于记忆相同用户的对话上下文，如果为 None 直接与LLM 进行对话
         Returns:
             str: LLM 生成的文本响应，失败时返回空字符串
         """
@@ -980,34 +982,37 @@ class ChatAssistant:
         llm_text = ""
         time_now = time.time()
         try:
-            llm_text = self.llm_client.chat_response(
-                input_text, effective_user_id
-            )
+            llm_text = self.llm_client.chat_response(input_text, effective_user_id)
             if not llm_text:
                 logger.warning("LLM 返回空响应")
                 llm_text = ""
             logger.info(
                 f"LLM 推理结果: [{llm_text}], 耗时: {(time.time() - time_now) * 1000:.2f} ms"
             )
-            
+
             self.last_interface_time = time.time()
             return llm_text
 
         except Exception as e:
-
             logger.error(f"LLM 对话失败: {e}")
             self.last_interface_time = time.time()
 
             return ""
 
-    def llm_stream_infer(self, input_text: str, user_id: str | None = None):
+    def llm_stream_infer(
+        self, input_text: str, user_id: str | None = None
+    ) -> Generator[tuple[str, int], None, None]:
         """
-        接收输入文本（可选携带用户 ID），调用 LLM 完成流式推理，返回生成器用于流式输出
+        接收输入文本（可选携带用户 ID），调用 LLM 完成流式推理，逐步返回生成的文本响应片段和对应的索引
+        Parameters:
+            input_text (str): 输入文本
+            user_id (str | None): 可选的用户 ID，用于记忆相同用户的对话上下文，如果为 None 直接与LLM 进行对话
+        Returns:
+            Generator[tuple[str, int], None, None]: 生成器，逐步返回LLM 生成的文本响应片段和对应的索引，失败时返回空字符串和当前索引
         """
         logger.info("LLM 流式推理中...")
         effective_user_id = user_id if user_id is not None else self.current_user_id
         time_now = time.time()
-        llm_text = ""
         llm_response_chunks = []
         index = 0
         try:
@@ -1018,7 +1023,6 @@ class ChatAssistant:
                     f"LLM 流式推理输出 [{index}]: [{llm_response_chunk}], 耗时: {(time.time() - time_now) * 1000:.2f} ms"
                 )
                 llm_response_chunks.append(llm_response_chunk)
-                llm_text = "".join(llm_response_chunks)
                 time_now = time.time()
 
                 yield llm_response_chunk, index
@@ -1166,7 +1170,6 @@ class ChatAssistant:
                     and time.time() - self.last_failed_kws_time
                     > self.failed_kws_threshold
                 ):
-
                     self.__update_llm_text(f"你可以说出:{self.set_kws} 来唤醒我!")
 
                     # 只有在 ACTIVE 状态下才播放提示语音
@@ -1183,7 +1186,6 @@ class ChatAssistant:
                     self.last_failed_kws_time = time.time()
 
                 else:
-
                     self.__update_llm_text("")
 
                 self.last_interface_time = time.time()
@@ -1270,7 +1272,6 @@ class ChatAssistant:
         # ----------- 唤醒词检测 -----------
         if self.flag_kws_used:
             if not self.kws_infer(self.asr_text):
-
                 # self.set_state(AssistantState.LISTENING)
 
                 self.last_interface_time = time.time()
@@ -1293,7 +1294,7 @@ class ChatAssistant:
             tts_can_play = self.check_tts_status()
             for chunk, index in self.llm_stream_infer(
                 self.asr_text, user_id=effective_user_id
-            ):  
+            ):
                 self.llm_text += chunk
                 if chunk.strip() and tts_can_play:
                     self.tts_stream_infer(
@@ -1302,7 +1303,7 @@ class ChatAssistant:
             self.__update_llm_text(self.llm_text)
         else:
             # -------- llm 推理 -----------
-            self.llm_text=self.llm_infer(self.asr_text, user_id=effective_user_id)
+            self.llm_text = self.llm_infer(self.asr_text, user_id=effective_user_id)
             self.__update_llm_text(self.llm_text)
 
             # -------- tts 播放 -----------
