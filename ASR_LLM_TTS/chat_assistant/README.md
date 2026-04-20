@@ -33,12 +33,6 @@ python3 -m tts.ttsplay
 python3 -m tts.ttsclient
 ```
 
-- LLM + TTS Demo(大语言模型 + 文本转语音)
-
-```bash
-python3 -m app.llm_tts_stream
-```
-
 - Chat Assistant Demo(集成语音识别、大语言模型、文本转语音)
 
 ```bash
