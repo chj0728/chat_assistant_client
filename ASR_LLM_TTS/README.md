@@ -207,17 +207,17 @@ chat_assistant_interfaces.srv.GetString_Response(success=True, message='音频�
 - 请求示例
 
 ```bash
-ros2 service call /asr_infer chat_assistant_interfaces/srv/GetString "{input: '/home/xuyao/chj/ws/ymbot/ASR_LLM_TTS/chat_assistant/wavs/enable_kws.wav'}"
+ros2 service call /asr_infer chat_assistant_interfaces/srv/GetString "{input: '/home/xuyao/chj/ws/ymbot/ASR_LLM_TTS/chat_assistant/wavs/tts_output.wav'}"
 ```
 
 - 响应示例
 
 ```bash
 waiting for service to become available...
-requester: making request: chat_assistant_interfaces.srv.GetString_Request(input='/home/xuyao/chj/ws/ymbot/ASR_LLM_TTS/chat_assistant/wavs/enable_kws.wav')
+requester: making request: chat_assistant_interfaces.srv.GetString_Request(input='/home/xuyao/chj/ws/ymbot/ASR_LLM_TTS/chat_assistant/wavs/tts_output.wav', user_id='')
 
 response:
-chat_assistant_interfaces.srv.GetString_Response(success=True, message='请说出正确的唤醒词号，再进行对话。😊')
+chat_assistant_interfaces.srv.GetString_Response(success=True, message='你好，这是一个文本转语音的测试。')
 ```
 
 #### 大语言模型服务（传入文本，返回生成文本）

@@ -36,8 +36,6 @@ class ToolEvent(Enum):
 MAX_QUEUE_SIZE = 10
 tool_event_queue = Queue(maxsize=MAX_QUEUE_SIZE)
 
-MAX_MESSAGES = 30  # 对话消息队列最大数量限制(包括系统消息,工具消息，用户和AI消息)
-
 
 def push_queue(data_queue: Queue, value) -> None:
     """将最新文本加入有限队列，保持队列容量受控。"""
@@ -651,9 +649,9 @@ def main(args=None):
                 chat_assistant_node.asr_publisher.publish(msg)
                 # logger.info(f"发布 ASR 识别结果到话题: [{asr_text}]")
 
-            if chat_assistant_node.chat_assistant.llm_response_queue.empty() is False:
+            if chat_assistant_node.chat_assistant.llm_text_queue.empty() is False:
                 llm_response = (
-                    chat_assistant_node.chat_assistant.llm_response_queue.get(
+                    chat_assistant_node.chat_assistant.llm_text_queue.get(
                         timeout=0.05
                     )
                 )
@@ -665,14 +663,14 @@ def main(args=None):
                 # logger.info(f"发布 LLM 生成结果到话题: [{llm_response}]")
 
             if chat_assistant_node.chat_assistant.response_queue.empty() is False:
-                response_json = chat_assistant_node.chat_assistant.response_queue.get(
+                response_data = chat_assistant_node.chat_assistant.response_queue.get(
                     timeout=0.05
                 )
 
                 # 发布 综合响应结果 到话题
                 response_msg = Response()
-                response_msg.asr_text = response_json.get("asr_text", "")
-                response_msg.llm_text = response_json.get("llm_text", "")
+                response_msg.asr_text = response_data.get("asr_text", "")
+                response_msg.llm_text = response_data.get("llm_text", "")
                 chat_assistant_node.response_publisher.publish(response_msg)
                 logger.info(
                     f"发布 综合响应结果 到话题: ASR Text: [{response_msg.asr_text}], LLM Text: [{response_msg.llm_text}]"

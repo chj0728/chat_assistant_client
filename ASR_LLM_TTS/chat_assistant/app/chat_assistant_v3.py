@@ -6,6 +6,7 @@ from difflib import SequenceMatcher
 from enum import Enum
 from pathlib import Path
 from queue import Empty, Full, Queue
+from dataclasses import dataclass, asdict
 
 import numpy as np
 import sounddevice as sd
@@ -27,6 +28,15 @@ SPECIAL_WORD_MAP = {
     ],
 }
 
+@dataclass
+class ResponseData:
+    asr_text: str = ""
+    llm_text: str = ""
+
+    def clear(self):
+        """重置响应数据"""
+        self.asr_text = ""
+        self.llm_text = ""
 
 class AssistantState(Enum):
     IDLE = 0  # 空闲 / 待唤醒
@@ -63,15 +73,17 @@ class ChatAssistant:
         self.configs = {}
 
         self.asr_text = ""
-        self.llm_response = ""
+        self.llm_text = ""
         self.current_user_id = None
 
         self.asr_text_queue = Queue(maxsize=MAX_QUEUE_SIZE)
-        self.llm_response_queue = Queue(maxsize=MAX_QUEUE_SIZE)
+        self.llm_text_queue = Queue(maxsize=MAX_QUEUE_SIZE)
 
-        # 同时保存 jason 形式的响应文本，包括 asr_text 和 llm_text
+        # 同时包括 asr_text 和 llm_text
         self.response_queue = Queue(maxsize=MAX_QUEUE_SIZE)
-        self.response_json = {}
+        # self.response_json = {}
+        self.response_data = ResponseData()
+        self.response_data.clear()
 
         self.input_stream = None
         self.recorder_thread = None
@@ -549,6 +561,17 @@ class ChatAssistant:
         # 重置状态
         self.__reset_segment_state()
 
+    def __update_llm_text(self, llm_text):
+        """更新 LLM 文本，并推送到队列。"""
+
+        # 更新单个响应数据对象，并推送到单独的 LLM 文本队列
+        self.__push_queue(self.llm_text_queue, llm_text)
+
+        # 更新综合响应数据对象，并推送到综合队列
+        self.response_data.llm_text = llm_text
+        self.__push_queue(self.response_queue, asdict(self.response_data))
+        self.response_data.clear()
+
     ################## 保存音频的模块 ##################
     def __save_audio_only(self):
         """
@@ -954,37 +977,27 @@ class ChatAssistant:
         """
         logger.info("LLM 推理中...")
         effective_user_id = user_id if user_id is not None else self.current_user_id
-        self.llm_response = ""
+        llm_text = ""
         time_now = time.time()
         try:
-            self.llm_response = self.llm_client.chat_response(
+            llm_text = self.llm_client.chat_response(
                 input_text, effective_user_id
             )
-            if not self.llm_response:
+            if not llm_text:
                 logger.warning("LLM 返回空响应")
-                self.llm_response = ""
+                llm_text = ""
             logger.info(
-                f"LLM 推理结果: [{self.llm_response}], 耗时: {(time.time() - time_now) * 1000:.2f} ms"
+                f"LLM 推理结果: [{llm_text}], 耗时: {(time.time() - time_now) * 1000:.2f} ms"
             )
-
-            ## 更新llm_response队列
-            self.__push_queue(self.llm_response_queue, self.llm_response)
-            ## response_json 更新 llm_text
-            self.response_json["llm_text"] = self.llm_response
-            ## 更新 response_queue 队列
-            self.__push_queue(self.response_queue, self.response_json)
-
+            
             self.last_interface_time = time.time()
-            return self.llm_response
+            return llm_text
 
         except Exception as e:
+
             logger.error(f"LLM 对话失败: {e}")
-
-            self.__push_queue(self.llm_response_queue, "")
-            self.response_json["llm_text"] = ""
-            self.__push_queue(self.response_queue, self.response_json)
-
             self.last_interface_time = time.time()
+
             return ""
 
     def llm_stream_infer(self, input_text: str, user_id: str | None = None):
@@ -994,7 +1007,7 @@ class ChatAssistant:
         logger.info("LLM 流式推理中...")
         effective_user_id = user_id if user_id is not None else self.current_user_id
         time_now = time.time()
-        self.llm_response = ""
+        llm_text = ""
         llm_response_chunks = []
         index = 0
         try:
@@ -1005,17 +1018,10 @@ class ChatAssistant:
                     f"LLM 流式推理输出 [{index}]: [{llm_response_chunk}], 耗时: {(time.time() - time_now) * 1000:.2f} ms"
                 )
                 llm_response_chunks.append(llm_response_chunk)
-                self.llm_response = "".join(llm_response_chunks)
+                llm_text = "".join(llm_response_chunks)
                 time_now = time.time()
 
                 yield llm_response_chunk, index
-
-            ## 更新llm_response队列
-            self.__push_queue(self.llm_response_queue, self.llm_response)
-            ## response_json 更新 llm_text
-            self.response_json["llm_text"] = self.llm_response
-            ## 更新 response_queue 队列
-            self.__push_queue(self.response_queue, self.response_json)
 
             self.last_interface_time = time.time()
 
@@ -1160,12 +1166,8 @@ class ChatAssistant:
                     and time.time() - self.last_failed_kws_time
                     > self.failed_kws_threshold
                 ):
-                    self.__push_queue(
-                        self.llm_response_queue, f"你可以说出:{self.set_kws} 来唤醒我!"
-                    )
-                    self.response_json["llm_text"] = (
-                        f"你可以说出:{self.set_kws} 来唤醒我!"
-                    )
+
+                    self.__update_llm_text(f"你可以说出:{self.set_kws} 来唤醒我!")
 
                     # 只有在 ACTIVE 状态下才播放提示语音
                     if self.tts_client_state == TTSClientState.ACTIVE:
@@ -1181,8 +1183,8 @@ class ChatAssistant:
                     self.last_failed_kws_time = time.time()
 
                 else:
-                    self.__push_queue(self.llm_response_queue, "")
-                    self.response_json["llm_text"] = ""
+
+                    self.__update_llm_text("")
 
                 self.last_interface_time = time.time()
                 return False
@@ -1214,9 +1216,11 @@ class ChatAssistant:
         logger.info("\n\n开始一次完整的交互流程...")
         effective_user_id = user_id if user_id is not None else self.current_user_id
 
-        # jason 形式的响应文本，包括 asr_text 和 llm_text
-        self.response_json = {}
+        # 响应数据，包括 asr_text 和 llm_text
+        # self.response_json = {}
+        self.response_data.clear()
 
+        self.asr_text = ""
         # -------- 检查 asr client 状态 ----------
         if self.asr_client_state == ASRClientState.IDLE:
             self.last_interface_time = time.time()
@@ -1259,27 +1263,27 @@ class ChatAssistant:
 
         ## 更新asr_text队列
         self.__push_queue(self.asr_text_queue, self.asr_text)
-        ## response_json 更新 asr_text
-        self.response_json["asr_text"] = self.asr_text
+        ##  更新 asr_text
+        # self.response_json["asr_text"] = self.asr_text
+        self.response_data.asr_text = self.asr_text
 
         # ----------- 唤醒词检测 -----------
         if self.flag_kws_used:
             if not self.kws_infer(self.asr_text):
+
                 # self.set_state(AssistantState.LISTENING)
-                # 更新 response_queue 队列
-                self.__push_queue(self.response_queue, self.response_json)
+
                 self.last_interface_time = time.time()
                 return
 
+        self.llm_text = ""
         # -------- 检查 LLM Agent 状态 ----------
         if self.llm_agent_state == LLMAgentState.IDLE:
             self.last_interface_time = time.time()
 
             logger.warning("LLM 模块未激活，跳过本次交互")
 
-            self.__push_queue(self.llm_response_queue, "")
-            self.response_json["llm_text"] = ""
-            self.__push_queue(self.response_queue, self.response_json)
+            self.__update_llm_text(self.llm_text)
 
             return
 
@@ -1289,20 +1293,23 @@ class ChatAssistant:
             tts_can_play = self.check_tts_status()
             for chunk, index in self.llm_stream_infer(
                 self.asr_text, user_id=effective_user_id
-            ):
+            ):  
+                self.llm_text += chunk
                 if chunk.strip() and tts_can_play:
                     self.tts_stream_infer(
                         self.__remove_intent_tags(chunk.strip()), index
                     )
+            self.__update_llm_text(self.llm_text)
         else:
             # -------- llm 推理 -----------
-            self.llm_infer(self.asr_text, user_id=effective_user_id)
+            self.llm_text=self.llm_infer(self.asr_text, user_id=effective_user_id)
+            self.__update_llm_text(self.llm_text)
 
             # -------- tts 播放 -----------
             ## -------- 检查 TTS 逻辑状态 ----------
             if not self.check_tts_status():
                 return
-            self.tts_infer(self.__remove_intent_tags(self.llm_response))
+            self.tts_infer(self.__remove_intent_tags(self.llm_text))
 
         logger.info("本次交互完成，等待下一次录音")
 
