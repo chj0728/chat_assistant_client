@@ -255,6 +255,7 @@ class LLMAgent:
                 else (
                     "你需要简洁且有礼貌地回答用户的问题，请保持回答简短且有条理，控制在100字以内。\n"
                     "在回答中尽量避免使用标点符号结尾，以便更自然地进行语音合成。\n"
+                    "如果你不确定答案，可以礼貌地告诉用户你不知道。\n"
                     "只有当用户回答退出、结束等相关内容时，调用结束对话的工具函数，礼貌地结束对话。\n"
                 )
             )
@@ -278,7 +279,7 @@ class LLMAgent:
             ],
             system_prompt=self.system_msg,  # if hasattr(self, "system_msg") else None,
             # checkpointer=InMemorySaver(),  # 使用内存检查点保存对话状态
-            # middleware=self.static_middleware_list + self.dynamic_middleware_list,
+            middleware=self.static_middleware_list + self.dynamic_middleware_list,
         )
 
         ## 创建一个完整版本的代理，支持工具调用和上下文记忆，适用于需要多轮对话和上下文理解的场景

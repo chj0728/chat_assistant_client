@@ -304,7 +304,7 @@ class ChatAssistant:
         self.reactive_kws_threshold = kws_cfg.get(
             "reactive_kws_threshold", 100
         )  # 重置 需要唤醒词检测 激活 LLM 时间间隔 (秒)
-        self.last_failed_kws_time = time.time()
+        self.last_failed_kws_time = 0  # 初始化上次未检测到唤醒词时间
         #######################################
 
         ################ 其他状态变量 ##############
@@ -1137,65 +1137,65 @@ class ChatAssistant:
             logger.info("长时间未与 LLM 交互，重置 LLM 模块为 IDLE 状态")
 
         # 判断是否启用唤醒词检测
-        if self.flag_kws_used:
-            # logger.info("需要唤醒词激活")
-            if self.llm_agent_state == LLMAgentState.ACTIVE:
-                logger.info("LLM 模块已处于 ACTIVE 状态，无需检测唤醒词")
-                self.last_interface_time = time.time()
-                return True
+        # if self.flag_kws_used:
+        # logger.info("需要唤醒词激活")
+        if self.llm_agent_state == LLMAgentState.ACTIVE:
+            logger.info("LLM 模块已处于 ACTIVE 状态，无需检测唤醒词")
+            self.last_interface_time = time.time()
+            return True
 
-            if wake_word_matched:
-                # self.flag_kws = 1
-                self.llm_agent_state = LLMAgentState.ACTIVE
+        if wake_word_matched:
+            # self.flag_kws = 1
+            self.llm_agent_state = LLMAgentState.ACTIVE
+
+            self.failed_enable_kws_count = 0
+
+            self.last_interface_time = time.time()
+
+            logger.info("检测到唤醒词，激活 LLM 模块")
+            return True
+        else:
+            # self.flag_kws = 0
+            self.llm_agent_state = LLMAgentState.IDLE
+
+            self.failed_enable_kws_count += 1
+
+            logger.info(
+                "未检测到唤醒词，失败次数: {}".format(self.failed_enable_kws_count)
+            )
+
+            # 如果连续多次未检测到唤醒词，且距离上次提示已超过一定时间，则推送提示语音
+            if (
+                self.failed_enable_kws_count >= self.failed_kws_counts
+                and time.time() - self.last_failed_kws_time
+                > self.failed_kws_threshold
+            ):
+                self.__update_llm_text(f"你可以说出:{self.set_kws} 来唤醒我!")
+
+                # 只有在 ACTIVE 状态下才播放提示语音
+                if self.tts_client_state == TTSClientState.ACTIVE:
+                    logger.info("TTS处于 ACTIVE 状态，准备播放提示语音")
+                    if self.tts_client.is_active() and self.enable_interrupt_tts:
+                        logger.info("TTS 播放中，启用了打断功能，准备中断播放")
+                        self.tts_client.interrupt()
+                        time.sleep(0.1)
+
+                    self.tts_infer(f"你可以说出:{self.set_kws} 来唤醒我!")
 
                 self.failed_enable_kws_count = 0
+                self.last_failed_kws_time = time.time()
 
-                self.last_interface_time = time.time()
-
-                logger.info("检测到唤醒词，激活 LLM 模块")
-                return True
             else:
-                # self.flag_kws = 0
-                self.llm_agent_state = LLMAgentState.IDLE
+                self.__update_llm_text("")
 
-                self.failed_enable_kws_count += 1
-
-                logger.info(
-                    "未检测到唤醒词，失败次数: {}".format(self.failed_enable_kws_count)
-                )
-
-                # 如果连续多次未检测到唤醒词，且距离上次提示已超过一定时间，则推送提示语音
-                if (
-                    self.failed_enable_kws_count >= self.failed_kws_counts
-                    and time.time() - self.last_failed_kws_time
-                    > self.failed_kws_threshold
-                ):
-                    self.__update_llm_text(f"你可以说出:{self.set_kws} 来唤醒我!")
-
-                    # 只有在 ACTIVE 状态下才播放提示语音
-                    if self.tts_client_state == TTSClientState.ACTIVE:
-                        logger.info("TTS处于 ACTIVE 状态，准备播放提示语音")
-                        if self.tts_client.is_active() and self.enable_interrupt_tts:
-                            logger.info("TTS 播放中，启用了打断功能，准备中断播放")
-                            self.tts_client.interrupt()
-                            time.sleep(0.1)
-
-                        self.tts_infer(f"你可以说出:{self.set_kws} 来唤醒我!")
-
-                    self.failed_enable_kws_count = 0
-                    self.last_failed_kws_time = time.time()
-
-                else:
-                    self.__update_llm_text("")
-
-                self.last_interface_time = time.time()
-                return False
-
-        else:
-            self.llm_agent_state = LLMAgentState.ACTIVE
             self.last_interface_time = time.time()
-            logger.info("未启用唤醒词激活功能")
-            return True
+            return False
+
+        # else:
+        #     self.llm_agent_state = LLMAgentState.ACTIVE
+        #     self.last_interface_time = time.time()
+        #     logger.info("未启用唤醒词激活功能")
+        #     return True
 
     ##########################################################
 
@@ -1272,10 +1272,14 @@ class ChatAssistant:
         # ----------- 唤醒词检测 -----------
         if self.flag_kws_used:
             if not self.kws_infer(self.asr_text):
-                # self.set_state(AssistantState.LISTENING)
 
                 self.last_interface_time = time.time()
                 return
+        else:
+            # self.llm_agent_state = LLMAgentState.ACTIVE
+
+            self.last_interface_time = time.time()
+            logger.info("未启用唤醒词激活功能")
 
         self.llm_text = ""
         # -------- 检查 LLM Agent 状态 ----------

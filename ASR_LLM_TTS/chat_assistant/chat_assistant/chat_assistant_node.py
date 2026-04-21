@@ -69,6 +69,24 @@ def end_conversation_tool():
     push_queue(tool_event_queue, ToolEvent.END_CONVERSATION.value)
     return
 
+@tool(description="调整默认扬声器音量")
+def adjust_speaker_volume_tool(volume: int):
+    # """调整系统默认扬声器音量的工具函数"""
+    logger.info(f"调用工具函数->调整系统默认扬声器音量为 {volume}。")
+
+    if volume > 0 and volume <= 10:
+        volume = int(volume * 10)  # 将0-10的音量转换为0-100的百分比
+    elif volume < 0:
+        volume = 0
+    elif volume > 100:
+        volume = 100
+    # 在这里添加实际的音量调整逻辑
+    # pactl set-sink-volume @DEFAULT_SINK@ {volume}%
+    os.system(f"pactl set-sink-volume @DEFAULT_SINK@ {volume}%")
+
+    return
+
+
 
 class DynamicToolMiddleware(AgentMiddleware):
     """
@@ -78,7 +96,7 @@ class DynamicToolMiddleware(AgentMiddleware):
     def wrap_model_call(self, request: ModelRequest, handler):
         # 添加动态工具请求处理
         updated = request.override(
-            tools=[*request.tools, response_wave_hands_tool, end_conversation_tool]
+            tools=[*request.tools, response_wave_hands_tool, end_conversation_tool, adjust_speaker_volume_tool]
         )
         # logger.info("动态工具中间件: 添加挥手回应和结束对话工具")
         return handler(updated)
@@ -92,6 +110,10 @@ class DynamicToolMiddleware(AgentMiddleware):
         if request.tool_call["name"] == "end_conversation_tool":
             logger.info("动态工具中间件: 检测到结束对话工具调用")
             return handler(request.override(tool=end_conversation_tool))
+
+        if request.tool_call["name"] == "adjust_speaker_volume_tool":
+            logger.info("动态工具中间件: 检测到调整扬声器音量工具调用")
+            return handler(request.override(tool=adjust_speaker_volume_tool))
 
         return handler(request)
 
