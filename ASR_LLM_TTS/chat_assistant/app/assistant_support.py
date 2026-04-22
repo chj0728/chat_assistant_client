@@ -50,8 +50,7 @@ class AssistantTextProcessor:
         self.wake_word_pinyin = self.extract_chinese_and_convert_to_pinyin(wake_word)
 
     def extract_chinese_and_convert_to_pinyin(self, input_string: str) -> str:
-        """提取输入字符串中的中文字符并转换为拼音
-        """
+        """提取输入字符串中的中文字符并转换为拼音"""
         chinese_characters = re.findall(r"[\u4e00-\u9fa5]", input_string)
         chinese_text = "".join(chinese_characters)
         pinyin_result = pinyin(chinese_text, style=Style.NORMAL)
@@ -110,13 +109,11 @@ class AssistantTextProcessor:
 
     @staticmethod
     def count_chinese_characters(input_string: str) -> int:
-        """统计输入字符串中中文字符的数量
-        """
+        """统计输入字符串中中文字符的数量"""
         return len(re.findall(r"[\u4e00-\u9fa5]", input_string))
 
     def replace_special_characters(self, input_string: str) -> str:
-        """根据预定义的词汇映射表替换输入字符串中的特殊字符或常见错误
-        """
+        """根据预定义的词汇映射表替换输入字符串中的特殊字符或常见错误"""
         if not input_string:
             return input_string
 
@@ -129,8 +126,7 @@ class AssistantTextProcessor:
 
     @staticmethod
     def remove_intent_tags(input_string: str) -> str:
-        """移除输入字符串中的意图标签
-        """
+        """移除输入字符串中的意图标签"""
         if not input_string:
             return input_string
 

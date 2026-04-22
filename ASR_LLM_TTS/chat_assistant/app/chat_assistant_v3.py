@@ -10,6 +10,12 @@ import numpy as np
 import sounddevice as sd
 import webrtcvad
 import yaml
+from asr import ASRClient
+from config import load_config
+from llm import LLMAgent
+from logger import logger
+from tts import RealtimeTTSPlayer, TTSClient
+
 from app.assistant_support import (
     MAX_QUEUE_SIZE,
     SPECIAL_WORD_MAP,
@@ -18,21 +24,18 @@ from app.assistant_support import (
     ComponentState,
     ResponseData,
 )
-from asr import ASRClient
-from config import load_config
-from llm import LLMAgent
-from logger import logger
-from tts import RealtimeTTSPlayer, TTSClient
 
 
 class ChatAssistant:
     def __init__(
         self,
-        config_path: str|Path|None = None,
+        config_path: str | Path | None = None,
         dynamic_tool_middlewares=None,
         dynamic_middleware_list=None,
     ):
-        self.config_path = Path(config_path).expanduser().resolve() if config_path else None
+        self.config_path = (
+            Path(config_path).expanduser().resolve() if config_path else None
+        )
         self.configs = {}
 
         self.asr_text = ""
@@ -925,10 +928,12 @@ class ChatAssistant:
         """
 
         # 提取汉字并转换为拼音
-        pinyin_text = self.text_processor.extract_chinese_and_convert_to_pinyin(asr_text)
+        pinyin_text = self.text_processor.extract_chinese_and_convert_to_pinyin(
+            asr_text
+        )
         logger.info(f"转换为拼音: {pinyin_text}")
-        wake_word_matched, best_window, best_score = self.text_processor.is_kws_pinyin_match(
-            pinyin_text
+        wake_word_matched, best_window, best_score = (
+            self.text_processor.is_kws_pinyin_match(pinyin_text)
         )
         if wake_word_matched:
             logger.info(
@@ -957,7 +962,7 @@ class ChatAssistant:
 
             self.last_interface_time = time.time()
             return True
-        
+
         # 判断是否需要重置唤醒词状态
         if time.time() - self.last_interface_time > self.reactive_kws_threshold:
             # self.flag_kws = 0
@@ -997,8 +1002,7 @@ class ChatAssistant:
             # 如果连续多次未检测到唤醒词，且距离上次提示已超过一定时间，则推送提示语音
             if (
                 self.failed_enable_kws_count >= self.failed_kws_counts
-                and time.time() - self.last_failed_kws_time
-                > self.failed_kws_threshold
+                and time.time() - self.last_failed_kws_time > self.failed_kws_threshold
             ):
                 self.__update_llm_text(f"你可以说出:{self.set_kws} 来唤醒我!")
 
@@ -1090,7 +1094,9 @@ class ChatAssistant:
         # ------- 替换特殊词汇 -------
         if self.enable_replace_special_characters:
             logger.info(f"替换前 ASR 文本: {self.asr_text}")
-            self.asr_text = self.text_processor.replace_special_characters(self.asr_text)
+            self.asr_text = self.text_processor.replace_special_characters(
+                self.asr_text
+            )
             logger.info(f"替换后 ASR 文本: {self.asr_text}")
 
         ## 更新asr_text队列

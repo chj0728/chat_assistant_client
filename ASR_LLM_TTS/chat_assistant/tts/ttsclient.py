@@ -15,11 +15,10 @@ from logger import logger
 from playsound3 import playsound
 from websockets.exceptions import ConnectionClosed
 
-
-WORKER_POLL_TIMEOUT_SEC = 0.1 # 后台线程轮询文本队列的超时时间，单位为秒
-INTERRUPT_GRACE_PERIOD_SEC = 0.2 # 打断后等待正在播放的音频块自然结束的宽限时间，单位为秒，过短可能导致频繁打断时声音碎片过多，过长可能导致响应不够及时
-LOCAL_AUDIO_STOP_WAIT_SEC = 0.1 # 本地音频停止后等待实际停止的宽限时间，单位为秒，过短可能导致声音未完全停止，过长可能导致响应不够及时
-WS_STARTUP_WAIT_SEC = 1.0 # WebSocket 运行时预热等待时间，单位为秒，过短可能导致首次请求时连接未准备好，过长可能导致启动延迟增加
+WORKER_POLL_TIMEOUT_SEC = 0.1  # 后台线程轮询文本队列的超时时间，单位为秒
+INTERRUPT_GRACE_PERIOD_SEC = 0.2  # 打断后等待正在播放的音频块自然结束的宽限时间，单位为秒，过短可能导致频繁打断时声音碎片过多，过长可能导致响应不够及时
+LOCAL_AUDIO_STOP_WAIT_SEC = 0.1  # 本地音频停止后等待实际停止的宽限时间，单位为秒，过短可能导致声音未完全停止，过长可能导致响应不够及时
+WS_STARTUP_WAIT_SEC = 1.0  # WebSocket 运行时预热等待时间，单位为秒，过短可能导致首次请求时连接未准备好，过长可能导致启动延迟增加
 
 
 class TTSClient:
