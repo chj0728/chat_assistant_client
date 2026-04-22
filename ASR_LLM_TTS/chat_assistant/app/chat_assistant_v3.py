@@ -1,10 +1,7 @@
-import re
 import threading
 import time
 import wave
-from dataclasses import asdict, dataclass
-from difflib import SequenceMatcher
-from enum import Enum
+from dataclasses import asdict
 from pathlib import Path
 from queue import Empty, Full, Queue
 from typing import Generator
@@ -13,66 +10,29 @@ import numpy as np
 import sounddevice as sd
 import webrtcvad
 import yaml
+from app.assistant_support import (
+    MAX_QUEUE_SIZE,
+    SPECIAL_WORD_MAP,
+    AssistantState,
+    AssistantTextProcessor,
+    ComponentState,
+    ResponseData,
+)
 from asr import ASRClient
 from config import load_config
 from llm import LLMAgent
 from logger import logger
-from pypinyin import Style, pinyin
 from tts import RealtimeTTSPlayer, TTSClient
-
-MAX_QUEUE_SIZE = 10
-
-SPECIAL_WORD_MAP = {
-    # 这里目标正确词作为键，常见错误变体列表作为值，可以根据实际情况调整和扩展
-    "": [
-        # 常见 ASR 错误示例，可以根据实际情况调整和扩展
-    ],
-}
-
-
-@dataclass
-class ResponseData:
-    asr_text: str = ""
-    llm_text: str = ""
-
-    def clear(self):
-        """重置响应数据"""
-        self.asr_text = ""
-        self.llm_text = ""
-
-
-class AssistantState(Enum):
-    IDLE = 0  # 空闲 / 待唤醒
-    ACTIVE = 1  # 激活状态
-    LISTENING = 2  # 正在录音（等用户说话）
-    THINKING = 3  #  ASR / LLM 推理中
-    SPEAKING = 4  # TTS 播放中
-
-
-class ASRClientState(Enum):
-    IDLE = 0  # 空闲
-    ACTIVE = 1  # 激活状态
-
-
-class LLMAgentState(Enum):
-    IDLE = 0  # 空闲
-    ACTIVE = 1  # 激活状态
-
-
-class TTSClientState(Enum):
-    IDLE = 0  # 空闲
-    ACTIVE = 1  # 激活状态
 
 
 class ChatAssistant:
     def __init__(
         self,
-        config_path: str,
+        config_path: str|Path|None = None,
         dynamic_tool_middlewares=None,
         dynamic_middleware_list=None,
     ):
-
-        self.config_yaml = Path(config_path).expanduser().resolve()
+        self.config_path = Path(config_path).expanduser().resolve() if config_path else None
         self.configs = {}
 
         self.asr_text = ""
@@ -84,7 +44,6 @@ class ChatAssistant:
 
         # 同时包括 asr_text 和 llm_text
         self.response_queue = Queue(maxsize=MAX_QUEUE_SIZE)
-        # self.response_json = {}
         self.response_data = ResponseData()
         self.response_data.clear()
 
@@ -168,65 +127,65 @@ class ChatAssistant:
         # self.set_state(AssistantState.IDLE)
 
     def load_config_and_initialize(self):
-
-        # ----------- 读取配置文件 -----------
-        # try:
-        #     with open(self.config_yaml, "r", encoding="utf-8") as f:
-        #         self.configs = yaml.safe_load(f)
-        #         logger.info(f"配置文件内容:\n{self.configs}")
-        # except Exception as e:
-        #     logger.error(f"读取配置文件失败: {e}")
-        #     # raise e
-        self.configs = load_config()
+        self.configs = load_config(self.config_path) if self.config_path else {}
         logger.debug("当前配置:\n%s", yaml.dump(self.configs, allow_unicode=True))
 
-        # ----------- 初始化ASR、LLM、TTS客户端 -----------
-        ############ ASR 服务器选择和客户端初始化 ##########
+        self._initialize_clients()
+        self._initialize_audio_settings()
+        self._initialize_vad_settings()
+        self._initialize_kws_settings()
+        self._initialize_runtime_state()
+
+    def _initialize_clients(self) -> None:
+        self.asr_client = self._build_asr_client()
+        self.llm_client = self._build_llm_client()
+        self.tts_client = self._build_tts_client()
+
+    def _build_asr_client(self) -> ASRClient:
         asr_server_type = self.configs.get("asr_server", ["asr_local"])[0]
         logger.info(f"选择的 ASR 服务器类型: {asr_server_type}")
         asr_cfg = self.configs.get(asr_server_type, {})
 
-        self.asr_client = ASRClient(
+        return ASRClient(
             host=asr_cfg.get("host", "192.168.10.101"),
             port=asr_cfg.get("port", 2002),
             timeout_sec=asr_cfg.get("timeout_sec", 30),
             use_websocket=asr_cfg.get("use_websocket", False),
         )
 
-        ########### LLM 服务器选择和客户端初始化 ##########
+    def _build_llm_client(self) -> LLMAgent:
         llm_cfg = self.configs.get("llm", {})
-        self.llm_client = LLMAgent(
+        llm_client = LLMAgent(
             host=llm_cfg.get("host", "192.168.50.125"),
             port=llm_cfg.get("port", 8000),
             temperature=llm_cfg.get("temperature", 0.3),
             max_tokens=llm_cfg.get("max_tokens", 512),
             enable_thinking=llm_cfg.get("enable_thinking", False),
-            # dynamic_tool_middlewares=self.dynamic_tool_middlewares,
             dynamic_middleware_list=self.dynamic_middleware_list,
             timeout=llm_cfg.get("timeout_sec", 10),
             system_prompt=llm_cfg.get("system_prompt", ""),
         )
         system_prompt = llm_cfg.get("system_prompt", "")
         if system_prompt:
-            self.llm_client.add_system_prompt(system_prompt)
+            llm_client.add_system_prompt(system_prompt)
         self.enable_stream = llm_cfg.get("enable_stream", False)
+        return llm_client
 
-        ########### TTS 服务器选择和客户端初始化 ##########
+    def _build_tts_client(self):
         tts_server_type = self.configs.get("tts_server", ["tts_local"])[0]
         logger.info(f"选择的 TTS 服务器类型: {tts_server_type}")
         tts_cfg = self.configs.get(tts_server_type, {})
 
         if tts_server_type == "tts_remote":
-            self.tts_client = RealtimeTTSPlayer(
+            tts_client = RealtimeTTSPlayer(
                 host=tts_cfg.get("host", "192.168.50.220"),
                 port=tts_cfg.get("port", 50000),
             )
-            self.tts_client.change_preset(
-                tts_cfg.get("voice_type", "default")
-            )  # "default"(女性活泼), "zh"(男性非标准) , "hard_zh"(男性业余), "longshu_zh"(男性专业), "longwan_zh"（女性专业）
+            tts_client.change_preset(tts_cfg.get("voice_type", "default"))
+            return tts_client
 
-        elif tts_server_type == "tts_local":
-            self.tts_client = TTSClient(
+        if tts_server_type == "tts_local":
+            return TTSClient(
                 host=tts_cfg.get("host", "192.168.10.101"),
                 port=tts_cfg.get("port", 50000),
                 timeout_sec=tts_cfg.get("timeout_sec", 30),
@@ -235,12 +194,11 @@ class ChatAssistant:
                 use_websocket=tts_cfg.get("use_websocket", True),
                 playback_start_delay_sec=tts_cfg.get("playback_start_delay_sec", 0.0),
             )
-        else:
-            logger.error(f"未知的 TTS 服务器类型: {tts_server_type}")
-            raise ValueError(f"未知的 TTS 服务器类型: {tts_server_type}")
-        # ------------------------------------------------
 
-        ############## 音频采集参数 ##############
+        logger.error(f"未知的 TTS 服务器类型: {tts_server_type}")
+        raise ValueError(f"未知的 TTS 服务器类型: {tts_server_type}")
+
+    def _initialize_audio_settings(self) -> None:
         audio_cfg = self.configs.get("Audio", {})
 
         self.audio_rate = audio_cfg.get("rate", 16000)
@@ -248,11 +206,8 @@ class ChatAssistant:
         self.chunk_duration_ms = audio_cfg.get("chunk_duration_ms", 30)
         self.audio_file_count = 0
         self.max_file_count = audio_cfg.get("max_file_count", 50)
-        # self.chunk_size = audio_cfg.get("chunk_size", 1024)
 
-        # 帧 = 采样率 * 持续时间(秒) （给 sounddevice 用）
         self.chunk_frames = int(self.audio_rate * self.chunk_duration_ms / 1000)
-        # 每帧2字节（16位采样）,字节数（给 PCM / VAD / AEC 用）
         self.chunk_bytes = self.chunk_frames * 2
         valid_frame_bytes = {
             int(self.audio_rate * ms / 1000) * 2 for ms in (10, 20, 30)
@@ -262,9 +217,8 @@ class ChatAssistant:
             self.chunk_duration_ms = 20
             self.chunk_frames = int(self.audio_rate * self.chunk_duration_ms / 1000)
             self.chunk_bytes = self.chunk_frames * 2
-        #########################################
 
-        ############## VAD 参数 ##############
+    def _initialize_vad_settings(self) -> None:
         vad_cfg = self.configs.get("VAD", {})
 
         self.vad_mode = vad_cfg.get("mode", 3)
@@ -278,80 +232,69 @@ class ChatAssistant:
         self.max_recording_duration = vad_cfg.get("max_recording_duration", 10.0)
         self.pause_duration = vad_cfg.get("pause_duration", 1.5)
         self.vad = webrtcvad.Vad(self.vad_mode)
-        ######################################
 
-        ############## 唤醒词参数 ##############
+    def _initialize_kws_settings(self) -> None:
         kws_cfg = self.configs.get("KWS", {})
 
         self.set_kws = kws_cfg.get("wake_word", "你好小特")
-        self.set_kws_pinyin = self.__extract_chinese_and_convert_to_pinyin(self.set_kws)
         self.kws_fuzzy_similarity_threshold = kws_cfg.get(
             "fuzzy_similarity_threshold", 0.78
         )
+        self.enable_replace_special_characters = self.configs.get(
+            "enable_replace_special_characters", False
+        )
+        self.word_map = SPECIAL_WORD_MAP
+        self.text_processor = AssistantTextProcessor(
+            wake_word=self.set_kws,
+            fuzzy_similarity_threshold=self.kws_fuzzy_similarity_threshold,
+            word_map=self.word_map,
+        )
+        self.set_kws_pinyin = self.text_processor.wake_word_pinyin
         logger.info(f"设置的唤醒词: {self.set_kws}, 拼音: {self.set_kws_pinyin}")
 
         self.flag_kws_used = kws_cfg.get("enable", True)
         if not self.flag_kws_used:
             logger.info("未启用唤醒词激活功能")
-        self.flag_kws = 0  # 唤醒词检测标志
-        self.failed_enable_kws_count = 0  # 连续未检测到唤醒词计数
-        self.failed_kws_counts = kws_cfg.get(
-            "failed_kws_counts", 2
-        )  # 连续未检测到唤醒词次数达到此值时，推送提示语音
-        self.failed_kws_threshold = kws_cfg.get(
-            "failed_kws_threshold", 30
-        )  # 连续未检测到唤醒词次数 达到 failed_kws_counts 后，推送提示语音的时间间隔 (秒)
-        self.reactive_kws_threshold = kws_cfg.get(
-            "reactive_kws_threshold", 100
-        )  # 重置 需要唤醒词检测 激活 LLM 时间间隔 (秒)
-        self.last_failed_kws_time = 0  # 初始化上次未检测到唤醒词时间
-        #######################################
+        self.flag_kws = 0
+        self.failed_enable_kws_count = 0
+        self.failed_kws_counts = kws_cfg.get("failed_kws_counts", 2)
+        self.failed_kws_threshold = kws_cfg.get("failed_kws_threshold", 30)
+        self.reactive_kws_threshold = kws_cfg.get("reactive_kws_threshold", 100)
+        self.last_failed_kws_time = 0
 
-        ################ 其他状态变量 ##############
-        self.recording_active = False  # 当前是否处于录音状态
-        self.segments_to_save = []  # 待保存的音频片段
-        self.saved_intervals = []  # 已保存的时间区间
-        self.last_active_time = time.time()  # 上次检测到有效语音的时间
-        self.last_vad_end_time = time.time()  # 上次保存的 VAD 有效段结束时间
-        self.last_llm_time = time.time()  # 上次与 LLM 交互的时间
-        self.last_tts_time = time.time()  # 上次 TTS 播放的时间
-        self.last_interface_time = time.time()  # 上次与任何模块交互的时间
+    def _initialize_runtime_state(self) -> None:
+        self.recording_active = False
+        self.segments_to_save = []
+        self.saved_intervals = []
+        self.last_active_time = time.time()
+        self.last_vad_end_time = time.time()
+        self.last_llm_time = time.time()
+        self.last_tts_time = time.time()
+        self.last_interface_time = time.time()
 
         self.enable_interrupt_tts = self.configs.get("enable_interrupt_tts", False)
-        self.enable_replace_special_characters = self.configs.get(
-            "enable_replace_special_characters", False
-        )
-        self.word_map = SPECIAL_WORD_MAP
-
         self.state = AssistantState.IDLE
         self.state_lock = threading.Lock()
 
-        self.asr_client_state = (
-            ASRClientState.ACTIVE
-            if self.configs.get("asr_enable", False)
-            else ASRClientState.IDLE
-        )  # 根据配置决定 ASR Client 是否默认激活
-        self.llm_agent_state = (
-            LLMAgentState.ACTIVE
-            if self.configs.get("llm_enable", False)
-            else LLMAgentState.IDLE
-        )  # 根据配置决定 LLM Agent 是否默认激活
-        self.tts_client_state = (
-            TTSClientState.ACTIVE
-            if self.configs.get("tts_enable", False)
-            else TTSClientState.IDLE
-        )  # 根据配置决定 TTS 是否默认激活
+        self.asr_client_state = self._initial_component_state("asr_enable")
+        self.llm_agent_state = self._initial_component_state("llm_enable")
+        self.tts_client_state = self._initial_component_state("tts_enable")
 
-        # ====== 能量统计 ======
         self.energy_instability_check = self.configs.get(
             "energy_instability_check", True
         )
-        # self.energy_window_duration = self.configs.get("energy_window_duration", 5.0)
-        self.max_energy_frames = self.configs.get("energy_frames", 50)  # 50 x 0.1s = 5s
+        self.max_energy_frames = self.configs.get("energy_frames", 50)
         self.energy_instability_threshold = self.configs.get(
             "energy_instability_threshold", 2.0
         )
-        self.energy_window = []  # 每个分析块的 RMS
+        self.energy_window = []
+
+    def _initial_component_state(self, config_key: str) -> ComponentState:
+        return (
+            ComponentState.ACTIVE
+            if self.configs.get(config_key, False)
+            else ComponentState.IDLE
+        )
 
     def __compute_energy_instability(self):
         """
@@ -368,136 +311,6 @@ class ChatAssistant:
         """重置音频片段状态。"""
         self.segments_to_save.clear()
         self.energy_window.clear()
-
-    def __extract_chinese_and_convert_to_pinyin(self, input_string):
-        """
-        提取字符串中的汉字，并将其转换为拼音。
-
-        :param input_string: 原始字符串
-        :return: 转换后的拼音字符串
-        """
-        # 使用正则表达式提取所有汉字
-        chinese_characters = re.findall(r"[\u4e00-\u9fa5]", input_string)
-        # 将汉字列表合并为字符串
-        chinese_text = "".join(chinese_characters)
-
-        # 转换为拼音
-        pinyin_result = pinyin(chinese_text, style=Style.NORMAL)
-        # 将拼音列表拼接为字符串
-        pinyin_text = " ".join([item[0] for item in pinyin_result])
-
-        return pinyin_text
-
-    def __is_kws_pinyin_match(self, detected_pinyin: str) -> bool:
-        """判断待检测拼音是否与唤醒词拼音近似匹配。"""
-        if not detected_pinyin or not self.set_kws_pinyin:
-            return False
-
-        detected_tokens = detected_pinyin.split()
-        target_tokens = self.set_kws_pinyin.split()
-
-        if not detected_tokens or not target_tokens:
-            return False
-
-        # 先走快速路径：包含完整目标拼音，直接判定为命中。
-        if self.set_kws_pinyin in detected_pinyin:
-            logger.info("唤醒词拼音包含精确匹配")
-            return True
-
-        target_joined = "".join(target_tokens)
-        target_len = len(target_tokens)
-
-        # 使用滑窗计算拼音相似度，允许长度有 1 个音节误差。
-        candidate_lens = {target_len}
-        if target_len > 1:
-            candidate_lens.add(target_len - 1)
-            candidate_lens.add(target_len + 1)
-
-        best_score = 0.0
-        best_window = ""
-
-        for win_len in sorted(candidate_lens):
-            if win_len <= 0:
-                continue
-
-            if len(detected_tokens) < win_len:
-                window_tokens_list = [detected_tokens]
-            else:
-                window_tokens_list = [
-                    detected_tokens[i : i + win_len]
-                    for i in range(0, len(detected_tokens) - win_len + 1)
-                ]
-
-            for window_tokens in window_tokens_list:
-                window_joined = "".join(window_tokens)
-                score = SequenceMatcher(None, window_joined, target_joined).ratio()
-
-                if score > best_score:
-                    best_score = score
-                    best_window = " ".join(window_tokens)
-
-                if score >= self.kws_fuzzy_similarity_threshold:
-                    logger.info(
-                        "唤醒词近似匹配成功, 窗口拼音: '%s', 相似度: %.3f, 阈值: %.3f",
-                        " ".join(window_tokens),
-                        score,
-                        self.kws_fuzzy_similarity_threshold,
-                    )
-                    return True
-
-        logger.info(
-            "唤醒词近似匹配未命中, 最佳窗口: '%s', 最佳相似度: %.3f, 阈值: %.3f",
-            best_window,
-            best_score,
-            self.kws_fuzzy_similarity_threshold,
-        )
-        return False
-
-    # 统计字符串中的汉字数量
-    def __count_chinese_characters(self, input_string):
-        """
-        统计字符串中的汉字数量。
-
-        :param input_string: 原始字符串
-        :return: 汉字数量
-        """
-        chinese_characters = re.findall(r"[\u4e00-\u9fa5]", input_string)
-        return len(chinese_characters)
-
-    # 替换字符串中的特殊字符为智己
-    def __replace_special_characters(self, input_string):
-        """
-        替换字符串中的特殊字符如为智己。
-
-        :param input_string: 原始字符串
-        :return: 替换后的字符串
-        """
-        if not input_string:
-            return input_string
-
-        for correct_word, variants in self.word_map.items():
-            for variant in variants:
-                input_string = input_string.replace(variant, correct_word)
-
-        return input_string
-
-    # 去除字符串 末尾 的 <INTENT> </INTENT> 标签
-    def __remove_intent_tags(self, input_string):
-        """
-        去除字符串末尾的 <INTENT> </INTENT> 标签。
-
-        :param input_string: 原始字符串
-        :return: 去除标签后的字符串
-        """
-        if not input_string:
-            return input_string
-
-        # 使用正则表达式去除末尾的 <INTENT>...</INTENT> 标签
-        cleaned_string = re.sub(
-            r"<INTENT>.*?</INTENT>$", "", input_string, flags=re.DOTALL
-        )
-
-        return cleaned_string.strip()
 
     def __check_vad_activity(self, audio_bytes: bytes) -> bool:
         """
@@ -809,37 +622,37 @@ class ChatAssistant:
         """
         激活 ASR Client，进入 ACTIVE 状态
         """
-        self.asr_client_state = ASRClientState.ACTIVE
+        self.asr_client_state = ComponentState.ACTIVE
 
     def deactivate_asr_client(self):
         """
         使 ASR Client 进入空闲状态
         """
-        self.asr_client_state = ASRClientState.IDLE
+        self.asr_client_state = ComponentState.IDLE
 
     def activate_llm_agent(self):
         """
         激活 LLM Agent，进入 ACTIVE 状态
         """
-        self.llm_agent_state = LLMAgentState.ACTIVE
+        self.llm_agent_state = ComponentState.ACTIVE
 
     def deactivate_llm_agent(self):
         """
         使 LLM Agent 进入空闲状态
         """
-        self.llm_agent_state = LLMAgentState.IDLE
+        self.llm_agent_state = ComponentState.IDLE
 
     def activate_tts_client(self):
         """
         激活 TTS Client，进入 ACTIVE 状态
         """
-        self.tts_client_state = TTSClientState.ACTIVE
+        self.tts_client_state = ComponentState.ACTIVE
 
     def deactivate_tts_client(self):
         """
         使 TTS Client 进入空闲状态
         """
-        self.tts_client_state = TTSClientState.IDLE
+        self.tts_client_state = ComponentState.IDLE
 
     ###############################################
 
@@ -901,7 +714,7 @@ class ChatAssistant:
             bool: 如果可以继续播放返回 True，否则返回 False
         """
         # -------- 检查 TTS 模块状态 ----------
-        if self.tts_client_state == TTSClientState.IDLE:
+        if self.tts_client_state == ComponentState.IDLE:
             logger.warning("TTS 模块未激活，跳过TTS播放")
             self.last_interface_time = time.time()
             time.sleep(0.1)
@@ -1111,15 +924,31 @@ class ChatAssistant:
         """
 
         # 提取汉字并转换为拼音
-        pinyin_text = self.__extract_chinese_and_convert_to_pinyin(asr_text)
+        pinyin_text = self.text_processor.extract_chinese_and_convert_to_pinyin(asr_text)
         logger.info(f"转换为拼音: {pinyin_text}")
-        wake_word_matched = self.__is_kws_pinyin_match(pinyin_text)
+        wake_word_matched, best_window, best_score = self.text_processor.is_kws_pinyin_match(
+            pinyin_text
+        )
+        if wake_word_matched:
+            logger.info(
+                "唤醒词近似匹配成功, 窗口拼音: '%s', 相似度: %.3f, 阈值: %.3f",
+                best_window,
+                best_score,
+                self.kws_fuzzy_similarity_threshold,
+            )
+        else:
+            logger.info(
+                "唤醒词近似匹配未命中, 最佳窗口: '%s', 最佳相似度: %.3f, 阈值: %.3f",
+                best_window,
+                best_score,
+                self.kws_fuzzy_similarity_threshold,
+            )
 
         if wake_word_matched and self.tts_client.is_active():
             logger.warning("检测到唤醒词， TTS 播放中，打断播放以避免语音叠加")
 
             # self.flag_kws = 1
-            self.llm_agent_state = LLMAgentState.ACTIVE
+            self.llm_agent_state = ComponentState.ACTIVE
 
             self.tts_client.interrupt()
 
@@ -1132,21 +961,21 @@ class ChatAssistant:
         if time.time() - self.last_interface_time > self.reactive_kws_threshold:
             # self.flag_kws = 0
             # if self.llm_agent_state == LLMAgentState.ACTIVE:
-            self.llm_agent_state = LLMAgentState.IDLE
+            self.llm_agent_state = ComponentState.IDLE
 
             logger.info("长时间未与 LLM 交互，重置 LLM 模块为 IDLE 状态")
 
         # 判断是否启用唤醒词检测
         # if self.flag_kws_used:
         # logger.info("需要唤醒词激活")
-        if self.llm_agent_state == LLMAgentState.ACTIVE:
+        if self.llm_agent_state == ComponentState.ACTIVE:
             logger.info("LLM 模块已处于 ACTIVE 状态，无需检测唤醒词")
             self.last_interface_time = time.time()
             return True
 
         if wake_word_matched:
             # self.flag_kws = 1
-            self.llm_agent_state = LLMAgentState.ACTIVE
+            self.llm_agent_state = ComponentState.ACTIVE
 
             self.failed_enable_kws_count = 0
 
@@ -1156,7 +985,7 @@ class ChatAssistant:
             return True
         else:
             # self.flag_kws = 0
-            self.llm_agent_state = LLMAgentState.IDLE
+            self.llm_agent_state = ComponentState.IDLE
 
             self.failed_enable_kws_count += 1
 
@@ -1173,7 +1002,7 @@ class ChatAssistant:
                 self.__update_llm_text(f"你可以说出:{self.set_kws} 来唤醒我!")
 
                 # 只有在 ACTIVE 状态下才播放提示语音
-                if self.tts_client_state == TTSClientState.ACTIVE:
+                if self.tts_client_state == ComponentState.ACTIVE:
                     logger.info("TTS处于 ACTIVE 状态，准备播放提示语音")
                     if self.tts_client.is_active() and self.enable_interrupt_tts:
                         logger.info("TTS 播放中，启用了打断功能，准备中断播放")
@@ -1200,7 +1029,7 @@ class ChatAssistant:
     ##########################################################
 
     ####################### 核心交互流程 #######################
-    def Inference(
+    def inference(
         self,
         audio_frames=None,
         audio_path: str | None = None,
@@ -1224,7 +1053,7 @@ class ChatAssistant:
 
         self.asr_text = ""
         # -------- 检查 asr client 状态 ----------
-        if self.asr_client_state == ASRClientState.IDLE:
+        if self.asr_client_state == ComponentState.IDLE:
             self.last_interface_time = time.time()
 
             logger.warning("ASR 模块未激活，跳过本次交互")
@@ -1251,7 +1080,7 @@ class ChatAssistant:
             return
 
         # -------- 判断asr_text中汉字数量，过少则忽略 ----------
-        chinese_char_count = self.__count_chinese_characters(self.asr_text)
+        chinese_char_count = self.text_processor.count_chinese_characters(self.asr_text)
         if chinese_char_count < 2:
             logger.warning("ASR 识别文本中汉字数量过少，跳过本次交互")
             self.last_interface_time = time.time()
@@ -1260,7 +1089,7 @@ class ChatAssistant:
         # ------- 替换特殊词汇 -------
         if self.enable_replace_special_characters:
             logger.info(f"替换前 ASR 文本: {self.asr_text}")
-            self.asr_text = self.__replace_special_characters(self.asr_text)
+            self.asr_text = self.text_processor.replace_special_characters(self.asr_text)
             logger.info(f"替换后 ASR 文本: {self.asr_text}")
 
         ## 更新asr_text队列
@@ -1283,7 +1112,7 @@ class ChatAssistant:
 
         self.llm_text = ""
         # -------- 检查 LLM Agent 状态 ----------
-        if self.llm_agent_state == LLMAgentState.IDLE:
+        if self.llm_agent_state == ComponentState.IDLE:
             self.last_interface_time = time.time()
 
             logger.warning("LLM 模块未激活，跳过本次交互")
@@ -1302,7 +1131,7 @@ class ChatAssistant:
                 self.llm_text += chunk
                 if chunk.strip() and tts_can_play:
                     self.tts_stream_infer(
-                        self.__remove_intent_tags(chunk.strip()), index
+                        self.text_processor.remove_intent_tags(chunk.strip()), index
                     )
             self.__update_llm_text(self.llm_text)
         else:
@@ -1314,9 +1143,23 @@ class ChatAssistant:
             ## -------- 检查 TTS 逻辑状态 ----------
             if not self.check_tts_status():
                 return
-            self.tts_infer(self.__remove_intent_tags(self.llm_text))
+            self.tts_infer(self.text_processor.remove_intent_tags(self.llm_text))
 
         logger.info("本次交互完成，等待下一次录音")
+
+    def Inference(
+        self,
+        audio_frames=None,
+        audio_path: str | None = None,
+        input_text: str | None = None,
+        user_id: str | None = None,
+    ):
+        return self.inference(
+            audio_frames=audio_frames,
+            audio_path=audio_path,
+            input_text=input_text,
+            user_id=user_id,
+        )
 
 
 if __name__ == "__main__":

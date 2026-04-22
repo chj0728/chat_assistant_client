@@ -204,7 +204,7 @@ class ChatAssistantNode(Node):
         self.last_user_id_msg_time = None
         self.user_id_stale_timeout_sec = 1.0
 
-        self.declare_parameter("config_path", "config/config.yaml")
+        self.declare_parameter("config_path_value", "config/config.yaml")
 
         self.init_params()
 
@@ -274,11 +274,12 @@ class ChatAssistantNode(Node):
 
     def init_params(self):
 
-        self.config_path = (
-            self.get_parameter("config_path").get_parameter_value().string_value
+        self.config_path_value = (
+            self.get_parameter("config_path_value").get_parameter_value().string_value
         )
-        self.config_yaml = Path(self.config_path).expanduser().resolve()
-        logger.info(f"配置文件路径: {self.config_yaml}")
+        logger.info(f"从参数服务器获取的配置文件路径: {self.config_path_value}")
+        self.config_path = Path(self.config_path_value).expanduser().resolve() if self.config_path_value else None
+        logger.info(f"配置文件路径: {self.config_path}")
 
         self.load_config_and_initialize()
 
@@ -293,15 +294,7 @@ class ChatAssistantNode(Node):
         加载配置文件参数
         初始化 ROS 相关参数和话题发布者
         """
-        # ----------- 读取配置文件 -----------
-        # try:
-        #     with open(self.config_yaml, "r", encoding="utf-8") as f:
-        #         self.configs = yaml.safe_load(f)
-        #         # logger.info(f"配置文件内容:\n{self.configs}")
-        # except Exception as e:
-        #     logger.error(f"读取配置文件失败: {e}")
-
-        self.configs = load_config()
+        self.configs = load_config(self.config_path) if self.config_path else {}
 
         ros_cfg = self.configs.get("ros_cfg", {})
 
