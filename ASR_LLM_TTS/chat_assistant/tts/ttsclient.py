@@ -16,6 +16,12 @@ from playsound3 import playsound
 from websockets.exceptions import ConnectionClosed
 
 
+WORKER_POLL_TIMEOUT_SEC = 0.1 # 后台线程轮询文本队列的超时时间，单位为秒
+INTERRUPT_GRACE_PERIOD_SEC = 0.2 # 打断后等待正在播放的音频块自然结束的宽限时间，单位为秒，过短可能导致频繁打断时声音碎片过多，过长可能导致响应不够及时
+LOCAL_AUDIO_STOP_WAIT_SEC = 0.1 # 本地音频停止后等待实际停止的宽限时间，单位为秒，过短可能导致声音未完全停止，过长可能导致响应不够及时
+WS_STARTUP_WAIT_SEC = 1.0 # WebSocket 运行时预热等待时间，单位为秒，过短可能导致首次请求时连接未准备好，过长可能导致启动延迟增加
+
+
 class TTSClient:
     def __init__(
         self,
@@ -71,8 +77,8 @@ class TTSClient:
         self._ws_started = threading.Event()
 
         # 文本队列 + 音频队列
-        self.text_queue = queue.Queue()
-        self.audio_queue = queue.Queue()
+        self.text_queue: queue.Queue[str] = queue.Queue()
+        self.audio_queue: queue.Queue[bytes] = queue.Queue()
 
         self.sound = None
         self.is_sounding = False
@@ -85,8 +91,16 @@ class TTSClient:
         self._audio_lock = threading.Lock()
         self._playback_buffer = np.empty((0, self.channels), dtype=np.float32)
 
-        ######### 回调式音频输出流。队列空时自动补静音，避免设备断粮 underrun #########
-        self.stream = sd.OutputStream(
+        self.stream = self.__create_output_stream()
+        self.stream.start()
+        self.tts_thread = self.__start_tts_worker()
+        self.__initialize_websocket_if_needed()
+
+    # ================= 私有接口 =================
+
+    def __create_output_stream(self) -> sd.OutputStream:
+        """创建音频输出流。"""
+        return sd.OutputStream(
             samplerate=self.sample_rate,
             channels=self.channels,
             dtype="float32",
@@ -94,28 +108,66 @@ class TTSClient:
             latency="low",
             callback=self.__audio_callback,
         )
-        self.stream.start()
 
-        ######### 后台 TTS worker 线程，串行处理文本到语音的请求和播放 #########
-        self.tts_thread = threading.Thread(
+    def __start_tts_worker(self) -> threading.Thread:
+        """启动后台 TTS worker。"""
+        tts_thread = threading.Thread(
             target=self.__tts_loop,
             daemon=True,
+            name="tts-worker",
         )
-        self.tts_thread.start()
+        tts_thread.start()
+        return tts_thread
 
-        #### 如果使用 WebSocket，提前启动事件循环线程，避免首次请求时的启动延迟 ####
-        if self.use_websocket:
-            self.__start_ws_runtime()
-            time.sleep(1.0)  # 确保事件循环线程启动完成
+    def __initialize_websocket_if_needed(self) -> None:
+        """按需预热 WebSocket 运行时，避免首次请求额外延迟。"""
+        if not self.use_websocket:
+            return
+
+        self.__start_ws_runtime()
+        time.sleep(WS_STARTUP_WAIT_SEC)
+        try:
+            self.__run_ws_coro(self.__ensure_ws_connected(), timeout=self.timeout)
+        except TimeoutError:
+            logger.error("TTS WebSocket 连接超时")
+        except Exception as e:
+            logger.error(f"TTS WebSocket 连接失败: {e}")
+
+    def __build_http_url(self, path: str) -> str:
+        return f"http://{self.host}:{self.port}{path}"
+
+    def __reset_playback_state(self) -> None:
+        with self._audio_lock:
+            self._playback_buffer = np.empty((0, self.channels), dtype=np.float32)
+            self._audio_active_started_ts = 0.0
+            self._last_audio_chunk_ts = 0.0
+        self.is_sounding = False
+
+    @staticmethod
+    def __drain_queue(target_queue: queue.Queue) -> None:
+        while not target_queue.empty():
             try:
-                self.__run_ws_coro(self.__ensure_ws_connected(), timeout=self.timeout)
-            except TimeoutError:
-                logger.error("TTS WebSocket 连接超时")
-            except Exception as e:
-                logger.error(f"TTS WebSocket 连接失败: {e}")
-        ####################################################################
+                target_queue.get_nowait()
+            except queue.Empty:
+                break
 
-    # ================= 私有接口 =================
+    def __stop_local_audio_playback(self) -> None:
+        if self.sound is not None and self.sound.is_alive():
+            self.sound.stop()
+            time.sleep(LOCAL_AUDIO_STOP_WAIT_SEC)
+
+    def __request_stream(self, text: str, data_type: str):
+        return requests.post(
+            self.__build_http_url("/api/tts"),
+            data={
+                "tts_text": text,
+                "data_type": data_type,
+                "sid": self.speaker_id,
+                "speed": self.speed,
+            },
+            timeout=self.timeout,
+            stream=data_type == "pcm",
+        )
 
     def __audio_callback(self, outdata, frames, time_info, status):
         del time_info
@@ -182,13 +234,9 @@ class TTSClient:
         严格串行的 TTS worker
         """
         while not self._stop_event.is_set():
-
-            time.sleep(0.1)
-
             try:
-                text = self.text_queue.get(timeout=0.1)
+                text = self.text_queue.get(timeout=WORKER_POLL_TIMEOUT_SEC)
             except queue.Empty:
-                time.sleep(0.1)
                 continue
 
             start_time = time.time()
@@ -208,19 +256,9 @@ class TTSClient:
 
     def __tts_request_http(self, text):
         try:
-            with requests.post(
-                "http://" + self.host + f":{self.port}/api/tts",
-                data={
-                    "tts_text": text,
-                    "data_type": "pcm",
-                    "sid": self.speaker_id,
-                    "speed": self.speed,
-                },
-                stream=True,
-            ) as resp:
+            with self.__request_stream(text, data_type="pcm") as resp:
                 resp.raise_for_status()
                 for chunk in resp.iter_content(chunk_size=self.chunk_size):
-                    # 检查停止或打断标志
                     if self._stop_event.is_set():
                         return
                     if self._interrupt_event.is_set():
@@ -389,27 +427,16 @@ class TTSClient:
 
     def generate_wav(self, text, filename) -> bool:
         try:
-            url = f"http://{self.host}:{self.port}/api/tts"
+            with self.__request_stream(text, data_type="wav") as resp:
+                resp.raise_for_status()
 
-            resp = requests.post(
-                url,
-                data={
-                    "tts_text": text,
-                    "data_type": "wav",
-                    "sid": self.speaker_id,
-                    "speed": self.speed,
-                },
-            )
+                if "audio" not in resp.headers.get("Content-Type", ""):
+                    logger.error("返回不是音频")
+                    logger.error(resp.text)
+                    return False
 
-            resp.raise_for_status()
-
-            if "audio" not in resp.headers.get("Content-Type", ""):
-                logger.error("返回不是音频")
-                logger.error(resp.text)
-                return False
-
-            with open(filename, "wb") as f:
-                f.write(resp.content)
+                with open(filename, "wb") as f:
+                    f.write(resp.content)
             return True
 
         except Exception as e:
@@ -420,16 +447,16 @@ class TTSClient:
         """
         只负责把文本放进队列，不阻塞，由后台线程处理并播放语音合成
         """
-        # 清除打断标志
         self._interrupt_event.clear()
 
-        if not text.strip():
+        normalized_text = text.strip()
+        if not normalized_text:
             return
 
         if interrupt:
             self.interrupt()
 
-        self.text_queue.put(text)
+        self.text_queue.put(normalized_text)
 
     def is_active(self):
         """检查播放器是否正在播放音频"""
@@ -448,10 +475,7 @@ class TTSClient:
     def play_audio(self, file_path, block=False):
         """播放本地音频文件（阻塞/非阻塞）"""
         try:
-            # 如果有正在播放的音频，先停止它
-            if self.sound is not None and self.sound.is_alive():
-                self.sound.stop()
-                time.sleep(0.1)  # 等待音频停止
+            self.__stop_local_audio_playback()
 
             self.sound = playsound(file_path, block=block)
 
@@ -466,7 +490,6 @@ class TTSClient:
             #     time.sleep(0.1)  # 等待音频播放结束
             # # print("播放完成！")
 
-            logger.info(f"开始播放音频文件: {file_path}")
         except Exception as e:
 
             logger.error(f"播放{file_path}失败: {e}")
@@ -484,32 +507,17 @@ class TTSClient:
         """打断：清空文本 + 音频"""
         self._interrupt_event.set()
 
-        time.sleep(0.2)
+        time.sleep(INTERRUPT_GRACE_PERIOD_SEC)
 
         if not self.text_queue.empty() or not self.audio_queue.empty():
             logger.info("正在清空播放队列...")
 
-        while not self.text_queue.empty():
-            try:
-                self.text_queue.get_nowait()
-            except queue.Empty:
-                break
-
-        while not self.audio_queue.empty():
-            try:
-                self.audio_queue.get_nowait()
-            except queue.Empty:
-                break
-
-        with self._audio_lock:
-            self._playback_buffer = np.empty((0, self.channels), dtype=np.float32)
-            self._audio_active_started_ts = 0.0
-            self._last_audio_chunk_ts = 0.0
-
-        if self.sound is not None and self.sound.is_alive():
-            self.sound.stop()
-            time.sleep(0.1)
-            logger.info("正在停止当前播放的音频...")
+        self.__drain_queue(self.text_queue)
+        self.__drain_queue(self.audio_queue)
+        self.__reset_playback_state()
+        # if self.sound is not None and self.sound.is_alive():
+        self.__stop_local_audio_playback()
+        logger.info("正在停止当前播放的音频...")
 
         self._interrupt_event.clear()
 
@@ -519,10 +527,11 @@ class TTSClient:
     def stop(self):
         """停止播放器"""
         self._stop_event.set()
+        self.interrupt()
         self.__close_ws_runtime()
         self.stream.stop()
         self.stream.close()
-        self.tts_thread.join()
+        self.tts_thread.join(timeout=3)
 
 
 if __name__ == "__main__":
