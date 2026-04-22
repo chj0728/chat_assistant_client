@@ -635,6 +635,7 @@ class ChatAssistant:
         激活 LLM Agent，进入 ACTIVE 状态
         """
         self.llm_agent_state = ComponentState.ACTIVE
+        self.last_interface_time = time.time()
 
     def deactivate_llm_agent(self):
         """
@@ -956,7 +957,7 @@ class ChatAssistant:
 
             self.last_interface_time = time.time()
             return True
-
+        
         # 判断是否需要重置唤醒词状态
         if time.time() - self.last_interface_time > self.reactive_kws_threshold:
             # self.flag_kws = 0
