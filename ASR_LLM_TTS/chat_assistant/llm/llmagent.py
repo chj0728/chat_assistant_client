@@ -12,6 +12,7 @@ description: 该模块定义了用于创建和管理基于大型语言模型（L
 """
 
 import sqlite3
+from pathlib import Path
 from typing import Any
 
 import requests
@@ -42,15 +43,59 @@ from logger import logger
 from pydantic import SecretStr
 from tools.functions import get_current_location, get_shanghai_time, get_weather_info
 
-config = load_config()
-MAX_MESSAGES = config.get("llm", {}).get("max_messages", 5)
-logger.debug(f"LLM Agent 配置 - MAX_MESSAGES: {MAX_MESSAGES}")
+DEFAULT_MAX_MESSAGES = 5
+DEFAULT_MODEL_ID = "Qwen/Qwen3"
+DEFAULT_DB_PATH = (
+    Path(__file__).resolve().parent.parent / "db" / "agent_conversations.db"
+)
+DEFAULT_SYSTEM_PROMPT = (
+    "你需要简洁且有礼貌地回答用户的问题，请保持回答简短且有条理，控制在100字以内。\n"
+    "在回答中尽量避免使用标点符号结尾，以便更自然地进行语音合成。\n"
+    "如果你不确定答案，可以礼貌地告诉用户你不知道。\n"
+    "只有当用户回答退出、结束等相关内容时，调用结束对话的工具函数，礼貌地结束对话。"
+)
 
 
-def create_optimized_sqlite_connection(db_path: str) -> sqlite3.Connection:
+def get_max_messages(default: int = DEFAULT_MAX_MESSAGES) -> int:
+    """从配置中读取最大历史消息数，读取失败时回退默认值。"""
+    config = load_config()
+    max_messages = config.get("llm", {}).get("max_messages", default)
+    logger.debug(f"LLM Agent 配置 - MAX_MESSAGES: {max_messages}")
+    return max_messages
+
+
+def build_system_prompt(extra_prompt: str | None = None) -> str:
+    """构造系统提示词。"""
+    if extra_prompt:
+        return f"{DEFAULT_SYSTEM_PROMPT}\n{extra_prompt}\n"
+    return DEFAULT_SYSTEM_PROMPT + "\n"
+
+
+def get_default_tools() -> list:
+    """返回默认启用的工具列表。"""
+    return [
+        get_current_time_tool,
+        get_current_location_tool,
+        get_weather_info_tool,
+    ]
+
+
+def normalize_message_content(content: Any) -> str:
+    """将 LangChain 消息内容统一转换为字符串。"""
+    if isinstance(content, list):
+        return "".join(part if isinstance(part, str) else str(part) for part in content)
+    if content is None:
+        return ""
+    return str(content)
+
+
+def create_optimized_sqlite_connection(db_path: str | Path) -> sqlite3.Connection:
     """创建经过性能优化的SQLite连接"""
+    db_path = Path(db_path).expanduser().resolve()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
     conn = sqlite3.connect(
-        db_path,
+        str(db_path),
         check_same_thread=False,  # 允许多线程访问
         timeout=30,  # 超时时间
         isolation_level=None,  # 自动提交模式
@@ -131,7 +176,7 @@ def trim_messages_before_model(
         messages,
         # When `len` is passed in as the token counter function,
         # max_tokens will count the number of messages in the chat history.
-        max_tokens=MAX_MESSAGES,
+        max_tokens=get_max_messages(),
         strategy="last",
         # Passing in `len` as a token counter function will
         # count the number of messages in the chat history.
@@ -198,68 +243,21 @@ class LLMAgent:
         self.dynamic_middleware_list = (
             dynamic_middleware_list if dynamic_middleware_list else []
         )
+        self.tools = get_default_tools()
+        self.system_msg = SystemMessage(content=build_system_prompt(system_prompt))
+        self.db_path = DEFAULT_DB_PATH
 
-        # 获取模型列表
         self.llm_url = f"http://{self.host}:{self.port}/v1/models"
-        try:
-            response = requests.get(self.llm_url, timeout=self.timeout)
-            data = response.json()
+        self._load_model_metadata()
 
-            # 获取第一个模型的ID
-            self.model_id = data["data"][0]["id"]
-            logger.info(f"使用的模型ID: {self.model_id}")
-
-            self.model_root = data["data"][0]["root"]
-            logger.info(f"模型根目录: {self.model_root}")
-
-        except Exception as e:
-            logger.error(f"获取模型列表失败: {e}")
-            # 使用默认模型ID
-            self.model_id = "Qwen/Qwen3"
-            logger.warning(f"使用默认模型ID: {self.model_id}")
-
-        # 初始化 ChatOpenAI 实例
-        ## refer from: https://reference.langchain.com/python/langchain-openai/chat_models/base/ChatOpenAI
-        self.llm_model = ChatOpenAI(
-            model=self.model_id,
-            stream_usage=True,
+        self.llm_model = self._create_chat_model(
             temperature=temperature,
             top_p=top_p,
-            # max_tokens=max_tokens, ## https://docs.langchain.com/oss/python/integrations/chat/openai#instantiation
-            timeout=self.timeout,
-            api_key=SecretStr("EMPTY"),  # vLLM不需要key
-            base_url=f"http://{self.host}:{self.port}/v1",  # vLLM服务地址
-            max_retries=2,
-            # vLLM parameters
-            ## refer from: https://docs.vllm.ai/en/v0.9.2/api/vllm/entrypoints/openai/protocol.html#vllm.entrypoints.openai.protocol.ChatCompletionRequest
-            extra_body={
-                "chat_template_kwargs": {"enable_thinking": enable_thinking},
-                "max_completion_tokens": max_tokens,
-                "top_k": top_k,
-                # "prompt": system_prompt,
-            },
+            top_k=top_k,
+            max_tokens=max_tokens,
+            enable_thinking=enable_thinking,
         )
         logger.info("LLM 模型初始化完成")
-
-        self.system_msg = SystemMessage(
-            content=(
-                (
-                    "你需要简洁且有礼貌地回答用户的问题，请保持回答简短且有条理，控制在100字以内。\n"
-                    "在回答中尽量避免使用标点符号结尾，以便更自然地进行语音合成。\n"
-                    "如果你不确定答案，可以礼貌地告诉用户你不知道。\n"
-                    "只有当用户回答退出、结束等相关内容时，调用结束对话的工具函数，礼貌地结束对话。\n"
-                    + system_prompt
-                    + "\n"
-                )
-                if system_prompt
-                else (
-                    "你需要简洁且有礼貌地回答用户的问题，请保持回答简短且有条理，控制在100字以内。\n"
-                    "在回答中尽量避免使用标点符号结尾，以便更自然地进行语音合成。\n"
-                    "如果你不确定答案，可以礼貌地告诉用户你不知道。\n"
-                    "只有当用户回答退出、结束等相关内容时，调用结束对话的工具函数，礼貌地结束对话。\n"
-                )
-            )
-        )
 
         # 创建聊天代理
         ## refer from:
@@ -267,44 +265,82 @@ class LLMAgent:
         ## Short-term memory: https://docs.langchain.com/oss/python/langchain/short-term-memory
 
         ## 创建一个不使用检查点的简化版本的代理，用于快速响应不需要上下文记忆的请求
-        self.tiny_agent = create_agent(
-            self.llm_model,
-            tools=[
-                get_current_time_tool,
-                get_current_location_tool,
-                get_weather_info_tool,
-                # response_wave_hands_tool,
-                # guide_customer_tool,
-                # end_conversation_tool,
-            ],
-            system_prompt=self.system_msg,  # if hasattr(self, "system_msg") else None,
-            # checkpointer=InMemorySaver(),  # 使用内存检查点保存对话状态
-            middleware=self.static_middleware_list + self.dynamic_middleware_list,
-        )
+        self.tiny_agent = self._create_agent_instance()
 
         ## 创建一个完整版本的代理，支持工具调用和上下文记忆，适用于需要多轮对话和上下文理解的场景
         ## 使用 sqlite 检查点保存对话状态，确保在多用户场景下能够持久化和管理每个用户的对话历史
         ## |--->refer from: https://reference.langchain.com/python/langgraph.checkpoint.sqlite/SqliteSaver
-        with create_optimized_sqlite_connection("../db/agent_conversations.db") as conn:
+        with create_optimized_sqlite_connection(self.db_path) as conn:
             # 创建一个 SqliteSaver 实例
             sqlite_saver = SqliteSaver(conn)
-            self.agent = create_agent(
-                self.llm_model,
-                tools=[
-                    get_current_time_tool,
-                    get_current_location_tool,
-                    get_weather_info_tool,
-                    # response_wave_hands_tool,
-                    # guide_customer_tool,
-                    # end_conversation_tool,
-                ],
-                system_prompt=self.system_msg,  # if hasattr(self, "system_msg") else None,
-                checkpointer=sqlite_saver,  # 使用 sqlite 检查点保存对话状态
-                middleware=self.static_middleware_list + self.dynamic_middleware_list,
-            )
+            self.agent = self._create_agent_instance(checkpointer=sqlite_saver)
         logger.info("LLM Agent 已就绪")
 
     # -------- private methods --------
+    def _load_model_metadata(self) -> None:
+        """探测远端模型信息，失败时回退默认模型。"""
+        try:
+            response = requests.get(self.llm_url, timeout=self.timeout)
+            response.raise_for_status()
+            data = response.json()
+            first_model = data["data"][0]
+            self.model_id = first_model["id"]
+            self.model_root = first_model.get("root")
+            logger.info(f"使用的模型ID: {self.model_id}")
+            logger.info(f"模型根目录: {self.model_root}")
+        except Exception as e:
+            logger.error(f"获取模型列表失败: {e}")
+            self.model_id = DEFAULT_MODEL_ID
+            self.model_root = None
+            logger.warning(f"使用默认模型ID: {self.model_id}")
+
+    def _create_chat_model(
+        self,
+        *,
+        temperature: float,
+        top_p: float,
+        top_k: int,
+        max_tokens: int,
+        enable_thinking: bool,
+    ) -> ChatOpenAI:
+        """
+        创建底层 ChatOpenAI 模型实例。
+        refer from: https://reference.langchain.com/python/langchain-openai/chat_models/base/ChatOpenAI
+        """
+        return ChatOpenAI(
+            model=self.model_id if self.model_id else DEFAULT_MODEL_ID,
+            stream_usage=True,
+            temperature=temperature,
+            top_p=top_p,
+            timeout=self.timeout,
+            api_key=SecretStr("EMPTY"),
+            base_url=f"http://{self.host}:{self.port}/v1",
+            max_retries=2,
+            # vLLM parameters
+            ## refer from: https://docs.vllm.ai/en/v0.9.2/api/vllm/entrypoints/openai/protocol.html#vllm.entrypoints.openai.protocol.ChatCompletionRequest
+            extra_body={
+                "chat_template_kwargs": {"enable_thinking": enable_thinking},
+                "max_completion_tokens": max_tokens,
+                "top_k": top_k,
+            },
+        )
+
+    def _create_agent_instance(self, checkpointer=None):
+        """
+        统一创建 LangChain Agent，避免 tiny/full agent 的重复装配。
+        - refer from:
+            - Agents: https://docs.langchain.com/oss/python/langchain/agents
+            - Short-term memory: https://docs.langchain.com/oss/python/langchain/short-term-memory
+            - sqlite checkpointer: https://reference.langchain.com/python/langgraph.checkpoint.sqlite/SqliteSaver
+        """
+        return create_agent(
+            self.llm_model,
+            tools=self.tools,
+            system_prompt=self.system_msg,
+            checkpointer=checkpointer,
+            middleware=self.static_middleware_list + self.dynamic_middleware_list,
+        )
+
     def __get_last_ai_content(self, state) -> str | None:
         """
         从对话状态中提取最后一条 AI 消息的内容。
@@ -328,13 +364,19 @@ class LLMAgent:
             state.get("messages", [])[-1] if state.get("messages") else None
         )
         if isinstance(latest_message, AIMessage):
-            content = latest_message.content
-            if isinstance(content, list):
-                return " ".join(
-                    part if isinstance(part, str) else str(part) for part in content
-                )
-            return content
+            return normalize_message_content(latest_message.content)
         return None
+
+    def _build_human_message(
+        self, user_text: str, user_id: str | None = None
+    ) -> HumanMessage:
+        """构造用户输入消息。"""
+        return HumanMessage(
+            content=user_text,
+            additional_kwargs={
+                "user_id": user_id,
+            },
+        )
 
     # -------- public methods for user --------
 
@@ -345,19 +387,13 @@ class LLMAgent:
         参数:
             prompt (str): 系统提示内容。
         """
-        self.system_msg.content += "\n" + prompt
+        self.system_msg.content = build_system_prompt(prompt).rstrip("\n")
 
     def chat_response(self, user_text: str, user_id: str | None = None) -> str | None:
         """
         发送用户输入，返回完整回答文本
         """
-        human_msg = HumanMessage(
-            content=user_text,
-            additional_kwargs={
-                "user_id": user_id,
-            },
-            # response_metadata={"user_id": user_id},
-        )
+        human_msg = self._build_human_message(user_text, user_id=user_id)
 
         if user_id:
             logger.debug(f"用户ID: {user_id} - 用户输入: {user_text}")
@@ -411,7 +447,7 @@ class LLMAgent:
         发送用户输入，以流式方式返回回答文本的分段内容，适合边说边播的场景
         """
         index = 0
-        human_msg = HumanMessage(content=user_text)
+        human_msg = self._build_human_message(user_text, user_id=user_id)
         buffer = ""
         min_chunk_chars = 20
         max_chunk_chars = 50
@@ -428,20 +464,11 @@ class LLMAgent:
                 stream_mode="messages",
             )
         ):
-
             ai_chunk = chunk[0] if isinstance(chunk, tuple) else chunk
             if not isinstance(ai_chunk, AIMessageChunk):
                 continue
 
-            chunk_text = ai_chunk.content
-            if isinstance(chunk_text, list):
-                chunk_text = "".join(
-                    part if isinstance(part, str) else str(part) for part in chunk_text
-                )
-            elif chunk_text is None:
-                chunk_text = ""
-            else:
-                chunk_text = str(chunk_text)
+            chunk_text = normalize_message_content(ai_chunk.content)
 
             if not chunk_text:
                 continue
@@ -477,14 +504,16 @@ if __name__ == "__main__":
 
     # llm_agent.add_system_prompt("你叫小白，是一个智能助理。")
 
+    user_id = input("请输入用户ID（可选，直接回车跳过）: ").strip() or None
+
     while True:
         user_input = input("User: ").strip()
         if user_input.lower() in ["exit", "quit"]:
             break
-        response = llm_agent.chat_response(user_input)
+        response = llm_agent.chat_response(user_input, user_id=user_id)
 
         print("AI:", response)
 
-        # for response_chunk, index in llm_agent.chat_response_stream(user_input):
+        # for response_chunk, index in llm_agent.chat_response_stream(user_input, user_id=user_id):
         #     print("AI:", response_chunk, end="\n", flush=False)
         # print()
