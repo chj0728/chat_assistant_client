@@ -255,8 +255,8 @@ class ChatAssistant:
         self.set_kws_pinyin = self.text_processor.wake_word_pinyin
         logger.info(f"设置的唤醒词: {self.set_kws}, 拼音: {self.set_kws_pinyin}")
 
-        self.flag_kws_used = kws_cfg.get("enable", True)
-        if not self.flag_kws_used:
+        self.kws_enabled = kws_cfg.get("enable", True)
+        if not self.kws_enabled:
             logger.info("未启用唤醒词激活功能")
         self.flag_kws = 0
         self.failed_enable_kws_count = 0
@@ -391,10 +391,32 @@ class ChatAssistant:
         self.__push_queue(self.response_queue, asdict(self.response_data))
         self.response_data.clear()
 
+    def __update_status(self):
+        """根据当前组件状态更新整体状态，并记录最后交互时间，需要循环调用以保持状态更新。
+        - 如果 TTS 正在播放，认为模型正在说话，更新 last_interface_time。
+        - 如果长时间未与 LLM 交互，重置 LLM 模块为 IDLE 状态。
+        """
+        if self.tts_client.is_active():
+            # tts 播放中，代表模型正在说话
+            # 更新 last_interface_time
+            self.last_interface_time = time.time()
+
+        # 判断是否需要重置唤醒词状态
+        if (
+            time.time() - self.last_interface_time > self.reactive_kws_threshold
+            and self.kws_enabled
+            and self.llm_agent_state != ComponentState.IDLE
+        ):
+            # self.flag_kws = 0
+            # if self.llm_agent_state == LLMAgentState.ACTIVE:
+            self.llm_agent_state = ComponentState.IDLE
+            self.last_interface_time = time.time()
+            logger.info("长时间未与 LLM 交互，重置 LLM 模块为 IDLE 状态")
+
     ################## 保存音频的模块 ##################
     def __save_audio_only(self):
         """
-        只负责把 segments_to_save 中的音频保存为 wav 文件
+        将 PCM16 字节流片段 直接传给 ASR 识别，并保存为 WAV 文件。
         """
         if not self.segments_to_save:
             return None
@@ -516,10 +538,10 @@ class ChatAssistant:
 
             now = time.time()
 
-            if self.tts_client.is_active():
-                # tts 播放中，代表模型正在说话
-                # 更新 last_interface_time
-                self.last_interface_time = now
+            # if self.tts_client.is_active():
+            #     # tts 播放中，代表模型正在说话
+            #     # 更新 last_interface_time
+            #     self.last_interface_time = now
 
             # indata: float32 [-1.0, 1.0]
             audio_buffer.append(indata.copy())
@@ -598,6 +620,10 @@ class ChatAssistant:
         ) as self.input_stream:
             logger.info("音频输入流已打开，等待录音...")
             while self.recording_active:
+
+                # 这里的循环主要是为了保持主线程活跃，以便音频回调函数能够持续接收数据并处理，同时也可以在这里监控状态或执行其他周期性任务
+                self.__update_status()
+
                 time.sleep(1)
         # logger.info(
         #     "sd.default.device info: {}".format(sd.query_devices(sd.default.device))
@@ -859,27 +885,13 @@ class ChatAssistant:
         time_now = time.time()
         try:
             self.tts_client.speak(llm_response.strip())
-
-            # while not self.tts_client.is_active():
-            #     if time.time() - time_now > 5.0:
-            #         logger.error("TTS 播放超时 或者 TTS 播放音频太短")
-            #         return False
-            #     time.sleep(0.01)
-
-            # elapsed_time = 0
-            # if isinstance(self.tts_client, RealtimeTTSPlayer):
-            #     elapsed_time = time.time() - time_now
-            # else:
-            #     elapsed_time = (
-            #         time.time()
-            #         - time_now
-            #         - self.tts_client.get_playback_start_delay_sec()
-            #     )
-
-            # logger.info(f"TTS 合成并播放音频延迟: {elapsed_time:.2f} 秒")
-            return self.tts_cost_time(time_now)
-
-            # return True
+            threading.Thread(
+                target=self.tts_cost_time,
+                args=(time_now,),
+                daemon=True,
+                name="tts-startup-monitor",
+            ).start()
+            return True
         except Exception as e:
             logger.error(f"TTS 播放失败: {e}")
             return False
@@ -894,7 +906,12 @@ class ChatAssistant:
             # 假设 tts_client.speak 为异步或基于缓冲队列的非阻塞调用
             self.tts_client.speak(llm_response_chunk.strip(), interrupt=False)
             if index == 0:
-                threading.Thread(target=self.tts_cost_time, args=(time_now,)).start()
+                threading.Thread(
+                    target=self.tts_cost_time,
+                    args=(time_now,),
+                    daemon=True,
+                    name="tts-stream-startup-monitor",
+                ).start()
             return True
         except Exception as e:
             logger.error(f"TTS 推送流式片段 [{index}] 失败: {e}")
@@ -904,11 +921,9 @@ class ChatAssistant:
         """
         计算 TTS 合成并播放音频的延迟时间
         """
-        while not self.tts_client.is_active():
-            if time.time() - start_time > 5.0:
-                logger.error("TTS 播放超时 或者 TTS 播放音频太短")
-                return False
-            time.sleep(0.01)
+        if not self.tts_client.wait_until_playback_starts(timeout_sec=5.0):
+            logger.error("TTS 播放超时 或者 TTS 播放音频太短")
+            return False
 
         elapsed_time = 0
         if isinstance(self.tts_client, RealtimeTTSPlayer):
@@ -963,16 +978,16 @@ class ChatAssistant:
             self.last_interface_time = time.time()
             return True
 
-        # 判断是否需要重置唤醒词状态
-        if time.time() - self.last_interface_time > self.reactive_kws_threshold:
-            # self.flag_kws = 0
-            # if self.llm_agent_state == LLMAgentState.ACTIVE:
-            self.llm_agent_state = ComponentState.IDLE
+        # # 判断是否需要重置唤醒词状态
+        # if time.time() - self.last_interface_time > self.reactive_kws_threshold:
+        #     # self.flag_kws = 0
+        #     # if self.llm_agent_state == LLMAgentState.ACTIVE:
+        #     self.llm_agent_state = ComponentState.IDLE
 
-            logger.info("长时间未与 LLM 交互，重置 LLM 模块为 IDLE 状态")
+        #     logger.info("长时间未与 LLM 交互，重置 LLM 模块为 IDLE 状态")
 
         # 判断是否启用唤醒词检测
-        # if self.flag_kws_used:
+        # if self.kws_enabled:
         # logger.info("需要唤醒词激活")
         if self.llm_agent_state == ComponentState.ACTIVE:
             logger.info("LLM 模块已处于 ACTIVE 状态，无需检测唤醒词")
@@ -1106,7 +1121,7 @@ class ChatAssistant:
         self.response_data.asr_text = self.asr_text
 
         # ----------- 唤醒词检测 -----------
-        if self.flag_kws_used:
+        if self.kws_enabled:
             if not self.kws_infer(self.asr_text):
 
                 self.last_interface_time = time.time()

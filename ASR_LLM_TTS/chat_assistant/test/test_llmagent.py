@@ -72,6 +72,36 @@ def test_build_system_prompt_appends_extra_prompt():
     assert prompt.endswith("补充规则\n")
 
 
+def test_select_stream_flush_index_avoids_open_intent_suffix():
+    """测试流式切分不会切进尾部未闭合的 INTENT 标签。"""
+    plain_text = "这是一段足够长的普通文本用于测试分段阈值是否生效。"
+    buffer = plain_text + "<INTENT>WAIT_FOR_TALK"
+
+    flush_index = llmagent_module.select_stream_flush_index(
+        buffer,
+        min_chunk_chars=20,
+        max_chunk_chars=50,
+        punctuation_marks="。！？!?；;，,：:",
+    )
+
+    assert flush_index == len(plain_text)
+
+
+def test_select_stream_flush_index_allows_closed_intent_suffix():
+    """测试 INTENT 标签闭合后，不会被误判为受保护尾段。"""
+    plain_text = "这是一段足够长的普通文本用于测试分段阈值是否生效。"
+    buffer = plain_text + "<INTENT>WAIT_FOR_TALK</INTENT>"
+
+    flush_index = llmagent_module.select_stream_flush_index(
+        buffer,
+        min_chunk_chars=20,
+        max_chunk_chars=50,
+        punctuation_marks="。！？!?；;，,：:",
+    )
+
+    assert flush_index == len(plain_text)
+
+
 def test_normalize_message_content_handles_list_and_none():
     """测试 normalize_message_content 是否正确处理列表和 None。"""
     assert (
@@ -226,6 +256,26 @@ def test_chat_response_stream_flushes_by_punctuation_with_user_id():
     stream_args, stream_kwargs = stateful_agent.stream_calls[0]
     assert stream_args[1] == {"configurable": {"thread_id": "user-2"}}
     assert stream_kwargs == {"stream_mode": "messages"}
+
+
+def test_chat_response_stream_keeps_intent_tag_unsplit():
+    """测试 chat_response_stream 不会把尾部 INTENT 标签切开。"""
+    agent = build_agent_shell()
+    plain_text = "这是一段足够长的文本用于测试标签保护并满足分段阈值。"
+    intent_text = "<INTENT>WAIT_FOR_TALK</INTENT>"
+    tiny_agent = DummyAgent(
+        stream_result=[
+            AIMessageChunk(content=plain_text),
+            AIMessageChunk(content="<INTENT>WAIT_FOR_"),
+            AIMessageChunk(content="TALK</INTENT>"),
+        ]
+    )
+    agent.agent = cast(Any, DummyAgent())
+    agent.tiny_agent = cast(Any, tiny_agent)
+
+    result = list(agent.chat_response_stream("hello"))
+
+    assert result == [(plain_text, 0), (intent_text, 1)]
 
 
 def test_get_last_ai_content_returns_none_for_non_ai_message():

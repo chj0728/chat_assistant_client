@@ -257,6 +257,15 @@ class RealtimeTTSPlayer:
             or (self.sound is not None and self.sound.is_alive())
         )
 
+    def wait_until_playback_starts(self, timeout_sec: float = 5.0) -> bool:
+        """等待播放器进入起播状态，超时则返回 False。"""
+        deadline = time.time() + timeout_sec
+        while not self.is_active():
+            if time.time() >= deadline:
+                return False
+            time.sleep(0.01)
+        return True
+
     def play_audio(self, file_path, block=False):
         """播放本地音频文件（阻塞/非阻塞）"""
         try:

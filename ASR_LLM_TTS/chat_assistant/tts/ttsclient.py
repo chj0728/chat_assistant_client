@@ -79,16 +79,28 @@ class TTSClient:
         self.text_queue: queue.Queue[str] = queue.Queue()
         self.audio_queue: queue.Queue[bytes] = queue.Queue()
 
-        self.sound = None
-        self.is_sounding = False
+        self.sound = None  # 当前正在播放的音频对象，playsound 没有提供接口来检查是否正在播放，因此需要自己维护状态
+        self.is_sounding = False  # 当前是否有音频正在播放，基于声音检测的状态，区别于音频对象的存在与否，用于更准确地反映实际播放状态
+
         self._audio_active_started_ts = 0.0  # 首帧时间戳，用于起播确认
+        self._audio_lock = threading.Lock()
         self._last_audio_chunk_ts = 0.0  # 最后一次收到音频块的时间戳，用于挂起判断
+
         self._playback_start_delay_sec = playback_start_delay_sec  # 起播确认延迟时间
         self._playback_hangover_sec = 0.0  # 结束后的挂起时间
-        self._stop_event = threading.Event()
-        self._interrupt_event = threading.Event()
-        self._audio_lock = threading.Lock()
-        self._playback_buffer = np.empty((0, self.channels), dtype=np.float32)
+        self._playback_buffer = np.empty(
+            (0, self.channels), dtype=np.float32
+        )  # 音频缓冲区，用于存储回调中未完全播放的音频数据
+
+        self._stop_event = (
+            threading.Event()
+        )  # 用于指示整个客户端停止，优先级高于打断事件
+        self._interrupt_event = (
+            threading.Event()
+        )  # 用于指示当前播放被打断，优先级低于停止事件
+        self._playback_started_event = (
+            threading.Event()
+        )  # 用于指示是否进入起播状态，起播状态定义为已连续播放超过起播确认延迟的音频块
 
         self.stream = self.__create_output_stream()
         self.stream.start()
@@ -141,6 +153,7 @@ class TTSClient:
             self._audio_active_started_ts = 0.0
             self._last_audio_chunk_ts = 0.0
         self.is_sounding = False
+        self._playback_started_event.clear()
 
     @staticmethod
     def __drain_queue(target_queue: queue.Queue) -> None:
@@ -152,6 +165,7 @@ class TTSClient:
 
     def __stop_local_audio_playback(self) -> None:
         if self.sound is not None and self.sound.is_alive():
+            logger.info("正在停止当前播放的音频...")
             self.sound.stop()
             time.sleep(LOCAL_AUDIO_STOP_WAIT_SEC)
 
@@ -180,6 +194,7 @@ class TTSClient:
             self.is_sounding = False
             self._audio_active_started_ts = 0.0
             self._last_audio_chunk_ts = 0.0
+            self._playback_started_event.clear()
             return
 
         filled = 0
@@ -218,6 +233,8 @@ class TTSClient:
             self.is_sounding = (
                 now - self._audio_active_started_ts
             ) >= self._playback_start_delay_sec
+            if self.is_sounding:
+                self._playback_started_event.set()
         else:
             # 短暂挂起窗口用于吸收回调调度抖动，避免状态频繁抖动。
             keep_active = (
@@ -226,6 +243,7 @@ class TTSClient:
             self.is_sounding = keep_active
             if not keep_active:
                 self._audio_active_started_ts = 0.0
+                self._playback_started_event.clear()
         ################################################
 
     def __tts_loop(self):
@@ -514,14 +532,20 @@ class TTSClient:
         self.__drain_queue(self.text_queue)
         self.__drain_queue(self.audio_queue)
         self.__reset_playback_state()
+
         # if self.sound is not None and self.sound.is_alive():
         self.__stop_local_audio_playback()
-        logger.info("正在停止当前播放的音频...")
 
         self._interrupt_event.clear()
 
     def get_playback_start_delay_sec(self):
         return self._playback_start_delay_sec
+
+    def wait_until_playback_starts(self, timeout_sec: float = 5.0) -> bool:
+        """等待起播确认事件，超时则返回 False。"""
+        if self.is_sounding:
+            return True
+        return self._playback_started_event.wait(timeout=timeout_sec)
 
     def stop(self):
         """停止播放器"""
