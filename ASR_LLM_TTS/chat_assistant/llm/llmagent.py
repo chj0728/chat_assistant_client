@@ -54,6 +54,8 @@ DEFAULT_SYSTEM_PROMPT = (
     "如果你不确定答案，可以礼貌地告诉用户你不知道。\n"
     "只有当用户回答退出、结束等相关内容时，调用结束对话的工具函数，礼貌地结束对话。"
 )
+INTENT_TAG_START = "<INTENT>"
+INTENT_TAG_END = "</INTENT>"
 
 
 def get_max_messages(default: int = DEFAULT_MAX_MESSAGES) -> int:
@@ -87,6 +89,52 @@ def normalize_message_content(content: Any) -> str:
     if content is None:
         return ""
     return str(content)
+
+
+def find_protected_suffix_start(buffer: str) -> int | None:
+    """返回尾部未闭合 INTENT 标签的起始位置；若不存在则返回 None。"""
+    last_open = buffer.rfind(INTENT_TAG_START)
+    if last_open < 0:
+        return None
+
+    last_close = buffer.rfind(INTENT_TAG_END)
+    if last_close > last_open:
+        return None
+
+    return last_open
+
+
+def select_stream_flush_index(
+    buffer: str,
+    *,
+    min_chunk_chars: int,
+    max_chunk_chars: int,
+    punctuation_marks: str,
+) -> int | None:
+    """选择流式文本的切分位置，并避免切入尾部未闭合的 INTENT 标签。"""
+    if len(buffer) < min_chunk_chars:
+        return None
+
+    flush_index = None
+    last_punctuation = max(
+        (buffer.rfind(mark) for mark in punctuation_marks), default=-1
+    )
+    if last_punctuation >= min_chunk_chars:
+        flush_index = last_punctuation + 1
+    elif len(buffer) >= max_chunk_chars:
+        flush_index = max_chunk_chars
+
+    if flush_index is None:
+        return None
+
+    protected_suffix_start = find_protected_suffix_start(buffer)
+    if protected_suffix_start is None or flush_index <= protected_suffix_start:
+        return flush_index
+
+    if protected_suffix_start >= min_chunk_chars:
+        return protected_suffix_start
+
+    return None
 
 
 def create_optimized_sqlite_connection(db_path: str | Path) -> sqlite3.Connection:
@@ -476,18 +524,12 @@ class LLMAgent:
             buffer += chunk_text
 
             while buffer:
-                flush_index = None
-                if len(buffer) >= min_chunk_chars:
-                    # Look for punctuation only starting from min_chunk_chars to ensure chunk has enough text
-                    last_punctuation = max(
-                        (buffer.rfind(mark) for mark in punctuation_marks), default=-1
-                    )
-
-                    if last_punctuation >= min_chunk_chars:
-                        flush_index = last_punctuation + 1
-                    elif len(buffer) >= max_chunk_chars:
-                        flush_index = max_chunk_chars
-
+                flush_index = select_stream_flush_index(
+                    buffer,
+                    min_chunk_chars=min_chunk_chars,
+                    max_chunk_chars=max_chunk_chars,
+                    punctuation_marks=punctuation_marks,
+                )
                 if flush_index is None:
                     break
 
