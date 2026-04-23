@@ -62,7 +62,7 @@ colcon build --symlink-install && source install/setup.bash
 
 Refer to [chat_assistant/README.md](chat_assistant/README.md) for detailed instructions on testing each module (ASR, LLM, TTS) and the integrated chat assistant.
 
-## 话题与服务列表
+## 话题列表
 
 ### 发布话题
 
@@ -115,15 +115,15 @@ data: 查询当前时间。
   - 订阅用户ID信息，LLM 可以根据用户ID进行上下文记忆
   - 若无话题发布用户ID信息，LLM 将无法进行上下文记忆，每次请求将被视为独立的单轮对话
 
-### 服务列表
+## 服务列表
 
-#### 在线重载配置文件
+### 在线重载配置文件
 
 ```bash
 ros2 service call /reload_config std_srvs/srv/Trigger
 ```
 
-#### 激活/非激活 ASR
+### 激活/非激活 ASR
 
 ```bash
 # 激活ASR服务
@@ -133,7 +133,7 @@ ros2 service call /activate_asr std_srvs/srv/Trigger
 ros2 service call /idle_asr std_srvs/srv/Trigger
 ```
 
-#### 激活/非激活 LLM
+### 激活/非激活 LLM
 
 ```bash
 # 激活LLM服务
@@ -143,7 +143,7 @@ ros2 service call /activate_llm std_srvs/srv/Trigger
 ros2 service call /idle_llm std_srvs/srv/Trigger
 ```
 
-#### 激活/非激活 TTS
+### 激活/非激活 TTS
 
 ```bash
 # 激活TTS服务
@@ -153,7 +153,7 @@ ros2 service call /activate_tts std_srvs/srv/Trigger
 ros2 service call /idle_tts std_srvs/srv/Trigger
 ```
 
-#### 激活/非激活 对话助手(同时激活/非激活 LLM和TTS服务)
+### 激活/非激活 对话助手(同时激活/非激活 LLM和TTS服务)
 
 ```bash
 # 激活对话助手服务
@@ -163,13 +163,13 @@ ros2 service call /activate_assistant std_srvs/srv/Trigger
 ros2 service call /idle_assistant std_srvs/srv/Trigger
 ```
 
-#### 打断语音播放
+### 打断语音播放
 
 ```bash
 ros2 service call /interrupt_audio std_srvs/srv/Trigger
 ```
 
-#### 播放音频（传入音频文件路径，播放该音频文件）
+### 播放音频（传入音频文件路径，播放该音频文件）
 
 - 服务名称：`/play_audio_file`
 - 服务类型：`chat_assistant_interfaces/srv/GetString`
@@ -194,7 +194,7 @@ response:
 chat_assistant_interfaces.srv.GetString_Response(success=True, message='音频播放成功')
 ```
 
-#### 语音识别服务（传入音频文件路径，返回识别文本）
+### 语音识别服务（传入音频文件路径，返回识别文本）
 
 - 服务名称：`/asr_infer`
 - 服务类型：`chat_assistant_interfaces/srv/GetString`
@@ -220,7 +220,7 @@ response:
 chat_assistant_interfaces.srv.GetString_Response(success=True, message='你好，这是一个文本转语音的测试。')
 ```
 
-#### 大语言模型服务（传入文本，返回生成文本）
+### 大语言模型服务（传入文本，返回生成文本）
 
 - 服务名称：`/llm_infer`
 - 服务类型：`chat_assistant_interfaces/srv/GetString`
@@ -289,7 +289,7 @@ response:
 chat_assistant_interfaces.srv.GetString_Response(success=True, message='我记得您喜欢红色<INTENT>WAIT_FOR_TALK</INTENT>')
 ```
 
-#### 在线文本转语音服务（传入文本，合成语音并播放）
+### 在线文本转语音服务（传入文本，合成语音并播放）
 
 - 服务名称：`/tts_infer`
 - 服务类型：`chat_assistant_interfaces/srv/GetString`
@@ -314,7 +314,7 @@ response:
 chat_assistant_interfaces.srv.GetString_Response(success=True, message='TTS 合成并播放音频成功')
 ```
 
-#### 离线文本转语音服务（传入文本，保存为 WAV 文件）
+### 离线文本转语音服务（传入文本，保存为 WAV 文件）
 
 - 服务名称：`/tts_generate_wav`
 - 服务类型：`chat_assistant_interfaces/srv/GenerateWav`
@@ -340,7 +340,7 @@ response:
 chat_assistant_interfaces.srv.GenerateWav_Response(success=True, message='WAV 文件已保存到 /home/xuyao/chj/ws/ymbot/ASR_LLM_TTS/chat_assistant/wavs/tts_output.wav')
 ```
 
-#### 接收文本输入，调用 ASR、LLM、TTS 完成一次完整的交互服务
+### 接收文本输入，调用 ASR、LLM、TTS 完成一次完整的交互服务
 
 - 服务名称：`/chat_assistant_infer`
 - 服务类型：`chat_assistant_interfaces/srv/GetString`
@@ -364,4 +364,19 @@ requester: making request: chat_assistant_interfaces.srv.GetString_Request(input
 
 response:
 chat_assistant_interfaces.srv.GetString_Response(success=True, message='聊天助手完整交互已完成')
+```
+
+## Testing
+
+```bash
+uv pip install -U pytest -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
+```
+
+- Run all tests
+
+```bash
+
+cd ASR_LLM_TTS/chat_assistant/
+
+pytest ./test/
 ```
