@@ -14,8 +14,6 @@ log/
 
 **.wav
 
-test/
-
 .env
 .env.*
 !.env.example

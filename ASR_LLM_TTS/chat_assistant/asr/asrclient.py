@@ -212,7 +212,7 @@ class ASRClient:
         text = re.sub(r"<unk>", "", text)
 
         # 2. 合并多空格
-        text = re.sub(r"\s+", " ", text)
+        text = re.sub(r"\s+", "", text)
 
         # # 3. 合并类似 "s s v v" → "ssvv"
         # text = re.sub(r"\b([a-zA-Z])\s+(?=[a-zA-Z]\b)", r"\1", text)
@@ -734,11 +734,10 @@ class ASRClient:
 if __name__ == "__main__":
 
     ws_client = ASRClient(
-        host="192.168.50.220",
-        port=2002,
+        host="192.168.50.107",
+        port=6006,
         timeout_sec=30,
-        use_websocket=False,
-        ws_path="/",
+        use_websocket=True,
     )
 
     import time

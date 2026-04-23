@@ -10,7 +10,7 @@ cd {workspace_root}/ASR_LLM_TTS/chat_assistant
 - ASR Demo(语音识别)
 
 ```bash
-python3 -m asr.asrclient_v1
+python3 -m asr.asrclient
 ```
 
 - LLM Demo(大语言模型)
