@@ -24,6 +24,7 @@ from langchain.agents.middleware import (
 )
 from langchain.messages import RemoveMessage
 from langchain.tools import tool
+from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.messages import (
     AIMessage,
     AIMessageChunk,
@@ -56,6 +57,19 @@ DEFAULT_SYSTEM_PROMPT = (
 )
 INTENT_TAG_START = "<INTENT>"
 INTENT_TAG_END = "</INTENT>"
+
+
+# config 设置里的回调函数示例，实际使用时可以根据需要进行修改和扩展
+## refer from:
+## - https://reference.langchain.com/python/langchain-core/callbacks/base/BaseCallbackHandler
+## - https://reference.langchain.org.cn/python/langchain_core/callbacks/
+class my_callback_handler(BaseCallbackHandler):
+    """自定义回调函数示例，用于处理模型生成的消息块。"""
+
+    logger.debug("初始化自定义回调处理器")
+
+    def on_chain_start(self, serialized, inputs, **kwargs):
+        logger.debug("链开始")
 
 
 def get_max_messages(default: int = DEFAULT_MAX_MESSAGES) -> int:
@@ -459,7 +473,11 @@ class LLMAgent:
                 ## refer from:
                 ## 1. https://docs.langchain.com/langsmith/observability-concepts#threads
                 ## 2. https://docs.langchain.com/langsmith/threads#group-traces-into-threads
-                {"configurable": {"thread_id": user_id}},
+                # {"configurable": {"thread_id": user_id}},
+                config={
+                    "callbacks": [my_callback_handler()],
+                    "configurable": {"thread_id": user_id},
+                },
                 stream_mode="values",
             )
             last_ai_content = self.__get_last_ai_content(result)
@@ -485,7 +503,9 @@ class LLMAgent:
                 #         }
                 #     ]
                 # }
-                {"messages": [human_msg]}
+                {"messages": [human_msg]},
+                config={"callbacks": [my_callback_handler()]},
+                stream_mode="values",
             )
             last_ai_content = self.__get_last_ai_content(result)
             return last_ai_content
@@ -503,12 +523,17 @@ class LLMAgent:
         for chunk in (
             self.agent.stream(
                 {"messages": [human_msg]},
-                {"configurable": {"thread_id": user_id}},
+                # {"configurable": {"thread_id": user_id}},
+                config={
+                    "callbacks": [my_callback_handler()],
+                    "configurable": {"thread_id": user_id},
+                },
                 stream_mode="messages",
             )
             if user_id
             else self.tiny_agent.stream(
                 {"messages": [human_msg]},
+                config={"callbacks": [my_callback_handler()]},
                 stream_mode="messages",
             )
         ):
