@@ -2,7 +2,7 @@ import logging
 import logging.handlers
 import os
 import time
-from datetime import time
+from datetime import time as dt_time
 
 # 获取环境变量中的 DEBUG_MODE，默认为 false
 DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
@@ -57,7 +57,7 @@ timed_handler = logging.handlers.TimedRotatingFileHandler(
     interval=1,  # 间隔倍数（如when="H"，interval=6则每6小时滚动）
     backupCount=48,  # 保留的旧日志文件个数
     encoding="utf-8",
-    atTime=time(0, 0, 0),  # 滚动时间点（每天零点）
+    atTime=dt_time(0, 0, 0),  # 滚动时间点（每天零点）
 )
 # 设置日志文件后缀格式为年-月-日_时-分
 # timed_handler.suffix = "%Y-%m-%d_%H-%M-%S"  # 精确到秒

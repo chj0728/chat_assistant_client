@@ -1,16 +1,36 @@
+# --- 基础工具 ---
 numpy
-playsound3
-pypinyin
+scipy
+setuptools
+
+# --- 配置与网络 ---
+python-dotenv
 pyyaml
 requests
-python-dotenv
-scipy
+websockets
+
+# --- 音频与语音 ---
+playsound3
+pypinyin
 sounddevice
 webrtcvad
-setuptools
+
+# --- LLM / OpenAI / LangChain ---
 openai
 langchain
+langchain-community
+langchain-core
+langchain-huggingface
 langchain-openai
-langchain_community
+langchain-text-splitters
 langgraph-checkpoint-sqlite
-websockets
+
+# --- 向量库 ---
+faiss-cpu
+
+# --- 本地 Embedding / Rerank ---
+sentence-transformers
+
+# --- 文档解析 ---
+docx2txt
+pypdf
