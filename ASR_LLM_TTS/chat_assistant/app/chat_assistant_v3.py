@@ -162,15 +162,16 @@ class ChatAssistant:
             host=llm_cfg.get("host", "192.168.50.125"),
             port=llm_cfg.get("port", 8000),
             temperature=llm_cfg.get("temperature", 0.3),
-            max_tokens=llm_cfg.get("max_tokens", 512),
+            max_completion_tokens=llm_cfg.get("max_completion_tokens", 150),
             enable_thinking=llm_cfg.get("enable_thinking", False),
             dynamic_middleware_list=self.dynamic_middleware_list,
             timeout=llm_cfg.get("timeout_sec", 10),
-            system_prompt=llm_cfg.get("system_prompt", ""),
+            extra_system_prompt=llm_cfg.get("extra_system_prompt", ""),
+            rag_enable=llm_cfg.get("rag_enable", False),
         )
-        system_prompt = llm_cfg.get("system_prompt", "")
-        if system_prompt:
-            llm_client.add_system_prompt(system_prompt)
+        # system_prompt = llm_cfg.get("system_prompt", "")
+        # if system_prompt:
+        #     llm_client.add_extra_system_prompt(system_prompt)
         self.enable_stream = llm_cfg.get("enable_stream", False)
         return llm_client
 

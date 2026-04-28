@@ -69,6 +69,7 @@ def end_conversation_tool():
     push_queue(tool_event_queue, ToolEvent.END_CONVERSATION.value)
     return
 
+
 @tool(description="调整默认扬声器音量")
 def adjust_speaker_volume_tool(volume: int):
     # """调整系统默认扬声器音量的工具函数"""
@@ -87,7 +88,6 @@ def adjust_speaker_volume_tool(volume: int):
     return
 
 
-
 class DynamicToolMiddleware(AgentMiddleware):
     """
     动态工具中间件示例，用于在运行时注册和调用工具
@@ -96,7 +96,12 @@ class DynamicToolMiddleware(AgentMiddleware):
     def wrap_model_call(self, request: ModelRequest, handler):
         # 添加动态工具请求处理
         updated = request.override(
-            tools=[*request.tools, response_wave_hands_tool, end_conversation_tool, adjust_speaker_volume_tool]
+            tools=[
+                *request.tools,
+                response_wave_hands_tool,
+                end_conversation_tool,
+                adjust_speaker_volume_tool,
+            ]
         )
         # logger.info("动态工具中间件: 添加挥手回应和结束对话工具")
         return handler(updated)
@@ -126,8 +131,8 @@ def test_before_agent(state: AgentState, runtime: Runtime) -> None:
     # global call_flag
     # call_flag = True
     logger.debug("=======> Before Agent Dynamic Middleware")
-    messages = state["messages"]
-    logger.debug(f"Current messages: {[m for m in messages]}")
+    # messages = state["messages"]
+    # logger.debug(f"Current messages: {[m for m in messages]}")
     # for m in messages:
     #     m.pretty_print()
 
@@ -169,9 +174,10 @@ def test_before_agent(state: AgentState, runtime: Runtime) -> None:
 
 @after_model
 def test_after_model(state: AgentState, runtime: Runtime) -> None:
-    logger.debug("=======> After Model Middleware")
+    logger.debug("=======> After Model Dynamic Middleware")
     messages = state["messages"]
-    logger.debug(f"Current messages: {[m for m in messages]}")
+    for i, m in enumerate(messages):
+        logger.debug(f"Message {i}: {m}")
     # for m in messages:
     #     m.pretty_print()
 
@@ -179,8 +185,8 @@ def test_after_model(state: AgentState, runtime: Runtime) -> None:
 @after_agent
 def test_after_agent(state: AgentState, runtime: Runtime) -> None:
     logger.debug("=======> After Agent Dynamic Middleware")
-    messages = state["messages"]
-    logger.debug(f"Current messages: {[m for m in messages]}")
+    # messages = state["messages"]
+    # logger.debug(f"Current messages: {[m for m in messages]}")
     # for m in messages:
     #     m.pretty_print()
 
@@ -191,7 +197,7 @@ middlewares = [
     # test_before_model,
     # trim_messages_before_model,
     # delete_old_messages_after_model,
-    test_after_model,
+    # test_after_model,
     test_after_agent,
 ]
 
@@ -278,7 +284,11 @@ class ChatAssistantNode(Node):
             self.get_parameter("config_path_value").get_parameter_value().string_value
         )
         logger.info(f"从参数服务器获取的配置文件路径: {self.config_path_value}")
-        self.config_path = Path(self.config_path_value).expanduser().resolve() if self.config_path_value else None
+        self.config_path = (
+            Path(self.config_path_value).expanduser().resolve()
+            if self.config_path_value
+            else None
+        )
         logger.info(f"配置文件路径: {self.config_path}")
 
         self.load_config_and_initialize()
@@ -665,10 +675,8 @@ def main(args=None):
                 # logger.info(f"发布 ASR 识别结果到话题: [{asr_text}]")
 
             if chat_assistant_node.chat_assistant.llm_text_queue.empty() is False:
-                llm_response = (
-                    chat_assistant_node.chat_assistant.llm_text_queue.get(
-                        timeout=0.05
-                    )
+                llm_response = chat_assistant_node.chat_assistant.llm_text_queue.get(
+                    timeout=0.05
                 )
 
                 # 发布 llm_response 到话题

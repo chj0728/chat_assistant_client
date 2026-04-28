@@ -20,11 +20,12 @@ from config import load_config
 from langchain.agents import AgentState, create_agent
 from langchain.agents.middleware import (
     AgentMiddleware,
+    after_model,
     before_model,
 )
 from langchain.messages import RemoveMessage
 from langchain.tools import tool
-from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.callbacks import BaseCallbackHandler, UsageMetadataCallbackHandler
 from langchain_core.messages import (
     AIMessage,
     AIMessageChunk,
@@ -33,10 +34,12 @@ from langchain_core.messages import (
     trim_messages,
 )
 
-# from langchain_core.messages.utils import count_tokens_approximately
+# from langgraph.store.sqlite import SqliteStore
+# from uuid import uuid7
+# from langsmith import uuid7_from_datetime
+from langchain_core.utils.uuid import uuid7
 from langchain_openai import ChatOpenAI
-
-# from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph.message import REMOVE_ALL_MESSAGES
 from langgraph.runtime import Runtime
@@ -68,8 +71,8 @@ class my_callback_handler(BaseCallbackHandler):
 
     logger.debug("初始化自定义回调处理器")
 
-    def on_chain_start(self, serialized, inputs, **kwargs):
-        logger.debug("链开始")
+    # def on_chain_start(self, serialized, inputs, **kwargs):
+    #     logger.debug("链开始")
 
 
 def get_max_messages(default: int = DEFAULT_MAX_MESSAGES) -> int:
@@ -80,7 +83,15 @@ def get_max_messages(default: int = DEFAULT_MAX_MESSAGES) -> int:
     return max_messages
 
 
-def build_system_prompt(extra_prompt: str | None = None) -> str:
+def get_max_tokens(default: int = 2048) -> int:
+    """从配置中读取最大历史消息数，读取失败时回退默认值。"""
+    config = load_config()
+    max_tokens = config.get("llm", {}).get("max_tokens", default)
+    logger.debug(f"LLM Agent 配置 - MAX_TOKENS: {max_tokens}")
+    return max_tokens
+
+
+def build_global_system_prompt(extra_prompt: str | None = None) -> str:
     """构造系统提示词。"""
     if extra_prompt:
         return f"{DEFAULT_SYSTEM_PROMPT}\n{extra_prompt}\n"
@@ -93,6 +104,14 @@ def get_default_tools() -> list:
         get_current_time_tool,
         get_current_location_tool,
         get_weather_info_tool,
+    ]
+
+
+def get_callback_handlers():
+    """返回默认启用的回调处理器列表。"""
+    return [
+        my_callback_handler(),
+        UsageMetadataCallbackHandler(),
     ]
 
 
@@ -211,15 +230,15 @@ def trim_messages_before_model(
 
     messages = state["messages"]
 
-    logger.debug(
-        f"\n=======> Before LLM Static Middleware:\n Current messages: {[m for m in messages]}"
-    )
+    logger.debug("\n=======> Before Model Middleware:\n Current messages:\n ")
+    for i, m in enumerate(messages):
+        logger.debug(f"Message {i}: {m}")
 
     # refer from: https://juejin.cn/post/7534535266226192430
-    ## 使用 token 数量限制的方式来控制对话历史长度
-    # trimmed = trim_messages(
+    # # 使用 token 数量限制的方式来控制对话历史长度
+    # trimmed_tokens_messages = trim_messages(
     #     messages,
-    #     max_tokens=100,  # 保留消息的最大token数量，超过时会删除最旧的消息，直到总token数在限制内
+    #     max_tokens=get_max_tokens(),  # 保留消息的最大token数量，超过时会删除最旧的消息，直到总token数在限制内
     #     strategy="last",  # 保留最近的消息，删除最旧的消息
     #     token_counter=count_tokens_approximately,  # 计算消息token数量的函数
     #     # Most chat models expect that chat history starts with either:
@@ -234,7 +253,7 @@ def trim_messages_before_model(
     # )
 
     ## 使用消息数量限制的方式来控制对话历史长度
-    trimmed = trim_messages(
+    trimmed_messages = trim_messages(
         messages,
         # When `len` is passed in as the token counter function,
         # max_tokens will count the number of messages in the chat history.
@@ -254,10 +273,37 @@ def trim_messages_before_model(
         allow_partial=False,
     )
 
-    logger.debug(f"\nTrimmed messages: {[m for m in trimmed]}")
+    logger.debug(
+        "\n=======> Before Model Middleware:\n Trimmed messages to fit context window:\n "
+    )
+    for i, m in enumerate(trimmed_messages):
+        logger.debug(f"Message {i}: {m}")
 
     # return {"messages": trimmed}
-    return {"messages": [RemoveMessage(id=REMOVE_ALL_MESSAGES), *trimmed]}
+    return {"messages": [RemoveMessage(id=REMOVE_ALL_MESSAGES), *trimmed_messages]}
+
+
+@after_model
+def delete_system_message_after_model(
+    state: AgentState, runtime: Runtime
+) -> dict[str, Any] | None:
+    """删除模型回复中的系统消息，避免系统消息被后续对话历史保留和重复使用。"""
+    messages = state["messages"]
+
+    logger.debug("\n=======> After Model Middleware:\n Current messages:\n ")
+    for i, m in enumerate(messages):
+        logger.debug(f"Message {i}: {m}")
+
+    # 删除 AI 回复中的系统消息
+    cleaned_messages = [m for m in messages if not isinstance(m, SystemMessage)]
+
+    logger.debug(
+        "\n=======> After Model Middleware:\n Cleaned messages (removed SystemMessage):\n "
+    )
+    for i, m in enumerate(cleaned_messages):
+        logger.debug(f"Message {i}: {m}")
+
+    return {"messages": [RemoveMessage(id=REMOVE_ALL_MESSAGES), *cleaned_messages]}
 
 
 class LLMAgent:
@@ -275,10 +321,11 @@ class LLMAgent:
         temperature=0.6,
         top_p=0.95,
         top_k=50,
-        max_tokens=256,
+        max_completion_tokens=256,
         enable_thinking=False,
         timeout=30,
-        system_prompt: str | None = None,
+        extra_system_prompt: str | None = None,
+        rag_enable=False,
     ):
         """
         初始化 LLMAgent 实例。
@@ -290,10 +337,11 @@ class LLMAgent:
             temperature (float): 控制生成文本的随机性。默认值为 0.6。
             top_p (float): 用于 nucleus 采样的概率阈值。默认值为 0.95。
             top_k (int): 用于 top-k 采样的词汇数量。默认值为 50。
-            max_tokens (int): 生成文本的最大 token 数量。默认值为 256。
+            max_completion_tokens (int): 生成内容（completion） 的 token 数量，根据实际情况调整。默认值为 256。
             enable_thinking (bool): 是否启用思考过程。默认值为 False。
             timeout (int): 请求超时时间（秒）。默认值为 30 秒。
-            system_prompt (str | None): 系统提示信息。默认值为 None。
+            extra_system_prompt (str | None): 额外的系统提示信息。用于初始化agent时构建的全局系统提示词。默认值为 None。
+            rag_enable (bool): 是否启用 RAG 功能。默认值为 False。启用后会在 调用LLM回复前先进行检索增强。
         """
 
         self.host = host
@@ -301,13 +349,26 @@ class LLMAgent:
         self.model_id = None
         self.model_root = None
         self.timeout = timeout
-        self.static_middleware_list = [trim_messages_before_model]
+        self.static_middleware_list = [
+            trim_messages_before_model,
+            delete_system_message_after_model,
+        ]
         self.dynamic_middleware_list = (
             dynamic_middleware_list if dynamic_middleware_list else []
         )
+        self.rag_enable = rag_enable
         self.tools = get_default_tools()
-        self.system_msg = SystemMessage(content=build_system_prompt(system_prompt))
+        self.global_system_msg = SystemMessage(
+            content=build_global_system_prompt(extra_system_prompt)
+        )
         self.db_path = DEFAULT_DB_PATH
+
+        self.thread_id = uuid7()  # 使用 UUID 作为默认线程 ID，确保唯一性
+        logger.debug(f"LLM Agent 初始化 - 线程ID: {self.thread_id}")
+
+        # 初始化使用统计回调处理器，用于收集和记录模型调用的使用数据，如 token 数量、调用次数等。这些数据可以用于监控模型的使用情况和优化性能。
+        ## refer from: https://docs.langchain.com/oss/python/langchain/models#token-usage
+        self.callback_handlers = get_callback_handlers()
 
         self.llm_url = f"http://{self.host}:{self.port}/v1/models"
         self._load_model_metadata()
@@ -316,7 +377,7 @@ class LLMAgent:
             temperature=temperature,
             top_p=top_p,
             top_k=top_k,
-            max_tokens=max_tokens,
+            max_completion_tokens=max_completion_tokens,
             enable_thinking=enable_thinking,
         )
         logger.info("LLM 模型初始化完成")
@@ -327,7 +388,7 @@ class LLMAgent:
         ## Short-term memory: https://docs.langchain.com/oss/python/langchain/short-term-memory
 
         ## 创建一个不使用检查点的简化版本的代理，用于快速响应不需要上下文记忆的请求
-        self.tiny_agent = self._create_agent_instance()
+        self.tiny_agent = self._create_agent_instance(checkpointer=InMemorySaver())
 
         ## 创建一个完整版本的代理，支持工具调用和上下文记忆，适用于需要多轮对话和上下文理解的场景
         ## 使用 sqlite 检查点保存对话状态，确保在多用户场景下能够持久化和管理每个用户的对话历史
@@ -337,6 +398,21 @@ class LLMAgent:
             sqlite_saver = SqliteSaver(conn)
             self.agent = self._create_agent_instance(checkpointer=sqlite_saver)
         logger.info("LLM Agent 已就绪")
+
+        # 如果启用 RAG 功能，初始化 RAG 客户端
+        if self.rag_enable:
+            try:
+                from RAG.rag_api import RAGService
+
+                self.rag_client = RAGService()
+
+                logger.info("RAG 功能已启用")
+
+            except ImportError as e:
+                logger.error(f"无法导入 RAG 模块: {e}")
+                self.rag_client = None
+                self.rag_enable = False
+                logger.warning("RAG 功能已禁用")
 
     # -------- private methods --------
     def _load_model_metadata(self) -> None:
@@ -362,7 +438,7 @@ class LLMAgent:
         temperature: float,
         top_p: float,
         top_k: int,
-        max_tokens: int,
+        max_completion_tokens: int,
         enable_thinking: bool,
     ) -> ChatOpenAI:
         """
@@ -382,7 +458,7 @@ class LLMAgent:
             ## refer from: https://docs.vllm.ai/en/v0.9.2/api/vllm/entrypoints/openai/protocol.html#vllm.entrypoints.openai.protocol.ChatCompletionRequest
             extra_body={
                 "chat_template_kwargs": {"enable_thinking": enable_thinking},
-                "max_completion_tokens": max_tokens,
+                "max_completion_tokens": max_completion_tokens,
                 "top_k": top_k,
             },
         )
@@ -398,7 +474,7 @@ class LLMAgent:
         return create_agent(
             self.llm_model,
             tools=self.tools,
-            system_prompt=self.system_msg,
+            system_prompt=self.global_system_msg,
             checkpointer=checkpointer,
             middleware=self.static_middleware_list + self.dynamic_middleware_list,
         )
@@ -440,33 +516,56 @@ class LLMAgent:
             },
         )
 
+    def _build_system_message(self, prompt: str) -> SystemMessage:
+        """构造系统提示消息。"""
+        return SystemMessage(content=prompt)
+
+    def _build_input_messages(self, user_text: str, user_id: str | None = None) -> list:
+        """构造输入消息列表，包含单次RAG增强时的系统提示和用户输入。"""
+        if self.rag_enable and self.rag_client is not None:
+            return [
+                self._build_system_message(
+                    self.rag_client.query(user_text).get("prompt", "")
+                ),
+                self._build_human_message(user_text, user_id=user_id),
+            ]
+
+        return [
+            self._build_human_message(user_text, user_id=user_id),
+            # self._build_system_message("you are a helpful assistant."),
+        ]
+
     # -------- public methods for user --------
 
-    def add_system_prompt(self, prompt: str):
-        """
-        追加系统提示内容。
+    # def add_extra_global_system_prompt(self, prompt: str):
+    #     """
+    #     追加系统提示内容。
 
-        参数:
-            prompt (str): 系统提示内容。
-        """
-        self.system_msg.content = build_system_prompt(prompt).rstrip("\n")
+    #     参数:
+    #         prompt (str): 系统提示内容。
+    #     """
+    #     self.global_system_msg.content += f"\n{prompt}\n"
 
     def chat_response(self, user_text: str, user_id: str | None = None) -> str | None:
         """
         发送用户输入，返回完整回答文本
         """
-        human_msg = self._build_human_message(user_text, user_id=user_id)
+        # human_msg = self._build_human_message(user_text, user_id=user_id)
+
+        # system_msg = SystemMessage("You are a helpful assistant.")
+        # messages = [
+        #     system_msg,
+        #     human_msg,
+        # ]
+
+        messages = self._build_input_messages(user_text, user_id=user_id)
+        logger.debug(f"构建输入消息-------------->: {[m for m in messages]}")
 
         if user_id:
             logger.debug(f"用户ID: {user_id} - 用户输入: {user_text}")
-            # system_msg = SystemMessage("You are a helpful assistant.")
-            # messages = [
-            #     system_msg,
-            #     human_msg,
-            # ]
 
             result = self.agent.invoke(
-                {"messages": [human_msg]},
+                {"messages": messages},
                 ## 这里的 thread_id 是为了让 agent 能够区分不同用户的对话上下文，确保每个用户的对话历史独立存储和管理
                 ## 具体实现上，agent 会使用 thread_id 来索引和检索对应用户的对话历史，从而在多用户场景下正确地维护每个用户的上下文信息
                 ## thread_id 的具体命名和使用方式可以根据实际需求进行调整，关键是要确保它能够唯一标识每个用户的对话线程
@@ -475,11 +574,12 @@ class LLMAgent:
                 ## 2. https://docs.langchain.com/langsmith/threads#group-traces-into-threads
                 # {"configurable": {"thread_id": user_id}},
                 config={
-                    "callbacks": [my_callback_handler()],
+                    "callbacks": self.callback_handlers,
                     "configurable": {"thread_id": user_id},
                 },
                 stream_mode="values",
             )
+            logger.debug(self.callback_handlers[1].usage_metadata)  # 输出使用统计信息
             last_ai_content = self.__get_last_ai_content(result)
             return last_ai_content
         else:
@@ -503,10 +603,20 @@ class LLMAgent:
                 #         }
                 #     ]
                 # }
-                {"messages": [human_msg]},
-                config={"callbacks": [my_callback_handler()]},
+                {"messages": messages},
+                config={
+                    "callbacks": self.callback_handlers,
+                    "configurable": {
+                        "thread_id": str(self.thread_id)
+                    },  # 使用默认线程ID，确保在没有提供用户ID时仍然能够区分对话上下文
+                    # "metadata": {
+                    #     "trimmed_method": "messages",
+                    #     "max_messages": get_max_messages(),
+                    # },
+                },
                 stream_mode="values",
             )
+            logger.debug(self.callback_handlers[1].usage_metadata)  # 输出使用统计信息
             last_ai_content = self.__get_last_ai_content(result)
             return last_ai_content
 
@@ -515,25 +625,32 @@ class LLMAgent:
         发送用户输入，以流式方式返回回答文本的分段内容，适合边说边播的场景
         """
         index = 0
-        human_msg = self._build_human_message(user_text, user_id=user_id)
+        # human_msg = self._build_human_message(user_text, user_id=user_id)
+        messages = self._build_input_messages(user_text, user_id=user_id)
+        logger.debug(f"构建输入消息-------------->: {[m for m in messages]}")
         buffer = ""
         min_chunk_chars = 20
         max_chunk_chars = 50
         punctuation_marks = "。！？!?；;，,：:"
         for chunk in (
             self.agent.stream(
-                {"messages": [human_msg]},
+                {"messages": messages},
                 # {"configurable": {"thread_id": user_id}},
                 config={
-                    "callbacks": [my_callback_handler()],
+                    "callbacks": self.callback_handlers,
                     "configurable": {"thread_id": user_id},
                 },
                 stream_mode="messages",
             )
             if user_id
             else self.tiny_agent.stream(
-                {"messages": [human_msg]},
-                config={"callbacks": [my_callback_handler()]},
+                {"messages": messages},
+                config={
+                    "callbacks": self.callback_handlers,
+                    "configurable": {
+                        "thread_id": str(self.thread_id)
+                    },  # 使用默认线程ID，确保在没有提供用户ID时仍然能够区分对话上下文
+                },
                 stream_mode="messages",
             )
         ):
