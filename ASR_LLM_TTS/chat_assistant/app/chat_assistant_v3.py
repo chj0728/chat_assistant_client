@@ -30,13 +30,13 @@ class ChatAssistant:
     def __init__(
         self,
         config_path: str | Path | None = None,
-        dynamic_tool_middlewares=None,
-        dynamic_middleware_list=None,
+        dynamic_middlewares=None,
     ):
         self.config_path = (
             Path(config_path).expanduser().resolve() if config_path else None
         )
         self.configs = {}
+        self.dynamic_middlewares = dynamic_middlewares
 
         self.asr_text = ""
         self.llm_text = ""
@@ -53,9 +53,6 @@ class ChatAssistant:
         self.input_stream = None
         self.recorder_thread = None
         self.recording_active = False
-
-        # self.dynamic_tool_middlewares = dynamic_tool_middlewares
-        self.dynamic_middleware_list = dynamic_middleware_list
 
         self.load_config_and_initialize()
 
@@ -157,22 +154,26 @@ class ChatAssistant:
         )
 
     def _build_llm_client(self) -> LLMAgent:
-        llm_cfg = self.configs.get("llm", {})
-        llm_client = LLMAgent(
-            host=llm_cfg.get("host", "192.168.50.125"),
-            port=llm_cfg.get("port", 8000),
-            temperature=llm_cfg.get("temperature", 0.3),
-            max_completion_tokens=llm_cfg.get("max_completion_tokens", 150),
-            enable_thinking=llm_cfg.get("enable_thinking", False),
-            dynamic_middleware_list=self.dynamic_middleware_list,
-            timeout=llm_cfg.get("timeout_sec", 10),
-            extra_system_prompt=llm_cfg.get("extra_system_prompt", ""),
-            rag_enable=llm_cfg.get("rag_enable", False),
+        # llm_cfg = self.configs.get("llm", {})
+        # llm_client = LLMAgent(
+        #     host=llm_cfg.get("host", "192.168.50.125"),
+        #     port=llm_cfg.get("port", 8000),
+        #     temperature=llm_cfg.get("temperature", 0.3),
+        #     max_completion_tokens=llm_cfg.get("max_completion_tokens", 150),
+        #     enable_thinking=llm_cfg.get("enable_thinking", False),
+        #     dynamic_middlewares=self.dynamic_middlewares,
+        #     timeout=llm_cfg.get("timeout_sec", 10),
+        #     extra_system_prompt=llm_cfg.get("extra_system_prompt", ""),
+        #     rag_enable=llm_cfg.get("rag_enable", False),
+        # )
+        self.llm_stream_infer_enable = self.configs.get(
+            "llm_stream_infer_enable", False
         )
-        # system_prompt = llm_cfg.get("system_prompt", "")
-        # if system_prompt:
-        #     llm_client.add_extra_system_prompt(system_prompt)
-        self.enable_stream = llm_cfg.get("enable_stream", False)
+
+        llm_client = LLMAgent.from_config(
+            config=self.configs,
+            dynamic_middlewares=self.dynamic_middlewares,
+        )
         return llm_client
 
     def _build_tts_client(self):
@@ -1144,7 +1145,7 @@ class ChatAssistant:
 
             return
 
-        if self.enable_stream:
+        if self.llm_stream_infer_enable:
             # -------- llm tts stream --------------
             # -------- 先确认当前阶段是否允许播放 TTS，避免分段打断自己 ---------
             tts_can_play = self.check_tts_status()

@@ -12,26 +12,21 @@ description: 该模块定义了用于创建和管理基于大型语言模型（L
 """
 
 import sqlite3
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import requests
-from config import load_config
-from langchain.agents import AgentState, create_agent
+from langchain.agents import create_agent
 from langchain.agents.middleware import (
     AgentMiddleware,
-    after_model,
-    before_model,
 )
-from langchain.messages import RemoveMessage
-from langchain.tools import tool
 from langchain_core.callbacks import BaseCallbackHandler, UsageMetadataCallbackHandler
 from langchain_core.messages import (
     AIMessage,
     AIMessageChunk,
     HumanMessage,
     SystemMessage,
-    trim_messages,
 )
 
 # from langgraph.store.sqlite import SqliteStore
@@ -41,13 +36,12 @@ from langchain_core.utils.uuid import uuid7
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.sqlite import SqliteSaver
-from langgraph.graph.message import REMOVE_ALL_MESSAGES
-from langgraph.runtime import Runtime
 from logger import logger
 from pydantic import SecretStr
-from tools.functions import get_current_location, get_shanghai_time, get_weather_info
 
-DEFAULT_MAX_MESSAGES = 5
+from llm.custom_middlewares import get_custom_middlewares
+from llm.custom_tools import get_custom_tools
+
 DEFAULT_MODEL_ID = "Qwen/Qwen3"
 DEFAULT_DB_PATH = (
     Path(__file__).resolve().parent.parent / "db" / "agent_conversations.db"
@@ -60,6 +54,11 @@ DEFAULT_SYSTEM_PROMPT = (
 )
 INTENT_TAG_START = "<INTENT>"
 INTENT_TAG_END = "</INTENT>"
+
+
+@dataclass
+class Context:
+    user_name: str
 
 
 # config 设置里的回调函数示例，实际使用时可以根据需要进行修改和扩展
@@ -75,20 +74,12 @@ class my_callback_handler(BaseCallbackHandler):
     #     logger.debug("链开始")
 
 
-def get_max_messages(default: int = DEFAULT_MAX_MESSAGES) -> int:
-    """从配置中读取最大历史消息数，读取失败时回退默认值。"""
-    config = load_config()
-    max_messages = config.get("llm", {}).get("max_messages", default)
-    logger.debug(f"LLM Agent 配置 - MAX_MESSAGES: {max_messages}")
-    return max_messages
-
-
-def get_max_tokens(default: int = 2048) -> int:
-    """从配置中读取最大历史消息数，读取失败时回退默认值。"""
-    config = load_config()
-    max_tokens = config.get("llm", {}).get("max_tokens", default)
-    logger.debug(f"LLM Agent 配置 - MAX_TOKENS: {max_tokens}")
-    return max_tokens
+def get_callback_handlers():
+    """返回默认启用的回调处理器列表。"""
+    return [
+        my_callback_handler(),
+        UsageMetadataCallbackHandler(),
+    ]
 
 
 def build_global_system_prompt(extra_prompt: str | None = None) -> str:
@@ -96,23 +87,6 @@ def build_global_system_prompt(extra_prompt: str | None = None) -> str:
     if extra_prompt:
         return f"{DEFAULT_SYSTEM_PROMPT}\n{extra_prompt}\n"
     return DEFAULT_SYSTEM_PROMPT + "\n"
-
-
-def get_default_tools() -> list:
-    """返回默认启用的工具列表。"""
-    return [
-        get_current_time_tool,
-        get_current_location_tool,
-        get_weather_info_tool,
-    ]
-
-
-def get_callback_handlers():
-    """返回默认启用的回调处理器列表。"""
-    return [
-        my_callback_handler(),
-        UsageMetadataCallbackHandler(),
-    ]
 
 
 def normalize_message_content(content: Any) -> str:
@@ -196,116 +170,6 @@ def create_optimized_sqlite_connection(db_path: str | Path) -> sqlite3.Connectio
     return conn
 
 
-# @tool(description="当用户询问当前时间时，获取上海当前时间的工具函数")
-@tool
-def get_current_time_tool() -> str:
-    """获取上海当前时间的工具函数"""
-    logger.debug("调用工具函数->获取当前时间。")
-    return get_shanghai_time()
-
-
-# @tool(description="当用户询问当前位置信息时，获取当前位置信息的工具函数")
-@tool
-def get_current_location_tool() -> str:
-    """获取当前位置信息的工具函数"""
-    logger.debug("调用工具函数->获取当前位置信息。")
-    return get_current_location()
-
-
-# @tool(description="当用户询问天气信息时，获取天气信息的工具函数")
-@tool
-def get_weather_info_tool() -> str:
-    """获取天气信息的工具函数"""
-    logger.debug("调用工具函数->获取天气信息。")
-    return get_weather_info()
-
-
-@before_model
-def trim_messages_before_model(
-    state: AgentState, runtime: Runtime
-) -> dict[str, Any] | None:
-    """Keep only the last few messages to fit context window.
-    official docs: https://docs.langchain.com/oss/python/langchain/short-term-memory#trim-messages
-    """
-
-    messages = state["messages"]
-
-    logger.debug("\n=======> Before Model Middleware:\n Current messages:\n ")
-    for i, m in enumerate(messages):
-        logger.debug(f"Message {i}: {m}")
-
-    # refer from: https://juejin.cn/post/7534535266226192430
-    # # 使用 token 数量限制的方式来控制对话历史长度
-    # trimmed_tokens_messages = trim_messages(
-    #     messages,
-    #     max_tokens=get_max_tokens(),  # 保留消息的最大token数量，超过时会删除最旧的消息，直到总token数在限制内
-    #     strategy="last",  # 保留最近的消息，删除最旧的消息
-    #     token_counter=count_tokens_approximately,  # 计算消息token数量的函数
-    #     # Most chat models expect that chat history starts with either:
-    #     # (1) a HumanMessage or
-    #     # (2) a SystemMessage followed by a HumanMessage
-    #     start_on="human",
-    #     # Usually, we want to keep the SystemMessage
-    #     # if it's present in the original history.
-    #     # The SystemMessage has special instructions for the model.
-    #     include_system=True,
-    #     allow_partial=False,
-    # )
-
-    ## 使用消息数量限制的方式来控制对话历史长度
-    trimmed_messages = trim_messages(
-        messages,
-        # When `len` is passed in as the token counter function,
-        # max_tokens will count the number of messages in the chat history.
-        max_tokens=get_max_messages(),
-        strategy="last",
-        # Passing in `len` as a token counter function will
-        # count the number of messages in the chat history.
-        token_counter=len,
-        # Most chat models expect that chat history starts with either:
-        # (1) a HumanMessage or
-        # (2) a SystemMessage followed by a HumanMessage
-        start_on="human",
-        # Usually, we want to keep the SystemMessage
-        # if it's present in the original history.
-        # The SystemMessage has special instructions for the model.
-        include_system=True,
-        allow_partial=False,
-    )
-
-    logger.debug(
-        "\n=======> Before Model Middleware:\n Trimmed messages to fit context window:\n "
-    )
-    for i, m in enumerate(trimmed_messages):
-        logger.debug(f"Message {i}: {m}")
-
-    # return {"messages": trimmed}
-    return {"messages": [RemoveMessage(id=REMOVE_ALL_MESSAGES), *trimmed_messages]}
-
-
-@after_model
-def delete_system_message_after_model(
-    state: AgentState, runtime: Runtime
-) -> dict[str, Any] | None:
-    """删除模型回复中的系统消息，避免系统消息被后续对话历史保留和重复使用。"""
-    messages = state["messages"]
-
-    logger.debug("\n=======> After Model Middleware:\n Current messages:\n ")
-    for i, m in enumerate(messages):
-        logger.debug(f"Message {i}: {m}")
-
-    # 删除 AI 回复中的系统消息
-    cleaned_messages = [m for m in messages if not isinstance(m, SystemMessage)]
-
-    logger.debug(
-        "\n=======> After Model Middleware:\n Cleaned messages (removed SystemMessage):\n "
-    )
-    for i, m in enumerate(cleaned_messages):
-        logger.debug(f"Message {i}: {m}")
-
-    return {"messages": [RemoveMessage(id=REMOVE_ALL_MESSAGES), *cleaned_messages]}
-
-
 class LLMAgent:
     """
     LLMAgent 类用于创建和管理基于大型语言模型（LLM）的聊天代理。
@@ -316,8 +180,7 @@ class LLMAgent:
         self,
         host,
         port,
-        dynamic_middleware_list: list[AgentMiddleware] | None = None,
-        # dynamic_tool_middlewares: AgentMiddleware | None = None,
+        dynamic_middlewares: list[AgentMiddleware] | None = None,
         temperature=0.6,
         top_p=0.95,
         top_k=50,
@@ -333,7 +196,7 @@ class LLMAgent:
         参数:
             host (str): LLM 服务的主机地址。
             port (int): LLM 服务的端口号。
-            dynamic_middleware_list (list[AgentMiddleware] | None): 可选的动态中间件列表。 默认值为 None。
+            dynamic_middlewares (list[AgentMiddleware] | None): 可选的动态中间件列表。 默认值为 None。
             temperature (float): 控制生成文本的随机性。默认值为 0.6。
             top_p (float): 用于 nucleus 采样的概率阈值。默认值为 0.95。
             top_k (int): 用于 top-k 采样的词汇数量。默认值为 50。
@@ -349,40 +212,81 @@ class LLMAgent:
         self.model_id = None
         self.model_root = None
         self.timeout = timeout
-        self.static_middleware_list = [
-            trim_messages_before_model,
-            delete_system_message_after_model,
-        ]
-        self.dynamic_middleware_list = (
-            dynamic_middleware_list if dynamic_middleware_list else []
-        )
-        self.rag_enable = rag_enable
-        self.tools = get_default_tools()
-        self.global_system_msg = SystemMessage(
-            content=build_global_system_prompt(extra_system_prompt)
-        )
-        self.db_path = DEFAULT_DB_PATH
 
-        self.thread_id = uuid7()  # 使用 UUID 作为默认线程 ID，确保唯一性
-        logger.debug(f"LLM Agent 初始化 - 线程ID: {self.thread_id}")
+        self.temperature = temperature
+        self.top_p = top_p
+        self.top_k = top_k
+        self.max_completion_tokens = max_completion_tokens
+        self.enable_thinking = enable_thinking
+        self.extra_system_prompt = extra_system_prompt
+        self.rag_enable = rag_enable
+
+        self.dynamic_middlewares = dynamic_middlewares if dynamic_middlewares else []
+        self.custom_middlewares = get_custom_middlewares()  # 获取自定义中间件列表
+        self.custom_tools = get_custom_tools()  # 获取自定义工具列表
+
+        self.global_system_msg = SystemMessage(
+            content=build_global_system_prompt(self.extra_system_prompt)
+        )
+
+        self.thread_id = (
+            uuid7()
+        )  # 使用 UUID 作为无用户ID 时的 thread_id ，确保每个 LLMAgent 实例的对话上下文独立且唯一
+        logger.debug(f"LLM Agent 初始化 - thread_id: {self.thread_id}")
 
         # 初始化使用统计回调处理器，用于收集和记录模型调用的使用数据，如 token 数量、调用次数等。这些数据可以用于监控模型的使用情况和优化性能。
         ## refer from: https://docs.langchain.com/oss/python/langchain/models#token-usage
         self.callback_handlers = get_callback_handlers()
 
+        # 初始化 ChatOpenAI 模型实例，并拉取远端模型信息，失败时回退默认模型
+        self.llm_model = self._init_chat_model()
+        logger.info("LLM Chat Model 初始化完成")
+
+        # 初始化聊天代理实例，支持工具调用和上下文记忆，适用于需要多轮对话和上下文理解的场景
+        self._init_agent()
+        logger.info("LLM Agent 已就绪")
+
+        # 初始化 RAG 客户端实例
+        self._init_rag_client()
+
+    # 传入配置参数初始化 Agent 实例，供外部调用，避免在外部模块中直接依赖 Agent 的创建细节
+    @classmethod
+    def from_config(
+        cls,
+        config: dict[str, Any],
+        dynamic_middlewares: list[AgentMiddleware] | None = None,
+    ) -> "LLMAgent":
+        """从配置字典创建 LLMAgent 实例。"""
+        llm_cfg = config.get("llm", {})
+        return cls(
+            host=llm_cfg.get("host", "localhost"),
+            port=llm_cfg.get("port", 8000),
+            temperature=llm_cfg.get("temperature", 0.6),
+            top_p=llm_cfg.get("top_p", 0.95),
+            top_k=llm_cfg.get("top_k", 50),
+            max_completion_tokens=llm_cfg.get("max_completion_tokens", 256),
+            enable_thinking=llm_cfg.get("enable_thinking", False),
+            extra_system_prompt=llm_cfg.get("extra_system_prompt", ""),
+            rag_enable=llm_cfg.get("rag_enable", False),
+            dynamic_middlewares=dynamic_middlewares,
+        )
+
+    # -------- private methods --------
+    def _init_chat_model(self) -> ChatOpenAI:
+        """初始化 ChatOpenAI 模型实例，并拉取远端模型信息，失败时回退默认模型。"""
         self.llm_url = f"http://{self.host}:{self.port}/v1/models"
         self._load_model_metadata()
-
-        self.llm_model = self._create_chat_model(
-            temperature=temperature,
-            top_p=top_p,
-            top_k=top_k,
-            max_completion_tokens=max_completion_tokens,
-            enable_thinking=enable_thinking,
+        return self._create_chat_model(
+            temperature=self.temperature,
+            top_p=self.top_p,
+            top_k=self.top_k,
+            max_completion_tokens=self.max_completion_tokens,
+            enable_thinking=self.enable_thinking,
         )
-        logger.info("LLM 模型初始化完成")
 
-        # 创建聊天代理
+    def _init_agent(self):
+        """初始化聊天代理实例。"""
+        # ---------------- 创建聊天代理 ----------------
         ## refer from:
         ## Agents: https://docs.langchain.com/oss/python/langchain/agents
         ## Short-term memory: https://docs.langchain.com/oss/python/langchain/short-term-memory
@@ -393,30 +297,30 @@ class LLMAgent:
         ## 创建一个完整版本的代理，支持工具调用和上下文记忆，适用于需要多轮对话和上下文理解的场景
         ## 使用 sqlite 检查点保存对话状态，确保在多用户场景下能够持久化和管理每个用户的对话历史
         ## |--->refer from: https://reference.langchain.com/python/langgraph.checkpoint.sqlite/SqliteSaver
+        self.db_path = DEFAULT_DB_PATH
         with create_optimized_sqlite_connection(self.db_path) as conn:
             # 创建一个 SqliteSaver 实例
             sqlite_saver = SqliteSaver(conn)
             self.agent = self._create_agent_instance(checkpointer=sqlite_saver)
-        logger.info("LLM Agent 已就绪")
 
-        # 如果启用 RAG 功能，初始化 RAG 客户端
-        if self.rag_enable:
-            try:
-                from RAG.rag_api import RAGService
+    def _init_rag_client(self):
+        """初始化 RAG 客户端实例。"""
+        if not self.rag_enable:
+            logger.info("RAG 功能未启用")
+            self.rag_client = None
+            return
+        try:
+            from RAG.rag_api import RAGService
 
-                self.rag_client = RAGService()
+            self.rag_client = RAGService()
+            logger.info("RAG 客户端初始化成功")
+        except ImportError as e:
+            logger.error(f"无法导入 RAG 模块: {e}")
+            self.rag_client = None
+            logger.warning("RAG 功能将不可用")
 
-                logger.info("RAG 功能已启用")
-
-            except ImportError as e:
-                logger.error(f"无法导入 RAG 模块: {e}")
-                self.rag_client = None
-                self.rag_enable = False
-                logger.warning("RAG 功能已禁用")
-
-    # -------- private methods --------
     def _load_model_metadata(self) -> None:
-        """探测远端模型信息，失败时回退默认模型。"""
+        """拉取远端模型信息，失败时回退默认模型。"""
         try:
             response = requests.get(self.llm_url, timeout=self.timeout)
             response.raise_for_status()
@@ -473,10 +377,11 @@ class LLMAgent:
         """
         return create_agent(
             self.llm_model,
-            tools=self.tools,
+            tools=self.custom_tools,
             system_prompt=self.global_system_msg,
+            middleware=self.custom_middlewares + self.dynamic_middlewares,
+            # context_schema=Context,
             checkpointer=checkpointer,
-            middleware=self.static_middleware_list + self.dynamic_middleware_list,
         )
 
     def __get_last_ai_content(self, state) -> str | None:
@@ -607,7 +512,7 @@ class LLMAgent:
                 config={
                     "callbacks": self.callback_handlers,
                     "configurable": {
-                        "thread_id": str(self.thread_id)
+                        "thread_id": str(self.thread_id),
                     },  # 使用默认线程ID，确保在没有提供用户ID时仍然能够区分对话上下文
                     # "metadata": {
                     #     "trimmed_method": "messages",

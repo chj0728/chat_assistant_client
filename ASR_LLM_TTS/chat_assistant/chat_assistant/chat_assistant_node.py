@@ -8,18 +8,13 @@ import rclpy
 from app import ChatAssistant
 from chat_assistant_interfaces.msg import Response
 from chat_assistant_interfaces.srv import GenerateWav, GetString
-from config import load_config
-from langchain.agents import AgentState
+from config import clear_config_cache, load_config
 from langchain.agents.middleware import (
     AgentMiddleware,
     ModelRequest,
-    after_agent,
-    after_model,
-    before_agent,
 )
 from langchain.agents.middleware.types import ToolCallRequest
 from langchain.tools import tool
-from langgraph.runtime import Runtime
 from logger import logger
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import ExternalShutdownException, MultiThreadedExecutor
@@ -125,80 +120,8 @@ class DynamicToolMiddleware(AgentMiddleware):
 
 # call_flag = False
 
-
-@before_agent
-def test_before_agent(state: AgentState, runtime: Runtime) -> None:
-    # global call_flag
-    # call_flag = True
-    logger.debug("=======> Before Agent Dynamic Middleware")
-    # messages = state["messages"]
-    # logger.debug(f"Current messages: {[m for m in messages]}")
-    # for m in messages:
-    #     m.pretty_print()
-
-
-# @2026-04-10 by caohaojie
-# this middleware is moved to llmagent.py, and is added to the static_middleware_list
-# @before_model
-# def trim_messages_before_model(
-#     state: AgentState, runtime: Runtime
-# ) -> dict[str, Any] | None:
-#     """Keep only the last few messages to fit context window."""
-#     pass
-
-
-# @after_model
-# def delete_old_messages_after_model(state: AgentState, runtime: Runtime) -> dict | None:
-#     # logger.info("=======> After Model Middleware")
-#     """Remove old messages to keep conversation manageable."""
-#     messages = state["messages"]
-#     logger.debug(
-#         f"After LLM Middleware - Current messages: {[m.content for m in messages]}"
-#     )
-
-#     # messages[0].pretty_print()
-
-#     if len(messages) > MAX_MESSAGES:
-#         logger.debug(
-#             f"历史对话消息量超过最大限制 ({len(messages)}) 超过最大限制 ({MAX_MESSAGES})，删除最旧的三分之一消息"
-#         )
-
-#         return {
-#             "messages": [
-#                 RemoveMessage(id=m.id if m.id else "")
-#                 for m in messages[: len(messages) // 3]  # 删除最旧的三分之一消息
-#             ]
-#         }
-#     return None
-
-
-@after_model
-def test_after_model(state: AgentState, runtime: Runtime) -> None:
-    logger.debug("=======> After Model Dynamic Middleware")
-    messages = state["messages"]
-    for i, m in enumerate(messages):
-        logger.debug(f"Message {i}: {m}")
-    # for m in messages:
-    #     m.pretty_print()
-
-
-@after_agent
-def test_after_agent(state: AgentState, runtime: Runtime) -> None:
-    logger.debug("=======> After Agent Dynamic Middleware")
-    # messages = state["messages"]
-    # logger.debug(f"Current messages: {[m for m in messages]}")
-    # for m in messages:
-    #     m.pretty_print()
-
-
-middlewares = [
+dynamic_middlewares = [
     # DynamicToolMiddleware(),
-    test_before_agent,
-    # test_before_model,
-    # trim_messages_before_model,
-    # delete_old_messages_after_model,
-    # test_after_model,
-    test_after_agent,
 ]
 
 
@@ -295,8 +218,7 @@ class ChatAssistantNode(Node):
 
         self.chat_assistant = ChatAssistant(
             config_path=self.config_path,
-            # dynamic_tool_middlewares=DynamicToolMiddleware(),
-            dynamic_middleware_list=middlewares,
+            dynamic_middlewares=dynamic_middlewares,
         )
 
     def load_config_and_initialize(self):
@@ -452,6 +374,8 @@ class ChatAssistantNode(Node):
         重新加载配置文件参数服务
         """
         logger.info("收到重新加载配置文件请求")
+
+        clear_config_cache()
 
         # 重新加载ros参数
         self.load_config_and_initialize()

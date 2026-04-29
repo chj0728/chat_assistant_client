@@ -13,19 +13,18 @@ asr_remote:
 
 ###################### LLM 配置 ######################
 llm_enable: true # 是否启动激活 LLM 模块
+llm_stream_infer_enable: true # 是否启用 LLM 流式推理，开启后可以配合 tts_stream_infer 实现边说边播效果
 llm:
   host: "192.168.50.125"
   port: 8000
   timeout_sec: 5
   temperature: 0.3 # 生成文本的随机程度，范围0-1，值越大越随机
-
   # （max_tokens + max_completion_tokens(限制模型回复tokens) +RAG 检索结果 tokens) 需要在模型的上下文窗口限制内，例如 2048 或 4096，具体取决于所使用的 LLM 模型
-  max_tokens: 150 # 历史消息和生成文本的最大 token 数量，用于控制上下文长度，避免超过模型限制，根据实际情况调整
-  max_messages: 5 # 上下文消息数量限制，根据实际情况调整
+  max_tokens: 200 # 历史消息和生成文本的最大 token 数量，用于控制上下文长度，避免超过模型限制，根据实际情况调整
+  max_messages: 10 # 上下文消息数量限制，根据实际情况调整
   max_completion_tokens: 120 # 只限制 生成内容（completion） 的 token 数量，不是输入（prompt）+输出（completion）的总token数，根据实际情况调整
 
   enable_thinking: false # 是否启用思考过程
-  enable_stream: false # 是否启用流式输出，开启后llm回复会分段返回，配合 tts_stream_infer 实现边说边播效果
   rag_enable: false # 是否启用 RAG 功能，启用后会在 LLM 回复前先进行检索增强
   extra_system_prompt: |
     同时你要根据根据用户的输入，判断用户想要进入哪个状态，并在回答末尾附加。
