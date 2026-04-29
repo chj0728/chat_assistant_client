@@ -100,6 +100,25 @@ class ASRClient:
                 logger.error(f"ASR WebSocket 连接异常: {e}")
         ###################################################################
 
+    # 传入配置参数初始化ASRClient实例
+    @classmethod
+    def from_config(cls, config: dict) -> "ASRClient":
+        return cls(
+            host=config.get("host", "192.168.50.125"),
+            port=config.get("port", 2002),
+            timeout_sec=config.get("timeout_sec", 30.0),
+            use_websocket=config.get("use_websocket", False),
+            ws_path=config.get("ws_path", "/ws/api/asr"),
+            ws_ping_interval=config.get("ws_ping_interval", None),
+            ws_ping_timeout=config.get("ws_ping_timeout", None),
+            samples_per_message=config.get("samples_per_message", 8000),
+            seconds_per_message=config.get("seconds_per_message", 0.1),
+            asr_queue_size=config.get("asr_queue_size", 20),
+            mic_channels=config.get("mic_channels", 1),
+            mic_samplerate=config.get("mic_samplerate", 16000),
+            mic_block_seconds=config.get("mic_block_seconds", 0.05),
+        )
+
     ############ 公共接口 ############
     def recognize(self, wav_path: str, use_websocket: Optional[bool] = True) -> str:
         """

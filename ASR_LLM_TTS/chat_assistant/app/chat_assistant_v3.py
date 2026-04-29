@@ -146,12 +146,13 @@ class ChatAssistant:
         logger.info(f"选择的 ASR 服务器类型: {asr_server_type}")
         asr_cfg = self.configs.get(asr_server_type, {})
 
-        return ASRClient(
-            host=asr_cfg.get("host", "192.168.10.101"),
-            port=asr_cfg.get("port", 2002),
-            timeout_sec=asr_cfg.get("timeout_sec", 30),
-            use_websocket=asr_cfg.get("use_websocket", False),
-        )
+        # return ASRClient(
+        #     host=asr_cfg.get("host", "192.168.10.101"),
+        #     port=asr_cfg.get("port", 2002),
+        #     timeout_sec=asr_cfg.get("timeout_sec", 30),
+        #     use_websocket=asr_cfg.get("use_websocket", False),
+        # )
+        return ASRClient.from_config(config=asr_cfg)
 
     def _build_llm_client(self) -> LLMAgent:
         # llm_cfg = self.configs.get("llm", {})
@@ -170,11 +171,10 @@ class ChatAssistant:
             "llm_stream_infer_enable", False
         )
 
-        llm_client = LLMAgent.from_config(
+        return LLMAgent.from_config(
             config=self.configs,
             dynamic_middlewares=self.dynamic_middlewares,
         )
-        return llm_client
 
     def _build_tts_client(self):
         tts_server_type = self.configs.get("tts_server", ["tts_local"])[0]
@@ -190,16 +190,16 @@ class ChatAssistant:
             return tts_client
 
         if tts_server_type == "tts_local":
-            return TTSClient(
-                host=tts_cfg.get("host", "192.168.10.101"),
-                port=tts_cfg.get("port", 50000),
-                timeout_sec=tts_cfg.get("timeout_sec", 30),
-                speaker_id=tts_cfg.get("speaker_id", 0),
-                speed=tts_cfg.get("speed", 1.0),
-                use_websocket=tts_cfg.get("use_websocket", True),
-                playback_start_delay_sec=tts_cfg.get("playback_start_delay_sec", 0.0),
-            )
-
+            # return TTSClient(
+            #     host=tts_cfg.get("host", "192.168.10.101"),
+            #     port=tts_cfg.get("port", 50000),
+            #     timeout_sec=tts_cfg.get("timeout_sec", 30),
+            #     speaker_id=tts_cfg.get("speaker_id", 0),
+            #     speed=tts_cfg.get("speed", 1.0),
+            #     use_websocket=tts_cfg.get("use_websocket", True),
+            #     playback_start_delay_sec=tts_cfg.get("playback_start_delay_sec", 0.0),
+            # )
+            return TTSClient.from_config(config=tts_cfg)
         logger.error(f"未知的 TTS 服务器类型: {tts_server_type}")
         raise ValueError(f"未知的 TTS 服务器类型: {tts_server_type}")
 

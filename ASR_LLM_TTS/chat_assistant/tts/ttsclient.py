@@ -107,6 +107,26 @@ class TTSClient:
         self.tts_thread = self.__start_tts_worker()
         self.__initialize_websocket_if_needed()
 
+    @classmethod
+    def from_config(cls, config: dict) -> "TTSClient":
+        """从配置字典创建 TTSClient 实例"""
+        return cls(
+            host=config.get("host", "192.168.10.101"),
+            port=config.get("port", 50000),
+            timeout_sec=config.get("timeout_sec", 30),
+            sample_rate=config.get("sample_rate", 16000),
+            channels=config.get("channels", 1),
+            chunk_size=config.get("chunk_size", 2048),
+            buffer_size=config.get("buffer_size", 4096),
+            speaker_id=config.get("speaker_id", 0),
+            speed=config.get("speed", 1.0),
+            use_websocket=config.get("use_websocket", False),
+            ws_path=config.get("ws_path", "/ws/api/tts"),
+            ws_ping_interval=config.get("ws_ping_interval"),
+            ws_ping_timeout=config.get("ws_ping_timeout"),
+            playback_start_delay_sec=config.get("playback_start_delay_sec", 0.0),
+        )
+
     # ================= 私有接口 =================
 
     def __create_output_stream(self) -> sd.OutputStream:
