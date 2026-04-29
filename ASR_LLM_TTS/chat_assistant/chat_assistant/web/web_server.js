@@ -71,8 +71,8 @@
           { key: "llm.temperature", label: "Temperature", type: "number", step: 0.1, min: 0, max: 1 },
           { key: "llm.max_tokens", label: "Max Tokens", type: "number", step: 1 },
           { key: "llm.enable_thinking", label: "启用思考过程", type: "bool" },
-          { key: "llm.enable_stream", label: "流式输出", type: "bool" },
-          { key: "llm.system_prompt", label: "系统提示语", type: "textarea" },
+          { key: "llm_stream_infer_enable", label: "流式输出", type: "bool" },
+          { key: "llm.extra_system_prompt", label: "额外的系统提示语", type: "textarea" },
         ]
       },
       {
