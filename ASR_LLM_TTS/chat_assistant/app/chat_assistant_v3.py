@@ -479,17 +479,18 @@ class ChatAssistant:
         audio_frames = [seg[0] for seg in self.segments_to_save]
 
         # 直接将 PCM16 字节流传给 ASR 识别
-        self.Inference(audio_frames=audio_frames)
+        ## 如果交互有效，则保存音频文件
+        if self.Inference(audio_frames=audio_frames):
 
-        # ===============================
-        # 4. 保存 WAV
-        # ===============================
-        with wave.open(str(audio_output_path), "wb") as wf:
-            wf.setnchannels(self.audio_channels)
-            wf.setsampwidth(2)  # int16
-            wf.setframerate(self.audio_rate)
-            wf.writeframes(b"".join(audio_frames))
-        logger.info(f"保存音频文件: {audio_output_path}")
+            # ===============================
+            # 4. 保存 WAV
+            # ===============================
+            with wave.open(str(audio_output_path), "wb") as wf:
+                wf.setnchannels(self.audio_channels)
+                wf.setsampwidth(2)  # int16
+                wf.setframerate(self.audio_rate)
+                wf.writeframes(b"".join(audio_frames))
+            logger.info(f"保存音频文件: {audio_output_path}")
 
         # ===============================
         # 5. 更新状态
@@ -1057,7 +1058,7 @@ class ChatAssistant:
         audio_path: str | None = None,
         input_text: str | None = None,
         user_id: str | None = None,
-    ):
+    ) -> bool:
         """
         负责调用 ASR、LLM、TTS 完成一次完整的交互
         Parameters:
@@ -1079,7 +1080,7 @@ class ChatAssistant:
             self.last_interface_time = time.time()
 
             logger.warning("ASR 模块未激活，跳过本次交互")
-            return
+            return False
 
         # -------- asr 识别 -----------
         if audio_frames is not None:
@@ -1091,7 +1092,7 @@ class ChatAssistant:
         else:
             logger.warning("未提供音频路径或输入文本，跳过本次交互")
             self.last_interface_time = time.time()
-            return
+            return False
         # self.asr_text = "你好，小特"  # 测试代码，固定返回唤醒词
         # ## response_json 更新 asr_text
         # response_json["asr_text"] = self.asr_text
@@ -1099,14 +1100,14 @@ class ChatAssistant:
             logger.warning("ASR 未识别到有效文本，跳过本次交互")
             self.last_interface_time = time.time()
             # self.set_state(AssistantState.LISTENING)
-            return
+            return False
 
         # -------- 判断asr_text中汉字数量，过少则忽略 ----------
         chinese_char_count = self.text_processor.count_chinese_characters(self.asr_text)
         if chinese_char_count < 2:
             logger.warning("ASR 识别文本中汉字数量过少，跳过本次交互")
             self.last_interface_time = time.time()
-            return
+            return False
 
         # ------- 替换特殊词汇 -------
         if self.enable_replace_special_characters:
@@ -1127,7 +1128,7 @@ class ChatAssistant:
             if not self.kws_infer(self.asr_text):
 
                 self.last_interface_time = time.time()
-                return
+                return False
         else:
             # self.llm_agent_state = LLMAgentState.ACTIVE
 
@@ -1143,7 +1144,7 @@ class ChatAssistant:
 
             self.__update_llm_text(self.llm_text)
 
-            return
+            return False
 
         if self.llm_stream_infer_enable:
             # -------- llm tts stream --------------
@@ -1166,10 +1167,11 @@ class ChatAssistant:
             # -------- tts 播放 -----------
             ## -------- 检查 TTS 逻辑状态 ----------
             if not self.check_tts_status():
-                return
+                return False
             self.tts_infer(self.text_processor.remove_intent_tags(self.llm_text))
 
         logger.info("本次交互完成，等待下一次录音")
+        return True
 
     def Inference(
         self,
@@ -1177,7 +1179,7 @@ class ChatAssistant:
         audio_path: str | None = None,
         input_text: str | None = None,
         user_id: str | None = None,
-    ):
+    ) -> bool:
         return self.inference(
             audio_frames=audio_frames,
             audio_path=audio_path,
