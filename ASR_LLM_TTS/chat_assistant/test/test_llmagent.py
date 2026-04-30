@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 from typing import Any, cast
 
+from langchain.agents.middleware import AgentMiddleware
 from langchain_core.messages import (
     AIMessage,
     AIMessageChunk,
@@ -42,34 +43,67 @@ class DummyAgent:
 
 def build_agent_shell():
     agent = llmagent_module.LLMAgent.__new__(llmagent_module.LLMAgent)
-    agent.system_msg = cast(Any, SystemMessage(content=""))
+    agent.global_system_msg = SystemMessage(content="")
+    agent.extra_system_prompt = ""
+    agent.callback_handlers = [SimpleNamespace(), SimpleNamespace(usage_metadata={})]
+    agent.thread_id = llmagent_module.uuid7()
+    agent.rag_enable = False
+    agent.rag_client = None
     return agent
 
 
-def test_get_max_messages_uses_config_value(monkeypatch):
-    """测试 get_max_messages 是否正确读取配置中的 max_messages 值。"""
-    monkeypatch.setattr(
-        llmagent_module,
-        "load_config",
-        lambda: {"llm": {"max_messages": 9}},
-    )
+def test_get_callback_handlers_returns_default_handlers():
+    """测试 get_callback_handlers 是否返回默认回调处理器列表。"""
+    handlers = llmagent_module.get_callback_handlers()
 
-    assert llmagent_module.get_max_messages() == 9
+    assert len(handlers) == 2
+    assert handlers[1].usage_metadata == {}
 
 
-def test_get_max_messages_falls_back_to_default(monkeypatch):
-    """测试 get_max_messages 在配置缺失时是否回退到默认值。"""
-    monkeypatch.setattr(llmagent_module, "load_config", lambda: {})
-
-    assert llmagent_module.get_max_messages(default=7) == 7
-
-
-def test_build_system_prompt_appends_extra_prompt():
-    """测试 build_system_prompt 是否正确拼接额外系统提示。"""
-    prompt = llmagent_module.build_system_prompt("补充规则")
+def test_build_global_system_prompt_appends_extra_prompt():
+    """测试 build_global_system_prompt 是否正确拼接额外系统提示。"""
+    prompt = llmagent_module.build_global_system_prompt("补充规则")
 
     assert llmagent_module.DEFAULT_SYSTEM_PROMPT in prompt
     assert prompt.endswith("补充规则\n")
+
+
+def test_from_config_maps_llm_options_to_constructor():
+    """测试 from_config 是否将 llm 配置映射到构造参数。"""
+
+    class StubAgent(llmagent_module.LLMAgent):
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+    middleware = cast(AgentMiddleware, object())
+    config = {
+        "llm": {
+            "host": "127.0.0.1",
+            "port": 9000,
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 10,
+            "max_completion_tokens": 512,
+            "enable_thinking": True,
+            "extra_system_prompt": "extra",
+            "rag_enable": True,
+        }
+    }
+
+    agent = cast(Any, StubAgent.from_config(config, dynamic_middlewares=[middleware]))
+
+    assert agent.kwargs == {
+        "host": "127.0.0.1",
+        "port": 9000,
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 10,
+        "max_completion_tokens": 512,
+        "enable_thinking": True,
+        "extra_system_prompt": "extra",
+        "rag_enable": True,
+        "dynamic_middlewares": [middleware],
+    }
 
 
 def test_select_stream_flush_index_avoids_open_intent_suffix():
@@ -164,56 +198,74 @@ def test_load_model_metadata_falls_back_to_default(monkeypatch):
     assert agent.model_root is None
 
 
-def test_add_system_prompt_updates_system_message():
-    """测试 add_system_prompt 是否正确更新系统提示消息内容。"""
+def test_build_input_messages_without_rag_returns_only_human_message():
+    """测试未启用 RAG 时输入消息仅包含用户消息。"""
     agent = build_agent_shell()
 
-    agent.add_system_prompt("新的规则")
+    messages = agent._build_input_messages("你好", user_id="user-1")
 
-    system_content = cast(str, agent.system_msg.content)
-    assert "新的规则" in system_content
-    assert system_content.endswith("新的规则")
+    assert messages == [
+        HumanMessage(content="你好", additional_kwargs={"user_id": "user-1"})
+    ]
 
 
-def test_chat_response_uses_stateful_agent_for_user_id():
-    """测试 chat_response 在提供 user_id 时是否走带上下文的 agent。"""
+def test_build_input_messages_with_rag_prepends_system_message():
+    """测试启用 RAG 时输入消息会带上检索增强提示。"""
+    agent = build_agent_shell()
+    agent.rag_enable = True
+    agent.rag_client = cast(
+        Any, SimpleNamespace(query=lambda user_text: {"prompt": f"RAG:{user_text}"})
+    )
+
+    messages = agent._build_input_messages("你好", user_id="user-1")
+
+    assert messages == [
+        SystemMessage(content="RAG:你好"),
+        HumanMessage(content="你好", additional_kwargs={"user_id": "user-1"}),
+    ]
+
+
+def test_chat_response_uses_agent_with_user_id_context():
+    """测试 chat_response 在提供 user_id 时会传入正确上下文和线程 ID。"""
     agent = build_agent_shell()
     stateful_agent = DummyAgent(
         invoke_result={"messages": [AIMessage(content="有上下文回答")]}
     )
-    tiny_agent = DummyAgent(invoke_result={"messages": [AIMessage(content="不应使用")]})
     agent.agent = cast(Any, stateful_agent)
-    agent.tiny_agent = cast(Any, tiny_agent)
 
     result = agent.chat_response("你好", user_id="user-1")
 
     assert result == "有上下文回答"
     assert len(stateful_agent.invoke_calls) == 1
     invoke_args, invoke_kwargs = stateful_agent.invoke_calls[0]
-    assert invoke_args[0]["messages"][0] == HumanMessage(
-        content="你好",
-        additional_kwargs={"user_id": "user-1"},
+    assert invoke_args == (
+        {
+            "messages": [
+                HumanMessage(content="你好", additional_kwargs={"user_id": "user-1"})
+            ]
+        },
     )
-    assert invoke_args[1] == {"configurable": {"thread_id": "user-1"}}
-    assert invoke_kwargs == {"stream_mode": "values"}
-    assert tiny_agent.invoke_calls == []
+    assert invoke_kwargs["context"] == llmagent_module.CustomContext(user_id="user-1")
+    assert invoke_kwargs["config"] == {
+        "callbacks": agent.callback_handlers,
+        "configurable": {"thread_id": "user-1"},
+    }
+    assert invoke_kwargs["stream_mode"] == "values"
 
 
-def test_chat_response_uses_tiny_agent_without_user_id():
-    """测试 chat_response 在未提供 user_id 时是否走无上下文的 tiny_agent。"""
+def test_chat_response_uses_default_thread_id_without_user_id():
+    """测试 chat_response 在未提供 user_id 时使用默认 thread_id。"""
     agent = build_agent_shell()
     stateful_agent = DummyAgent(
-        invoke_result={"messages": [AIMessage(content="不应使用")]}
+        invoke_result={"messages": [AIMessage(content="快速回答")]}
     )
-    tiny_agent = DummyAgent(invoke_result={"messages": [AIMessage(content="快速回答")]})
     agent.agent = cast(Any, stateful_agent)
-    agent.tiny_agent = cast(Any, tiny_agent)
 
     result = agent.chat_response("你好")
 
     assert result == "快速回答"
-    assert len(tiny_agent.invoke_calls) == 1
-    invoke_args, invoke_kwargs = tiny_agent.invoke_calls[0]
+    assert len(stateful_agent.invoke_calls) == 1
+    invoke_args, invoke_kwargs = stateful_agent.invoke_calls[0]
     assert invoke_args == (
         {
             "messages": [
@@ -221,21 +273,37 @@ def test_chat_response_uses_tiny_agent_without_user_id():
             ]
         },
     )
-    assert invoke_kwargs == {}
-    assert stateful_agent.invoke_calls == []
+    assert invoke_kwargs["context"] == llmagent_module.CustomContext(user_id=None)
+    assert invoke_kwargs["config"] == {
+        "callbacks": agent.callback_handlers,
+        "configurable": {"thread_id": str(agent.thread_id)},
+    }
+    assert invoke_kwargs["stream_mode"] == "values"
 
 
 def test_chat_response_stream_flushes_by_max_chunk_length():
     """测试 chat_response_stream 是否在达到最大长度时正确切分输出。"""
     agent = build_agent_shell()
-    stateful_agent = DummyAgent()
-    tiny_agent = DummyAgent(stream_result=[AIMessageChunk(content="a" * 55)])
+    stateful_agent = DummyAgent(stream_result=[AIMessageChunk(content="a" * 55)])
     agent.agent = cast(Any, stateful_agent)
-    agent.tiny_agent = cast(Any, tiny_agent)
 
     result = list(agent.chat_response_stream("hello"))
 
     assert result == [("a" * 50, 0), ("a" * 5, 1)]
+    stream_args, stream_kwargs = stateful_agent.stream_calls[0]
+    assert stream_args == (
+        {
+            "messages": [
+                HumanMessage(content="hello", additional_kwargs={"user_id": None})
+            ]
+        },
+    )
+    assert stream_kwargs["context"] == llmagent_module.CustomContext(user_id=None)
+    assert stream_kwargs["config"] == {
+        "callbacks": agent.callback_handlers,
+        "configurable": {"thread_id": str(agent.thread_id)},
+    }
+    assert stream_kwargs["stream_mode"] == "messages"
 
 
 def test_chat_response_stream_flushes_by_punctuation_with_user_id():
@@ -245,17 +313,26 @@ def test_chat_response_stream_flushes_by_punctuation_with_user_id():
     stateful_agent = DummyAgent(
         stream_result=[(AIMessageChunk(content=sentence), SimpleNamespace())]
     )
-    tiny_agent = DummyAgent()
     agent.agent = cast(Any, stateful_agent)
-    agent.tiny_agent = cast(Any, tiny_agent)
 
     result = list(agent.chat_response_stream("你好", user_id="user-2"))
 
     assert result == [(sentence, 0)]
     assert len(stateful_agent.stream_calls) == 1
     stream_args, stream_kwargs = stateful_agent.stream_calls[0]
-    assert stream_args[1] == {"configurable": {"thread_id": "user-2"}}
-    assert stream_kwargs == {"stream_mode": "messages"}
+    assert stream_args == (
+        {
+            "messages": [
+                HumanMessage(content="你好", additional_kwargs={"user_id": "user-2"})
+            ]
+        },
+    )
+    assert stream_kwargs["context"] == llmagent_module.CustomContext(user_id="user-2")
+    assert stream_kwargs["config"] == {
+        "callbacks": agent.callback_handlers,
+        "configurable": {"thread_id": "user-2"},
+    }
+    assert stream_kwargs["stream_mode"] == "messages"
 
 
 def test_chat_response_stream_keeps_intent_tag_unsplit():
@@ -270,8 +347,7 @@ def test_chat_response_stream_keeps_intent_tag_unsplit():
             AIMessageChunk(content="TALK</INTENT>"),
         ]
     )
-    agent.agent = cast(Any, DummyAgent())
-    agent.tiny_agent = cast(Any, tiny_agent)
+    agent.agent = cast(Any, tiny_agent)
 
     result = list(agent.chat_response_stream("hello"))
 

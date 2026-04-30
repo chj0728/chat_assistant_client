@@ -12,9 +12,8 @@ description: 该模块定义了用于创建和管理基于大型语言模型（L
 """
 
 import sqlite3
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Generator
 
 import requests
 from langchain.agents import create_agent
@@ -39,6 +38,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from logger import logger
 from pydantic import SecretStr
 
+from llm.custom_context import CustomContext
 from llm.custom_middlewares import get_custom_middlewares
 from llm.custom_tools import get_custom_tools
 
@@ -54,11 +54,6 @@ DEFAULT_SYSTEM_PROMPT = (
 )
 INTENT_TAG_START = "<INTENT>"
 INTENT_TAG_END = "</INTENT>"
-
-
-@dataclass
-class Context:
-    user_name: str
 
 
 # config 设置里的回调函数示例，实际使用时可以根据需要进行修改和扩展
@@ -157,16 +152,14 @@ def create_optimized_sqlite_connection(db_path: str | Path) -> sqlite3.Connectio
     )
 
     # 性能优化配置
-    conn.executescript(
-        """
+    conn.executescript("""
         PRAGMA journal_mode=WAL;          -- 写前日志模式，提高并发性能
         PRAGMA synchronous=NORMAL;        -- 平衡性能和数据安全
         PRAGMA cache_size=-2000;          -- 设置2MB缓存
         PRAGMA temp_store=MEMORY;         -- 临时表存储在内存中
         PRAGMA mmap_size=268435456;       -- 256MB内存映射
         PRAGMA busy_timeout=5000;         -- 5秒忙超时
-        """
-    )
+        """)
     return conn
 
 
@@ -374,13 +367,14 @@ class LLMAgent:
             - Agents: https://docs.langchain.com/oss/python/langchain/agents
             - Short-term memory: https://docs.langchain.com/oss/python/langchain/short-term-memory
             - sqlite checkpointer: https://reference.langchain.com/python/langgraph.checkpoint.sqlite/SqliteSaver
+            - context_schema：https://docs.langchain.com/oss/python/langchain/runtime
         """
         return create_agent(
             self.llm_model,
             tools=self.custom_tools,
             system_prompt=self.global_system_msg,
             middleware=self.custom_middlewares + self.dynamic_middlewares,
-            # context_schema=Context,
+            context_schema=CustomContext,  # 获取自定义上下文类并传入 Agent
             checkpointer=checkpointer,
         )
 
@@ -442,15 +436,6 @@ class LLMAgent:
 
     # -------- public methods for user --------
 
-    # def add_extra_global_system_prompt(self, prompt: str):
-    #     """
-    #     追加系统提示内容。
-
-    #     参数:
-    #         prompt (str): 系统提示内容。
-    #     """
-    #     self.global_system_msg.content += f"\n{prompt}\n"
-
     def chat_response(self, user_text: str, user_id: str | None = None) -> str | None:
         """
         发送用户输入，返回完整回答文本
@@ -466,66 +451,34 @@ class LLMAgent:
         messages = self._build_input_messages(user_text, user_id=user_id)
         logger.debug(f"构建输入消息-------------->: {[m for m in messages]}")
 
-        if user_id:
-            logger.debug(f"用户ID: {user_id} - 用户输入: {user_text}")
+        # if user_id:
+        logger.debug(f"用户ID: {user_id} - 用户输入: {user_text}")
 
-            result = self.agent.invoke(
-                {"messages": messages},
-                ## 这里的 thread_id 是为了让 agent 能够区分不同用户的对话上下文，确保每个用户的对话历史独立存储和管理
-                ## 具体实现上，agent 会使用 thread_id 来索引和检索对应用户的对话历史，从而在多用户场景下正确地维护每个用户的上下文信息
-                ## thread_id 的具体命名和使用方式可以根据实际需求进行调整，关键是要确保它能够唯一标识每个用户的对话线程
-                ## refer from:
-                ## 1. https://docs.langchain.com/langsmith/observability-concepts#threads
-                ## 2. https://docs.langchain.com/langsmith/threads#group-traces-into-threads
-                # {"configurable": {"thread_id": user_id}},
-                config={
-                    "callbacks": self.callback_handlers,
-                    "configurable": {"thread_id": user_id},
-                },
-                stream_mode="values",
-            )
-            logger.debug(self.callback_handlers[1].usage_metadata)  # 输出使用统计信息
-            last_ai_content = self.__get_last_ai_content(result)
-            return last_ai_content
-        else:
-            logger.debug(f"用户ID未提供 - 用户输入: {user_text}")
+        result = self.agent.invoke(
+            {"messages": messages},
+            context=CustomContext(user_id=user_id),
+            ## 这里的 thread_id 是为了让 agent 能够区分不同用户的对话上下文，确保每个用户的对话历史独立存储和管理
+            ## 具体实现上，agent 会使用 thread_id 来索引和检索对应用户的对话历史，从而在多用户场景下正确地维护每个用户的上下文信息
+            ## thread_id 的具体命名和使用方式可以根据实际需求进行调整，关键是要确保它能够唯一标识每个用户的对话线程
+            ## refer from:
+            ## 1. https://docs.langchain.com/langsmith/observability-concepts#threads
+            ## 2. https://docs.langchain.com/langsmith/threads#group-traces-into-threads
+            # {"configurable": {"thread_id": user_id}},
+            config={
+                "callbacks": self.callback_handlers,
+                "configurable": {
+                    "thread_id": user_id if user_id else str(self.thread_id)
+                },  # 使用用户ID作为线程ID，如果未提供用户ID，则使用默认线程ID
+            },
+            stream_mode="values",
+        )
+        logger.debug(self.callback_handlers[1].usage_metadata)  # 输出使用统计信息
+        last_ai_content = self.__get_last_ai_content(result)
+        return last_ai_content
 
-            # conversation = [
-            #     # {
-            #     #     "role": "system",
-            #     #     "content": self.system_msg.content,
-            #     # },
-            #     {"role": "user", "content": user_text},
-            # ]
-            # result = self.llm_model.invoke(conversation)
-
-            result = self.tiny_agent.invoke(
-                # {
-                #     "messages": [
-                #         {
-                #             "role": "user",
-                #             "content": user_text,
-                #         }
-                #     ]
-                # }
-                {"messages": messages},
-                config={
-                    "callbacks": self.callback_handlers,
-                    "configurable": {
-                        "thread_id": str(self.thread_id),
-                    },  # 使用默认线程ID，确保在没有提供用户ID时仍然能够区分对话上下文
-                    # "metadata": {
-                    #     "trimmed_method": "messages",
-                    #     "max_messages": get_max_messages(),
-                    # },
-                },
-                stream_mode="values",
-            )
-            logger.debug(self.callback_handlers[1].usage_metadata)  # 输出使用统计信息
-            last_ai_content = self.__get_last_ai_content(result)
-            return last_ai_content
-
-    def chat_response_stream(self, user_text: str, user_id: str | None = None):
+    def chat_response_stream(
+        self, user_text: str, user_id: str | None = None
+    ) -> Generator[tuple[str, int], Any, None]:
         """
         发送用户输入，以流式方式返回回答文本的分段内容，适合边说边播的场景
         """
@@ -537,27 +490,17 @@ class LLMAgent:
         min_chunk_chars = 20
         max_chunk_chars = 50
         punctuation_marks = "。！？!?；;，,：:"
-        for chunk in (
-            self.agent.stream(
-                {"messages": messages},
-                # {"configurable": {"thread_id": user_id}},
-                config={
-                    "callbacks": self.callback_handlers,
-                    "configurable": {"thread_id": user_id},
+        for chunk in self.agent.stream(
+            {"messages": messages},
+            context=CustomContext(user_id=user_id),
+            # {"configurable": {"thread_id": user_id}},
+            config={
+                "callbacks": self.callback_handlers,
+                "configurable": {
+                    "thread_id": (user_id if user_id else str(self.thread_id))
                 },
-                stream_mode="messages",
-            )
-            if user_id
-            else self.tiny_agent.stream(
-                {"messages": messages},
-                config={
-                    "callbacks": self.callback_handlers,
-                    "configurable": {
-                        "thread_id": str(self.thread_id)
-                    },  # 使用默认线程ID，确保在没有提供用户ID时仍然能够区分对话上下文
-                },
-                stream_mode="messages",
-            )
+            },
+            stream_mode="messages",
         ):
             ai_chunk = chunk[0] if isinstance(chunk, tuple) else chunk
             if not isinstance(ai_chunk, AIMessageChunk):

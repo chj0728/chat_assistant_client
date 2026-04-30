@@ -28,6 +28,8 @@ from langgraph.graph.message import REMOVE_ALL_MESSAGES
 from langgraph.runtime import Runtime
 from logger import logger
 
+from llm.custom_context import CustomContext
+
 
 @before_agent
 def test_before_agent(state: AgentState, runtime: Runtime) -> None:
@@ -42,11 +44,13 @@ def test_before_agent(state: AgentState, runtime: Runtime) -> None:
 
 @before_model
 def trim_messages_before_model(
-    state: AgentState, runtime: Runtime
+    state: AgentState, runtime: Runtime[CustomContext]
 ) -> dict[str, Any] | None:
     """Keep only the last few messages to fit context window.
     official docs: https://docs.langchain.com/oss/python/langchain/short-term-memory#trim-messages
     """
+
+    logger.debug(f"runtime.context.user_id------------>: \n{runtime.context.user_id}")
 
     messages = state["messages"]
 
