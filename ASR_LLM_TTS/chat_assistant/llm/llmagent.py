@@ -284,7 +284,7 @@ class LLMAgent:
         ## Agents: https://docs.langchain.com/oss/python/langchain/agents
         ## Short-term memory: https://docs.langchain.com/oss/python/langchain/short-term-memory
 
-        ## 创建一个不使用检查点的简化版本的代理，用于快速响应不需要上下文记忆的请求
+        ## 创建一个使用内存检查点的简易代理，适用于不需要持久化对话历史的场景，如单轮问答或测试环境
         self.tiny_agent = self._create_agent_instance(checkpointer=InMemorySaver())
 
         ## 创建一个完整版本的代理，支持工具调用和上下文记忆，适用于需要多轮对话和上下文理解的场景

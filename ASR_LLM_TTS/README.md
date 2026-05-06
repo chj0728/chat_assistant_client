@@ -231,7 +231,7 @@ chat_assistant_interfaces.srv.GetString_Response(success=True, message='你好�
     - `bool success`：表示服务调用是否成功
     - `string message`：生成结果文本 or 错误信息  
 - 请求与响应示例
-  - 未提供 user_id，LLM 不会使用上下文记忆，直接根据输入文本生成回答，适合单轮对话
+  - 未提供 user_id，LLM 使用临时的上下文记忆(程序运行期间有效，重启后上下文将丢失)
 
 ```bash
 #--------------requests without user_id, no context memory --------------
