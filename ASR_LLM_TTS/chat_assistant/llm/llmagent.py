@@ -424,7 +424,9 @@ class LLMAgent:
         if self.rag_enable and self.rag_client is not None:
             return [
                 self._build_system_message(
-                    self.rag_client.query(user_text).get("prompt", "")
+                    self.rag_client.query(query=user_text, user_id=user_id).get(
+                        "prompt", ""
+                    )
                 ),
                 self._build_human_message(user_text, user_id=user_id),
             ]
