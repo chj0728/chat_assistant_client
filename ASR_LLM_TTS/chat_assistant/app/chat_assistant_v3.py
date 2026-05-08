@@ -1,10 +1,11 @@
+import asyncio
 import threading
 import time
 import wave
 from dataclasses import asdict
 from pathlib import Path
 from queue import Empty, Full, Queue
-from typing import Generator
+from typing import AsyncIterator
 
 import numpy as np
 import sounddevice as sd
@@ -15,6 +16,7 @@ from config import load_config
 from llm import LLMAgent
 from logger import logger
 from tts import RealtimeTTSPlayer, TTSClient
+from voice.voice_recognizer import VoiceRecognizer
 
 from app.assistant_support import (
     MAX_QUEUE_SIZE,
@@ -24,6 +26,8 @@ from app.assistant_support import (
     ComponentState,
     ResponseData,
 )
+
+vr = VoiceRecognizer()
 
 
 class ChatAssistant:
@@ -415,6 +419,15 @@ class ChatAssistant:
             self.last_interface_time = time.time()
             logger.info("长时间未与 LLM 交互，重置 LLM 模块为 IDLE 状态")
 
+    def _run_inference_sync(self, **kwargs) -> bool:
+        """在同步调用栈中桥接执行异步 Inference。"""
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(self.Inference(**kwargs))
+
+        raise RuntimeError("不能在已运行的事件循环中同步调用 Inference")
+
     ################## 保存音频的模块 ##################
     def __save_audio_only(self):
         """
@@ -480,7 +493,7 @@ class ChatAssistant:
 
         # 直接将 PCM16 字节流传给 ASR 识别
         ## 如果交互有效，则保存音频文件
-        if self.Inference(audio_frames=audio_frames):
+        if self._run_inference_sync(audio_frames=audio_frames):
 
             # ===============================
             # 4. 保存 WAV
@@ -814,7 +827,19 @@ class ChatAssistant:
             logger.error(f"ASR 识别失败: {e}")
             return ""
 
-    def llm_infer(self, input_text: str, user_id: str | None = None):
+    async def async_asr_infer(self, audio_frames=None):
+        """
+        ASR 异步识别接口，支持 PCM16 字节流输入
+        - 如果 audio_frames 为空，则返回空字符串
+        - 返回识别文本，失败时返回空字符串
+        """
+        if audio_frames is None:
+            logger.warning("未提供 audio_frames，跳过 ASR 识别")
+            return ""
+
+        return await asyncio.to_thread(self.asr_infer, audio_frames=audio_frames)
+
+    async def llm_infer(self, input_text: str, user_id: str | None = None):
         """
         接收输入文本（可选携带用户 ID），调用 LLM 完成推理，返回生成的文本响应
         Parameters:
@@ -828,7 +853,9 @@ class ChatAssistant:
         llm_text = ""
         time_now = time.time()
         try:
-            llm_text = self.llm_client.chat_response(input_text, effective_user_id)
+            llm_text = await self.llm_client.chat_response(
+                input_text, effective_user_id
+            )
             if not llm_text:
                 logger.warning("LLM 返回空响应")
                 llm_text = ""
@@ -845,9 +872,9 @@ class ChatAssistant:
 
             return ""
 
-    def llm_stream_infer(
+    async def llm_stream_infer(
         self, input_text: str, user_id: str | None = None
-    ) -> Generator[tuple[str, int], None, None]:
+    ) -> AsyncIterator[tuple[str, int]]:
         """
         接收输入文本（可选携带用户 ID），调用 LLM 完成流式推理，逐步返回生成的文本响应片段和对应的索引
         Parameters:
@@ -862,7 +889,7 @@ class ChatAssistant:
         llm_response_chunks = []
         index = 0
         try:
-            for llm_response_chunk, index in self.llm_client.chat_response_stream(
+            async for llm_response_chunk, index in self.llm_client.chat_response_stream(
                 input_text, effective_user_id
             ):
                 logger.info(
@@ -1052,7 +1079,7 @@ class ChatAssistant:
     ##########################################################
 
     ####################### 核心交互流程 #######################
-    def inference(
+    async def inference(
         self,
         audio_frames=None,
         audio_path: str | None = None,
@@ -1069,6 +1096,7 @@ class ChatAssistant:
         """
         logger.info("\n\n开始一次完整的交互流程...")
         effective_user_id = user_id if user_id is not None else self.current_user_id
+        logger.info(f"本次交互使用的用户 ID: {effective_user_id}")
 
         # 响应数据，包括 asr_text 和 llm_text
         # self.response_json = {}
@@ -1084,7 +1112,16 @@ class ChatAssistant:
 
         # -------- asr 识别 -----------
         if audio_frames is not None:
-            self.asr_text = self.asr_infer(audio_frames=audio_frames)
+            now = time.time()
+            self.asr_text, vr_results = await asyncio.gather(
+                self.async_asr_infer(audio_frames=audio_frames),
+                vr.recognize_async(
+                    self.asr_client.normalize_audio_frames(audio_frames)
+                ),
+            )
+            logger.info(f"VR 识别结果: {vr_results}")
+            logger.info(f"ASR 异步识别耗时: {time.time() - now:.2f} 秒")
+
         elif audio_path:
             self.asr_text = self.asr_infer(audio_path=audio_path)
         elif input_text:
@@ -1150,7 +1187,7 @@ class ChatAssistant:
             # -------- llm tts stream --------------
             # -------- 先确认当前阶段是否允许播放 TTS，避免分段打断自己 ---------
             tts_can_play = self.check_tts_status()
-            for chunk, index in self.llm_stream_infer(
+            async for chunk, index in self.llm_stream_infer(
                 self.asr_text, user_id=effective_user_id
             ):
                 self.llm_text += chunk
@@ -1161,7 +1198,9 @@ class ChatAssistant:
             self.__update_llm_text(self.llm_text)
         else:
             # -------- llm 推理 -----------
-            self.llm_text = self.llm_infer(self.asr_text, user_id=effective_user_id)
+            self.llm_text = await self.llm_infer(
+                self.asr_text, user_id=effective_user_id
+            )
             self.__update_llm_text(self.llm_text)
 
             # -------- tts 播放 -----------
@@ -1173,14 +1212,14 @@ class ChatAssistant:
         logger.info("本次交互完成，等待下一次录音")
         return True
 
-    def Inference(
+    async def Inference(
         self,
         audio_frames=None,
         audio_path: str | None = None,
         input_text: str | None = None,
         user_id: str | None = None,
     ) -> bool:
-        return self.inference(
+        return await self.inference(
             audio_frames=audio_frames,
             audio_path=audio_path,
             input_text=input_text,

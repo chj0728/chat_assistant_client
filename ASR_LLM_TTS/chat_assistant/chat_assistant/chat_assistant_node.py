@@ -1,3 +1,4 @@
+import asyncio
 import os
 import time
 from enum import Enum
@@ -298,7 +299,9 @@ class ChatAssistantNode(Node):
         logger.info(
             f"收到聊天助手完整交互请求，输入文本: {input_text}，user_id: {user_id}"
         )
-        self.chat_assistant.Inference(input_text=input_text, user_id=user_id)
+        asyncio.run(
+            self.chat_assistant.Inference(input_text=input_text, user_id=user_id)
+        )
 
         response.success = True
         response.message = "聊天助手完整交互已完成"
@@ -418,7 +421,9 @@ class ChatAssistantNode(Node):
         user_id = request_user_id if request_user_id else self.get_latest_user_id()
 
         logger.info(f"LLM 收到请求，输入文本: [{input_text}], user_id: [{user_id}]")
-        llm_result = self.chat_assistant.llm_infer(input_text, user_id=user_id)
+        llm_result = asyncio.run(
+            self.chat_assistant.llm_infer(input_text, user_id=user_id)
+        )
 
         # 检查 LLM 结果是否有效
         if llm_result is None:

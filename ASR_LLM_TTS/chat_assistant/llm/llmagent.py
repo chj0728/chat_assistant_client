@@ -11,10 +11,14 @@ description: 该模块定义了用于创建和管理基于大型语言模型（L
 - LangChain GitHub 仓库: https://github.com/langchain-ai/langchain
 """
 
+import asyncio
 import sqlite3
+import threading
 from pathlib import Path
-from typing import Any, Generator
+from queue import Queue
+from typing import Any, AsyncIterator
 
+import aiosqlite
 import requests
 from langchain.agents import create_agent
 from langchain.agents.middleware import (
@@ -27,6 +31,7 @@ from langchain_core.messages import (
     HumanMessage,
     SystemMessage,
 )
+from langchain_core.runnables import RunnableConfig
 
 # from langgraph.store.sqlite import SqliteStore
 # from uuid import uuid7
@@ -34,7 +39,7 @@ from langchain_core.messages import (
 from langchain_core.utils.uuid import uuid7
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
-from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from logger import logger
 from pydantic import SecretStr
 
@@ -163,6 +168,35 @@ def create_optimized_sqlite_connection(db_path: str | Path) -> sqlite3.Connectio
     return conn
 
 
+async def create_optimized_aiosqlite_connection(
+    db_path: str | Path,
+) -> aiosqlite.Connection:
+    """创建经过性能优化的异步SQLite连接"""
+    db_path = Path(db_path).expanduser().resolve()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    async def _create_connection():
+        conn = await aiosqlite.connect(
+            str(db_path),
+            check_same_thread=False,  # 允许多线程访问
+            timeout=30,  # 超时时间
+            isolation_level=None,  # 自动提交模式
+        )
+
+        # 性能优化配置
+        await conn.executescript("""
+            PRAGMA journal_mode=WAL;          -- 写前日志模式，提高并发性能
+            PRAGMA synchronous=NORMAL;        -- 平衡性能和数据安全
+            PRAGMA cache_size=-2000;          -- 设置2MB缓存
+            PRAGMA temp_store=MEMORY;         -- 临时表存储在内存中
+            PRAGMA mmap_size=268435456;       -- 256MB内存映射
+            PRAGMA busy_timeout=5000;         -- 5秒忙超时
+            """)
+        return conn
+
+    return await _create_connection()
+
+
 class LLMAgent:
     """
     LLMAgent 类用于创建和管理基于大型语言模型（LLM）的聊天代理。
@@ -284,17 +318,242 @@ class LLMAgent:
         ## Agents: https://docs.langchain.com/oss/python/langchain/agents
         ## Short-term memory: https://docs.langchain.com/oss/python/langchain/short-term-memory
 
-        ## 创建一个使用内存检查点的简易代理，适用于不需要持久化对话历史的场景，如单轮问答或测试环境
+        ## 保留一个轻量代理，便于测试或无持久化场景下复用既有装配逻辑
         self.tiny_agent = self._create_agent_instance(checkpointer=InMemorySaver())
 
-        ## 创建一个完整版本的代理，支持工具调用和上下文记忆，适用于需要多轮对话和上下文理解的场景
-        ## 使用 sqlite 检查点保存对话状态，确保在多用户场景下能够持久化和管理每个用户的对话历史
-        ## |--->refer from: https://reference.langchain.com/python/langgraph.checkpoint.sqlite/SqliteSaver
         self.db_path = DEFAULT_DB_PATH
-        with create_optimized_sqlite_connection(self.db_path) as conn:
-            # 创建一个 SqliteSaver 实例
-            sqlite_saver = SqliteSaver(conn)
-            self.agent = self._create_agent_instance(checkpointer=sqlite_saver)
+        self.async_sqlite_saver = None
+        self._async_sqlite_conn = None
+        self.agent = None
+        self._background_loop = None
+        self._background_thread = None
+        self._background_ready = threading.Event()
+        self._background_lock = threading.Lock()
+        self._startup_error = None
+        self._start_background_runtime()
+
+    def _start_background_runtime(self):
+        """启动长期存活的后台事件循环，并在其中初始化异步 Agent。"""
+        with self._background_lock:
+            if (
+                self._background_thread is not None
+                and self._background_thread.is_alive()
+            ):
+                return
+
+            self._background_ready.clear()
+            self._startup_error = None
+            self._background_thread = threading.Thread(
+                target=self._run_background_loop,
+                name="llm-agent-loop",
+                daemon=True,
+            )
+            self._background_thread.start()
+
+        self._background_ready.wait()
+        if self._startup_error is not None:
+            raise RuntimeError("后台异步 Agent 初始化失败") from self._startup_error
+
+    def _run_background_loop(self):
+        """在线程中运行长期后台事件循环。"""
+        loop = asyncio.new_event_loop()
+        self._background_loop = loop
+        asyncio.set_event_loop(loop)
+
+        try:
+            loop.run_until_complete(self._initialize_background_runtime())
+        except Exception as exc:
+            self._startup_error = exc
+            self._background_ready.set()
+            return
+
+        self._background_ready.set()
+
+        try:
+            loop.run_forever()
+        finally:
+            try:
+                loop.run_until_complete(self._shutdown_background_runtime())
+            finally:
+                asyncio.set_event_loop(None)
+                loop.close()
+                self._background_loop = None
+
+    async def _initialize_background_runtime(self):
+        """在后台事件循环中初始化持久化连接和 Agent。"""
+        self._async_sqlite_conn = await create_optimized_aiosqlite_connection(
+            self.db_path
+        )
+        self.async_sqlite_saver = AsyncSqliteSaver(self._async_sqlite_conn)
+        await self.async_sqlite_saver.setup()
+        self.agent = self._create_agent_instance(checkpointer=self.async_sqlite_saver)
+
+    async def _shutdown_background_runtime(self):
+        """在后台事件循环中释放持久化资源。"""
+        self.agent = None
+        self.async_sqlite_saver = None
+
+        async_sqlite_conn = self._async_sqlite_conn
+        self._async_sqlite_conn = None
+        if async_sqlite_conn is not None:
+            await async_sqlite_conn.close()
+
+    def _use_direct_agent_path(self) -> bool:
+        """测试替身或手工注入 agent 时，允许不经过后台 loop 直接调用。"""
+        return (
+            self.agent is not None and getattr(self, "_background_loop", None) is None
+        )
+
+    def _get_background_loop(self) -> asyncio.AbstractEventLoop:
+        """返回已初始化完成的后台事件循环。"""
+        background_loop = self._background_loop
+        if background_loop is None:
+            raise RuntimeError("后台事件循环尚未初始化")
+        return background_loop
+
+    def _get_agent(self) -> Any:
+        """返回已初始化完成的长期复用 Agent。"""
+        agent = self.agent
+        if agent is None:
+            raise RuntimeError("后台 Agent 尚未初始化")
+        return agent
+
+    def _get_async_sqlite_saver(self) -> AsyncSqliteSaver:
+        """返回已初始化完成的长期复用 AsyncSqliteSaver。"""
+        async_sqlite_saver = self.async_sqlite_saver
+        if async_sqlite_saver is None:
+            raise RuntimeError("后台 AsyncSqliteSaver 尚未初始化")
+        return async_sqlite_saver
+
+    async def _run_on_background_loop(self, coro):
+        """把协程提交到长期后台事件循环执行。"""
+        self._start_background_runtime()
+        future = asyncio.run_coroutine_threadsafe(coro, self._get_background_loop())
+        return await asyncio.wrap_future(future)
+
+    async def _ainvoke_on_background(
+        self, messages: list, user_id: str | None = None
+    ) -> Any:
+        """在后台事件循环中执行 agent.ainvoke。"""
+        return await self._get_agent().ainvoke(
+            {"messages": messages},
+            context=CustomContext(user_id=user_id),
+            config=self._build_runtime_config(user_id),
+            stream_mode="values",
+        )
+
+    async def _astream_to_queue_on_background(
+        self,
+        messages: list,
+        user_id: str | None,
+        output_queue: Queue,
+    ) -> None:
+        """在后台事件循环中执行 agent.astream，并通过线程安全队列向外转发。"""
+        try:
+            async for chunk in self._get_agent().astream(
+                {"messages": messages},
+                context=CustomContext(user_id=user_id),
+                config=self._build_runtime_config(user_id),
+                stream_mode="messages",
+            ):
+                output_queue.put(("chunk", chunk))
+        except Exception as exc:
+            output_queue.put(("error", exc))
+        finally:
+            output_queue.put(("done", None))
+
+    async def _alist_checkpoints_on_background(self, config: RunnableConfig) -> list:
+        """在后台事件循环中获取检查点列表。"""
+        return [
+            checkpoint
+            async for checkpoint in self._get_async_sqlite_saver().alist(config=config)
+        ]
+
+    async def _aget_checkpoint_tuple_on_background(
+        self, config: RunnableConfig
+    ) -> tuple | None:
+        """在后台事件循环中获取检查点元组。"""
+        return await self._get_async_sqlite_saver().aget_tuple(config=config)
+
+    def _collect_ready_stream_fragments(
+        self,
+        buffer: str,
+        index: int,
+        *,
+        min_chunk_chars: int,
+        max_chunk_chars: int,
+        punctuation_marks: str,
+    ) -> tuple[list[tuple[str, int]], str, int]:
+        """从累计缓冲区中提取可立即输出的流式文本分片。"""
+        fragments: list[tuple[str, int]] = []
+
+        while buffer:
+            flush_index = select_stream_flush_index(
+                buffer,
+                min_chunk_chars=min_chunk_chars,
+                max_chunk_chars=max_chunk_chars,
+                punctuation_marks=punctuation_marks,
+            )
+            if flush_index is None:
+                break
+
+            fragments.append((buffer[:flush_index], index))
+            buffer = buffer[flush_index:]
+            index += 1
+
+        return fragments, buffer, index
+
+    def _append_stream_chunk(
+        self,
+        buffer: str,
+        index: int,
+        chunk: Any,
+        *,
+        min_chunk_chars: int,
+        max_chunk_chars: int,
+        punctuation_marks: str,
+    ) -> tuple[list[tuple[str, int]], str, int]:
+        """处理单个流式 chunk，并返回当前可输出的文本分片。"""
+        ai_chunk = chunk[0] if isinstance(chunk, tuple) else chunk
+        if not isinstance(ai_chunk, AIMessageChunk):
+            return [], buffer, index
+
+        chunk_text = normalize_message_content(ai_chunk.content)
+        if not chunk_text:
+            return [], buffer, index
+
+        buffer += chunk_text
+        return self._collect_ready_stream_fragments(
+            buffer,
+            index,
+            min_chunk_chars=min_chunk_chars,
+            max_chunk_chars=max_chunk_chars,
+            punctuation_marks=punctuation_marks,
+        )
+
+    def close(self):
+        """停止后台事件循环线程并释放长期资源。"""
+        with self._background_lock:
+            background_loop = self._background_loop
+            background_thread = self._background_thread
+
+        if background_loop is None or background_thread is None:
+            return
+
+        background_loop.call_soon_threadsafe(background_loop.stop)
+        background_thread.join(timeout=5)
+        self._background_thread = None
+
+    async def aclose(self):
+        """异步关闭后台事件循环线程。"""
+        await asyncio.to_thread(self.close)
+
+    def _build_runtime_config(self, user_id: str | None = None) -> RunnableConfig:
+        """构造带线程 ID 的运行时配置。"""
+        return {
+            "callbacks": self.callback_handlers,
+            "configurable": {"thread_id": user_id if user_id else str(self.thread_id)},
+        }
 
     def _init_rag_client(self):
         """初始化 RAG 客户端实例。"""
@@ -337,7 +596,7 @@ class LLMAgent:
         top_k: int,
         max_completion_tokens: int,
         enable_thinking: bool,
-    ) -> ChatOpenAI:
+    ):
         """
         创建底层 ChatOpenAI 模型实例。
         refer from: https://reference.langchain.com/python/langchain-openai/chat_models/base/ChatOpenAI
@@ -438,7 +697,9 @@ class LLMAgent:
 
     # -------- public methods for user --------
 
-    def chat_response(self, user_text: str, user_id: str | None = None) -> str | None:
+    async def chat_response(
+        self, user_text: str, user_id: str | None = None
+    ) -> str | None:
         """
         发送用户输入，返回完整回答文本
         """
@@ -456,31 +717,21 @@ class LLMAgent:
         # if user_id:
         logger.debug(f"用户ID: {user_id} - 用户输入: {user_text}")
 
-        result = self.agent.invoke(
-            {"messages": messages},
-            context=CustomContext(user_id=user_id),
-            ## 这里的 thread_id 是为了让 agent 能够区分不同用户的对话上下文，确保每个用户的对话历史独立存储和管理
-            ## 具体实现上，agent 会使用 thread_id 来索引和检索对应用户的对话历史，从而在多用户场景下正确地维护每个用户的上下文信息
-            ## thread_id 的具体命名和使用方式可以根据实际需求进行调整，关键是要确保它能够唯一标识每个用户的对话线程
-            ## refer from:
-            ## 1. https://docs.langchain.com/langsmith/observability-concepts#threads
-            ## 2. https://docs.langchain.com/langsmith/threads#group-traces-into-threads
-            # {"configurable": {"thread_id": user_id}},
-            config={
-                "callbacks": self.callback_handlers,
-                "configurable": {
-                    "thread_id": user_id if user_id else str(self.thread_id)
-                },  # 使用用户ID作为线程ID，如果未提供用户ID，则使用默认线程ID
-            },
-            stream_mode="values",
-        )
+        if self._use_direct_agent_path():
+            logger.debug("直接调用 agent.ainvoke 进行对话")
+            result = await self._ainvoke_on_background(messages, user_id)
+        else:
+            logger.debug("通过后台事件循环调用 agent.ainvoke 进行对话")
+            result = await self._run_on_background_loop(
+                self._ainvoke_on_background(messages, user_id)
+            )
         logger.debug(self.callback_handlers[1].usage_metadata)  # 输出使用统计信息
         last_ai_content = self.__get_last_ai_content(result)
         return last_ai_content
 
-    def chat_response_stream(
+    async def chat_response_stream(
         self, user_text: str, user_id: str | None = None
-    ) -> Generator[tuple[str, int], Any, None]:
+    ) -> AsyncIterator[tuple[str, int]]:
         """
         发送用户输入，以流式方式返回回答文本的分段内容，适合边说边播的场景
         """
@@ -492,51 +743,95 @@ class LLMAgent:
         min_chunk_chars = 20
         max_chunk_chars = 50
         punctuation_marks = "。！？!?；;，,：:"
-        for chunk in self.agent.stream(
-            {"messages": messages},
-            context=CustomContext(user_id=user_id),
-            # {"configurable": {"thread_id": user_id}},
-            config={
-                "callbacks": self.callback_handlers,
-                "configurable": {
-                    "thread_id": (user_id if user_id else str(self.thread_id))
-                },
-            },
-            stream_mode="messages",
-        ):
-            ai_chunk = chunk[0] if isinstance(chunk, tuple) else chunk
-            if not isinstance(ai_chunk, AIMessageChunk):
-                continue
-
-            chunk_text = normalize_message_content(ai_chunk.content)
-
-            if not chunk_text:
-                continue
-
-            buffer += chunk_text
-
-            while buffer:
-                flush_index = select_stream_flush_index(
+        if self._use_direct_agent_path():
+            logger.debug("直接调用 agent.astream 进行流式对话")
+            chunk_iter = self._get_agent().astream(
+                {"messages": messages},
+                context=CustomContext(user_id=user_id),
+                config=self._build_runtime_config(user_id),
+                stream_mode="messages",
+            )
+            async for chunk in chunk_iter:
+                fragments, buffer, index = self._append_stream_chunk(
                     buffer,
+                    index,
+                    chunk,
                     min_chunk_chars=min_chunk_chars,
                     max_chunk_chars=max_chunk_chars,
                     punctuation_marks=punctuation_marks,
                 )
-                if flush_index is None:
-                    break
+                for fragment in fragments:
+                    yield fragment
+        else:
+            logger.debug("通过后台事件循环调用 agent.astream 进行流式对话")
+            self._start_background_runtime()
+            output_queue: Queue = Queue()
+            background_task = asyncio.run_coroutine_threadsafe(
+                self._astream_to_queue_on_background(messages, user_id, output_queue),
+                self._get_background_loop(),
+            )
 
-                yield buffer[:flush_index], index
-                buffer = buffer[flush_index:]
-                index += 1
+            while True:
+                event_type, payload = await asyncio.to_thread(output_queue.get)
+                if event_type == "done":
+                    break
+                if event_type == "error":
+                    await asyncio.wrap_future(background_task)
+                    raise payload
+
+                chunk = payload
+                fragments, buffer, index = self._append_stream_chunk(
+                    buffer,
+                    index,
+                    chunk,
+                    min_chunk_chars=min_chunk_chars,
+                    max_chunk_chars=max_chunk_chars,
+                    punctuation_marks=punctuation_marks,
+                )
+                for fragment in fragments:
+                    yield fragment
+
+            await asyncio.wrap_future(background_task)
 
         if buffer:
             yield buffer, index
 
+    # list checkpoints
+    async def list_checkpoints(self, user_id: str | None = None) -> list:
+        """根据用户ID列出对应的对话检查点列表。 如果用户ID未提供，则使用默认线程ID列出检查点。"""
+        config: RunnableConfig = {
+            "configurable": {"thread_id": user_id if user_id else str(self.thread_id)}
+        }
+        if self._use_direct_agent_path() and self.async_sqlite_saver is not None:
+            return [
+                checkpoint
+                async for checkpoint in self.async_sqlite_saver.alist(config=config)
+            ]
+        return await self._run_on_background_loop(
+            self._alist_checkpoints_on_background(config)
+        )
 
-if __name__ == "__main__":
+    # get_tuple
+    async def get_checkpoint_tuple(self, user_id: str | None = None) -> tuple | None:
+        """根据用户ID获取对应的对话检查点数据元组。 如果用户ID未提供，则使用默认线程ID获取检查点。"""
+        config: RunnableConfig = {
+            "configurable": {"thread_id": user_id if user_id else str(self.thread_id)}
+        }
+        if self._use_direct_agent_path() and self.async_sqlite_saver is not None:
+            return await self.async_sqlite_saver.aget_tuple(config=config)
+        return await self._run_on_background_loop(
+            self._aget_checkpoint_tuple_on_background(config)
+        )
+
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
+            pass
+
+
+async def _main():
     llm_agent = LLMAgent(host="192.168.50.125", port=8000)
-
-    # llm_agent.add_system_prompt("你叫小白，是一个智能助理。")
 
     user_id = input("请输入用户ID（可选，直接回车跳过）: ").strip() or None
 
@@ -544,10 +839,13 @@ if __name__ == "__main__":
         user_input = input("User: ").strip()
         if user_input.lower() in ["exit", "quit"]:
             break
-        response = llm_agent.chat_response(user_input, user_id=user_id)
+        response = await llm_agent.chat_response(user_input, user_id=user_id)
 
         print("AI:", response)
 
-        # for response_chunk, index in llm_agent.chat_response_stream(user_input, user_id=user_id):
-        #     print("AI:", response_chunk, end="\n", flush=False)
-        # print()
+        checkpoints = await llm_agent.get_checkpoint_tuple(user_id=user_id)
+        print(f"当前用户的对话检查点列表: {checkpoints}")
+
+
+if __name__ == "__main__":
+    asyncio.run(_main())
