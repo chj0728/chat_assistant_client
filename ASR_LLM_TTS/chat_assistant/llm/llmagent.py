@@ -515,7 +515,7 @@ class LLMAgent:
     ) -> tuple[list[tuple[str, int]], str, int]:
         """处理单个流式 chunk，并返回当前可输出的文本分片。"""
         ai_chunk = chunk[0] if isinstance(chunk, tuple) else chunk
-        if not isinstance(ai_chunk, AIMessageChunk):
+        if not isinstance(ai_chunk, (AIMessageChunk, AIMessage)):
             return [], buffer, index
 
         chunk_text = normalize_message_content(ai_chunk.content)
