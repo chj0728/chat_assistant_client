@@ -839,7 +839,7 @@ class ChatAssistant:
 
         return await asyncio.to_thread(self.asr_infer, audio_frames=audio_frames)
 
-    async def llm_infer(self, input_text: str, user_id: str | None = None):
+    async def async_llm_infer(self, input_text: str, user_id: str | None = None):
         """
         接收输入文本（可选携带用户 ID），调用 LLM 完成推理，返回生成的文本响应
         Parameters:
@@ -872,7 +872,7 @@ class ChatAssistant:
 
             return ""
 
-    async def llm_stream_infer(
+    async def async_lllm_stream_infer(
         self, input_text: str, user_id: str | None = None
     ) -> AsyncIterator[tuple[str, int]]:
         """
@@ -906,7 +906,7 @@ class ChatAssistant:
             logger.error(f"LLM 流式对话失败: {e}")
             yield "", index
 
-    def tts_infer(self, llm_response):
+    def tts_infer(self, text):
         """
         负责调用 TTS 完成语音合成和播放
         """
@@ -914,7 +914,7 @@ class ChatAssistant:
         logger.info("TTS 合成和播放中...")
         time_now = time.time()
         try:
-            self.tts_client.speak(llm_response.strip())
+            self.tts_client.speak(text.strip())
             threading.Thread(
                 target=self.tts_cost_time,
                 args=(time_now,),
@@ -967,6 +967,12 @@ class ChatAssistant:
         logger.info(f"TTS 合成并播放音频延迟: {elapsed_time:.2f} 秒")
         return True
 
+    async def async_tts_infer(self, text):
+        """
+        TTS 异步接口，负责调用 TTS 完成语音合成和播放
+        """
+        return await asyncio.to_thread(self.tts_infer, text)
+
     def kws_infer(self, asr_text):
         """
         负责唤醒词检测逻辑
@@ -1016,9 +1022,6 @@ class ChatAssistant:
 
         #     logger.info("长时间未与 LLM 交互，重置 LLM 模块为 IDLE 状态")
 
-        # 判断是否启用唤醒词检测
-        # if self.kws_enabled:
-        # logger.info("需要唤醒词激活")
         if self.llm_agent_state == ComponentState.ACTIVE:
             logger.info("LLM 模块已处于 ACTIVE 状态，无需检测唤醒词")
             self.last_interface_time = time.time()
@@ -1094,9 +1097,22 @@ class ChatAssistant:
             - input_text: 可选的文本输入，用于 ASR 识别，当 audio_frames 和 audio_path 都为空时使用
             - user_id: 可选的用户 ID，用于支持个性化对话，如果为 None 则使用当前默认用户 ID
         """
+
+        # # 测试异步的 asr, llm, tts 接口是否能正确协同工作
+        # now = time.time()
+        # asr_result, llm_result, tts_result = await asyncio.gather(
+        #     self.async_asr_infer(audio_frames=audio_frames),
+        #     self.async_llm_infer(input_text="你好小特，介绍自己", user_id=user_id),
+        #     self.async_tts_infer("你好，我是小特，一个智能语音助手！"),
+        # )
+        # logger.info(
+        #     f"测试异步 ASR 结果: {asr_result}, LLM 结果: {llm_result}, TTS 结果: {tts_result}, 耗时: {(time.time() - now) * 1000:.2f} ms"
+        # )
+        # return True
+
         logger.info("\n\n开始一次完整的交互流程...")
         effective_user_id = user_id if user_id is not None else self.current_user_id
-        logger.info(f"本次交互使用的用户 ID: {effective_user_id}")
+        logger.info(f"本次交互视觉用户 ID: {effective_user_id}")
 
         # 响应数据，包括 asr_text 和 llm_text
         # self.response_json = {}
@@ -1119,7 +1135,7 @@ class ChatAssistant:
                     self.asr_client.normalize_audio_frames(audio_frames)
                 ),
             )
-            logger.info(f"VR 识别结果: {vr_results}")
+            logger.info(f"VR 声纹识别结果: {vr_results}")
             logger.info(f"ASR 异步识别耗时: {time.time() - now:.2f} 秒")
 
         elif audio_path:
@@ -1187,7 +1203,7 @@ class ChatAssistant:
             # -------- llm tts stream --------------
             # -------- 先确认当前阶段是否允许播放 TTS，避免分段打断自己 ---------
             tts_can_play = self.check_tts_status()
-            async for chunk, index in self.llm_stream_infer(
+            async for chunk, index in self.async_lllm_stream_infer(
                 self.asr_text, user_id=effective_user_id
             ):
                 self.llm_text += chunk
@@ -1198,7 +1214,7 @@ class ChatAssistant:
             self.__update_llm_text(self.llm_text)
         else:
             # -------- llm 推理 -----------
-            self.llm_text = await self.llm_infer(
+            self.llm_text = await self.async_llm_infer(
                 self.asr_text, user_id=effective_user_id
             )
             self.__update_llm_text(self.llm_text)
