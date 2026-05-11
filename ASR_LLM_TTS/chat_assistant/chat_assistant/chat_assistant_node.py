@@ -569,13 +569,12 @@ class ChatAssistantNode(Node):
 
     def handle_user_id(self, msg):
         """
-        处理订阅到的用户ID消息
+        处理订阅到的用户 vision_id 消息，更新当前用户 ID，并记录消息接收时间以便后续判断数据是否过期
         """
-        user_id = msg.data.strip() if msg.data else None
         self.last_user_id_msg_time = time.time()
-        self.current_user_id = user_id
-        logger.debug(f"收到用户ID消息: {user_id}")
-        self.chat_assistant.set_current_user_id(user_id)
+        self.current_user_id = msg.data.strip() if msg.data else None
+        logger.debug(f"收到用户vision_id消息: {self.current_user_id}")
+        self.chat_assistant.set_current_user_id(self.current_user_id)
 
 
 def main(args=None):
