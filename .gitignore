@@ -24,3 +24,5 @@ log/
 *.history
 
 RAG/
+
+voice/
