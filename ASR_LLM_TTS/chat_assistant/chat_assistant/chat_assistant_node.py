@@ -422,7 +422,7 @@ class ChatAssistantNode(Node):
 
         logger.info(f"LLM 收到请求，输入文本: [{input_text}], user_id: [{user_id}]")
         llm_result = asyncio.run(
-            self.chat_assistant.async_llm_infer(input_text, user_id=user_id)
+            self.chat_assistant.async_llm_infer(input_text, vision_id=user_id)
         )
 
         # 检查 LLM 结果是否有效

@@ -432,28 +432,29 @@ class LLMAgent:
         return await asyncio.wrap_future(future)
 
     async def _ainvoke_on_background(
-        self, messages: list, user_id: str | None = None
+        self, messages: list, vision_id: str | None = None, voice_id: str | None = None
     ) -> Any:
         """在后台事件循环中执行 agent.ainvoke。"""
         return await self._get_agent().ainvoke(
             {"messages": messages},
-            context=CustomContext(user_id=user_id),
-            config=self._build_runtime_config(user_id),
+            context=CustomContext(vision_id=vision_id, voice_id=voice_id),
+            config=self._build_runtime_config(vision_id),
             stream_mode="values",
         )
 
     async def _astream_to_queue_on_background(
         self,
         messages: list,
-        user_id: str | None,
         output_queue: Queue,
+        vision_id: str | None = None,
+        voice_id: str | None = None,
     ) -> None:
         """在后台事件循环中执行 agent.astream，并通过线程安全队列向外转发。"""
         try:
             async for chunk in self._get_agent().astream(
                 {"messages": messages},
-                context=CustomContext(user_id=user_id),
-                config=self._build_runtime_config(user_id),
+                context=CustomContext(vision_id=vision_id, voice_id=voice_id),
+                config=self._build_runtime_config(thread_id=vision_id),
                 stream_mode="messages",
             ):
                 output_queue.put(("chunk", chunk))
@@ -548,11 +549,13 @@ class LLMAgent:
         """异步关闭后台事件循环线程。"""
         await asyncio.to_thread(self.close)
 
-    def _build_runtime_config(self, user_id: str | None = None) -> RunnableConfig:
+    def _build_runtime_config(self, thread_id: str | None = None) -> RunnableConfig:
         """构造带线程 ID 的运行时配置。"""
         return {
             "callbacks": self.callback_handlers,
-            "configurable": {"thread_id": user_id if user_id else str(self.thread_id)},
+            "configurable": {
+                "thread_id": thread_id if thread_id else str(self.thread_id)
+            },
         }
 
     def _init_rag_client(self):
@@ -664,13 +667,14 @@ class LLMAgent:
         return None
 
     def _build_human_message(
-        self, user_text: str, user_id: str | None = None
+        self, user_text: str, vision_id: str | None = None, voice_id: str | None = None
     ) -> HumanMessage:
         """构造用户输入消息。"""
         return HumanMessage(
             content=user_text,
             additional_kwargs={
-                "user_id": user_id,
+                "vision_id": vision_id,
+                "voice_id": voice_id,
             },
         )
 
@@ -678,27 +682,35 @@ class LLMAgent:
         """构造系统提示消息。"""
         return SystemMessage(content=prompt)
 
-    def _build_input_messages(self, user_text: str, user_id: str | None = None) -> list:
+    def _build_input_messages(
+        self, user_text: str, vision_id: str | None = None, voice_id: str | None = None
+    ) -> list:
         """构造输入消息列表，包含单次RAG增强时的系统提示和用户输入。"""
         if self.rag_enable and self.rag_client is not None:
             return [
                 self._build_system_message(
-                    self.rag_client.query(query=user_text, user_id=user_id).get(
-                        "prompt", ""
-                    )
+                    self.rag_client.query(
+                        query=user_text,
+                        vision_user_id=vision_id,
+                        voice_user_id=voice_id,
+                    ).get("prompt", "")
                 ),
-                self._build_human_message(user_text, user_id=user_id),
+                self._build_human_message(
+                    user_text, vision_id=vision_id, voice_id=voice_id
+                ),
             ]
 
         return [
-            self._build_human_message(user_text, user_id=user_id),
+            self._build_human_message(
+                user_text, vision_id=vision_id, voice_id=voice_id
+            ),
             # self._build_system_message("you are a helpful assistant."),
         ]
 
     # -------- public methods for user --------
 
     async def chat_response(
-        self, user_text: str, user_id: str | None = None
+        self, user_text: str, vision_id: str | None = None, voice_id: str | None = None
     ) -> str | None:
         """
         发送用户输入，返回完整回答文本
@@ -711,33 +723,37 @@ class LLMAgent:
         #     human_msg,
         # ]
 
-        messages = self._build_input_messages(user_text, user_id=user_id)
+        messages = self._build_input_messages(
+            user_text, vision_id=vision_id, voice_id=voice_id
+        )
         logger.debug(f"构建输入消息-------------->: {[m for m in messages]}")
 
         # if user_id:
-        logger.debug(f"用户ID: {user_id} - 用户输入: {user_text}")
+        logger.debug(f"视觉ID: {vision_id}, 语音ID: {voice_id} - 用户输入: {user_text}")
 
         if self._use_direct_agent_path():
             logger.debug("直接调用 agent.ainvoke 进行对话")
-            result = await self._ainvoke_on_background(messages, user_id)
+            result = await self._ainvoke_on_background(messages, vision_id, voice_id)
         else:
             logger.debug("通过后台事件循环调用 agent.ainvoke 进行对话")
             result = await self._run_on_background_loop(
-                self._ainvoke_on_background(messages, user_id)
+                self._ainvoke_on_background(messages, vision_id, voice_id)
             )
         logger.debug(self.callback_handlers[1].usage_metadata)  # 输出使用统计信息
         last_ai_content = self.__get_last_ai_content(result)
         return last_ai_content
 
     async def chat_response_stream(
-        self, user_text: str, user_id: str | None = None
+        self, user_text: str, vision_id: str | None = None, voice_id: str | None = None
     ) -> AsyncIterator[tuple[str, int]]:
         """
         发送用户输入，以流式方式返回回答文本的分段内容，适合边说边播的场景
         """
         index = 0
         # human_msg = self._build_human_message(user_text, user_id=user_id)
-        messages = self._build_input_messages(user_text, user_id=user_id)
+        messages = self._build_input_messages(
+            user_text, vision_id=vision_id, voice_id=voice_id
+        )
         logger.debug(f"构建输入消息-------------->: {[m for m in messages]}")
         buffer = ""
         min_chunk_chars = 20
@@ -747,8 +763,8 @@ class LLMAgent:
             logger.debug("直接调用 agent.astream 进行流式对话")
             chunk_iter = self._get_agent().astream(
                 {"messages": messages},
-                context=CustomContext(user_id=user_id),
-                config=self._build_runtime_config(user_id),
+                context=CustomContext(vision_id=vision_id, voice_id=voice_id),
+                config=self._build_runtime_config(thread_id=vision_id),
                 stream_mode="messages",
             )
             async for chunk in chunk_iter:
@@ -767,7 +783,9 @@ class LLMAgent:
             self._start_background_runtime()
             output_queue: Queue = Queue()
             background_task = asyncio.run_coroutine_threadsafe(
-                self._astream_to_queue_on_background(messages, user_id, output_queue),
+                self._astream_to_queue_on_background(
+                    messages, output_queue, vision_id=vision_id, voice_id=voice_id
+                ),
                 self._get_background_loop(),
             )
 
@@ -797,10 +815,12 @@ class LLMAgent:
             yield buffer, index
 
     # list checkpoints
-    async def list_checkpoints(self, user_id: str | None = None) -> list:
-        """根据用户ID列出对应的对话检查点列表。 如果用户ID未提供，则使用默认线程ID列出检查点。"""
+    async def list_checkpoints(self, thread_id: str | None = None) -> list:
+        """根据线程ID列出对应的对话检查点列表。 如果线程ID未提供，则使用默认线程ID列出检查点。"""
         config: RunnableConfig = {
-            "configurable": {"thread_id": user_id if user_id else str(self.thread_id)}
+            "configurable": {
+                "thread_id": thread_id if thread_id else str(self.thread_id)
+            }
         }
         if self._use_direct_agent_path() and self.async_sqlite_saver is not None:
             return [
@@ -812,10 +832,12 @@ class LLMAgent:
         )
 
     # get_tuple
-    async def get_checkpoint_tuple(self, user_id: str | None = None) -> tuple | None:
-        """根据用户ID获取对应的对话检查点数据元组。 如果用户ID未提供，则使用默认线程ID获取检查点。"""
+    async def get_checkpoint_tuple(self, thread_id: str | None = None) -> tuple | None:
+        """根据线程ID获取对应的对话检查点数据元组。 如果线程ID未提供，则使用默认线程ID获取检查点。"""
         config: RunnableConfig = {
-            "configurable": {"thread_id": user_id if user_id else str(self.thread_id)}
+            "configurable": {
+                "thread_id": thread_id if thread_id else str(self.thread_id)
+            }
         }
         if self._use_direct_agent_path() and self.async_sqlite_saver is not None:
             return await self.async_sqlite_saver.aget_tuple(config=config)
@@ -833,17 +855,20 @@ class LLMAgent:
 async def _main():
     llm_agent = LLMAgent(host="192.168.50.125", port=8000)
 
-    user_id = input("请输入用户ID（可选，直接回车跳过）: ").strip() or None
+    vision_id = input("请输入视觉ID（可选，直接回车跳过）: ").strip() or None
+    voice_id = input("请输入语音ID（可选，直接回车跳过）: ").strip() or None
 
     while True:
         user_input = input("User: ").strip()
         if user_input.lower() in ["exit", "quit"]:
             break
-        response = await llm_agent.chat_response(user_input, user_id=user_id)
+        response = await llm_agent.chat_response(
+            user_input, vision_id=vision_id, voice_id=voice_id
+        )
 
         print("AI:", response)
 
-        checkpoints = await llm_agent.get_checkpoint_tuple(user_id=user_id)
+        checkpoints = await llm_agent.get_checkpoint_tuple(thread_id=vision_id)
         print(f"当前用户的对话检查点列表: {checkpoints}")
 
 

@@ -839,7 +839,9 @@ class ChatAssistant:
 
         return await asyncio.to_thread(self.asr_infer, audio_frames=audio_frames)
 
-    async def async_llm_infer(self, input_text: str, user_id: str | None = None):
+    async def async_llm_infer(
+        self, input_text: str, vision_id: str | None = None, voice_id: str | None = None
+    ) -> str:
         """
         接收输入文本（可选携带用户 ID），调用 LLM 完成推理，返回生成的文本响应
         Parameters:
@@ -849,12 +851,15 @@ class ChatAssistant:
             str: LLM 生成的文本响应，失败时返回空字符串
         """
         logger.info("LLM 推理中...")
-        effective_user_id = user_id if user_id is not None else self.current_user_id
+        effective_vision_id = (
+            vision_id if vision_id is not None else self.current_user_id
+        )
+        effective_voice_id = voice_id if voice_id is not None else None
         llm_text = ""
         time_now = time.time()
         try:
             llm_text = await self.llm_client.chat_response(
-                input_text, effective_user_id
+                input_text, effective_vision_id, effective_voice_id
             )
             if not llm_text:
                 logger.warning("LLM 返回空响应")
@@ -873,24 +878,28 @@ class ChatAssistant:
             return ""
 
     async def async_lllm_stream_infer(
-        self, input_text: str, user_id: str | None = None
+        self, input_text: str, vision_id: str | None = None, voice_id: str | None = None
     ) -> AsyncIterator[tuple[str, int]]:
         """
         接收输入文本（可选携带用户 ID），调用 LLM 完成流式推理，逐步返回生成的文本响应片段和对应的索引
         Parameters:
             input_text (str): 输入文本
-            user_id (str | None): 可选的用户 ID，用于记忆相同用户的对话上下文，如果为 None 直接与LLM 进行对话
+            vision_id (str | None): 可选的视觉 ID，用于记忆相同用户的对话上下文，如果为 None 直接与LLM 进行对话
+            voice_id (str | None): 可选的语音 ID，用于记忆相同用户的对话上下文，如果为 None 直接与LLM 进行对话
         Returns:
             Generator[tuple[str, int], None, None]: 生成器，逐步返回LLM 生成的文本响应片段和对应的索引，失败时返回空字符串和当前索引
         """
         logger.info("LLM 流式推理中...")
-        effective_user_id = user_id if user_id is not None else self.current_user_id
+        effective_vision_id = (
+            vision_id if vision_id is not None else self.current_user_id
+        )
+        effective_voice_id = voice_id if voice_id is not None else None
         time_now = time.time()
         llm_response_chunks = []
         index = 0
         try:
             async for llm_response_chunk, index in self.llm_client.chat_response_stream(
-                input_text, effective_user_id
+                input_text, effective_vision_id, effective_voice_id
             ):
                 logger.info(
                     f"LLM 流式推理输出 [{index}]: [{llm_response_chunk}], 耗时: {(time.time() - time_now) * 1000:.2f} ms"
@@ -1111,8 +1120,8 @@ class ChatAssistant:
         # return True
 
         logger.info("\n\n开始一次完整的交互流程...")
-        effective_user_id = user_id if user_id is not None else self.current_user_id
-        logger.info(f"本次交互视觉用户 ID: {effective_user_id}")
+        voice_id = None
+        vision_id = user_id if user_id is not None else self.current_user_id
 
         # 响应数据，包括 asr_text 和 llm_text
         # self.response_json = {}
@@ -1132,11 +1141,18 @@ class ChatAssistant:
             self.asr_text, vr_results = await asyncio.gather(
                 self.async_asr_infer(audio_frames=audio_frames),
                 vr.recognize_async(
-                    self.asr_client.normalize_audio_frames(audio_frames)
+                    self.asr_client.normalize_audio_frames(audio_frames),
+                    vision_user_id=vision_id,
                 ),
             )
+
             logger.info(f"VR 声纹识别结果: {vr_results}")
             logger.info(f"ASR 异步识别耗时: {time.time() - now:.2f} 秒")
+
+            voice_id = vr_results[0] if vr_results else None
+
+            logger.info(f"本次交互视觉用户 ID: {vision_id}")
+            logger.info(f"本次交互语音用户 ID: {voice_id}")
 
         elif audio_path:
             self.asr_text = self.asr_infer(audio_path=audio_path)
@@ -1204,7 +1220,7 @@ class ChatAssistant:
             # -------- 先确认当前阶段是否允许播放 TTS，避免分段打断自己 ---------
             tts_can_play = self.check_tts_status()
             async for chunk, index in self.async_lllm_stream_infer(
-                self.asr_text, user_id=effective_user_id
+                self.asr_text, vision_id=vision_id, voice_id=voice_id
             ):
                 self.llm_text += chunk
                 if chunk.strip() and tts_can_play:
@@ -1215,7 +1231,7 @@ class ChatAssistant:
         else:
             # -------- llm 推理 -----------
             self.llm_text = await self.async_llm_infer(
-                self.asr_text, user_id=effective_user_id
+                self.asr_text, vision_id=vision_id, voice_id=voice_id
             )
             self.__update_llm_text(self.llm_text)
 

@@ -15,6 +15,8 @@ class CustomContext:
 
     # 这里可以添加一些自定义字段，比如用户信息、会话状态等
     user_id: str | None = "default_user"
+    vision_id: str | None = "default_vision"
+    voice_id: str | None = "default_voice"
     session_id: str = "default_session"
     # 其他字段...
 
