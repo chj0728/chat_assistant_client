@@ -111,6 +111,23 @@ def find_protected_suffix_start(buffer: str) -> int | None:
     return last_open
 
 
+def find_trailing_intent_tag_start(buffer: str) -> int | None:
+    """返回尾部完整或未闭合 INTENT 标签的起始位置；若尾部不存在则返回 None。"""
+    last_open = buffer.rfind(INTENT_TAG_START)
+    if last_open < 0:
+        return None
+
+    last_close = buffer.rfind(INTENT_TAG_END)
+    if last_close < last_open:
+        return last_open
+
+    trailing_intent_end = last_close + len(INTENT_TAG_END)
+    if trailing_intent_end == len(buffer):
+        return last_open
+
+    return None
+
+
 def select_stream_flush_index(
     buffer: str,
     *,
@@ -118,17 +135,32 @@ def select_stream_flush_index(
     max_chunk_chars: int,
     punctuation_marks: str,
 ) -> int | None:
-    """选择流式文本的切分位置，并避免切入尾部未闭合的 INTENT 标签。"""
+    """选择流式文本的切分位置，在指定窗口内优先按标点切分。"""
     if len(buffer) < min_chunk_chars:
         return None
 
+    protected_suffix_start = find_trailing_intent_tag_start(buffer)
+    searchable_text = (
+        buffer[:protected_suffix_start]
+        if protected_suffix_start is not None
+        else buffer
+    )
+
+    if len(searchable_text) < min_chunk_chars:
+        return None
+
+    window_end = min(len(searchable_text), max_chunk_chars)
+    window_text = searchable_text[:window_end]
+    window_start = min_chunk_chars - 1
+
     flush_index = None
     last_punctuation = max(
-        (buffer.rfind(mark) for mark in punctuation_marks), default=-1
+        (window_text.rfind(mark, window_start) for mark in punctuation_marks),
+        default=-1,
     )
-    if last_punctuation >= min_chunk_chars:
+    if last_punctuation >= window_start:
         flush_index = last_punctuation + 1
-    elif len(buffer) >= max_chunk_chars:
+    elif len(searchable_text) >= max_chunk_chars:
         flush_index = max_chunk_chars
 
     if flush_index is None:
