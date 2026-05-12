@@ -375,13 +375,16 @@ class ChatAssistant:
             self.__reset_segment_state()
             return
 
-        # 能量稳定，保存音频
+        # 有录音片段且距离上次 VAD 结束时间超过 pause_duration 则保存音频
         if (
             self.segments_to_save
-            and self.segments_to_save[-1][1] > self.last_vad_end_time
+            and self.segments_to_save[-1][1]
+            > self.last_vad_end_time + self.pause_duration
         ):
             self.__save_audio_only()
             self.last_active_time = timestamp
+        else:
+            logger.warning("缓冲时间内，跳过保存音频")
 
         # 重置状态
         self.__reset_segment_state()
@@ -494,6 +497,7 @@ class ChatAssistant:
         # 直接将 PCM16 字节流传给 ASR 识别
         ## 如果交互有效，则保存音频文件
         if self._run_inference_sync(audio_frames=audio_frames):
+            # if self.Inference(audio_frames=audio_frames):
 
             # ===============================
             # 4. 保存 WAV
@@ -510,6 +514,7 @@ class ChatAssistant:
         # ===============================
         self.saved_intervals.append((start_time, end_time))
         self.last_vad_end_time = end_time
+        logger.info(f"更新 VAD 结束时间: {self.last_vad_end_time}")
 
         self.segments_to_save.clear()
 
@@ -590,7 +595,7 @@ class ChatAssistant:
                         now - self.last_active_time > self.no_speech_threshold
                         and self.segments_to_save
                     ):
-                        logger.info("静音时间超过阈值，保存音频段")
+                        logger.info("静音时间超过阈值，收集历史音频段")
                         ### 保存末尾的音频段
                         self.segments_to_save.append((audio_bytes, now))
                         self.__finalize_pending_segments(now)

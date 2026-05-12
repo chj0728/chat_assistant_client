@@ -128,6 +128,31 @@ def find_trailing_intent_tag_start(buffer: str) -> int | None:
     return None
 
 
+def find_trailing_intent_prefix_start(buffer: str) -> int | None:
+    """返回尾部未拼完整的 INTENT 起始标签前缀位置；若不存在则返回 None。"""
+    for prefix_len in range(len(INTENT_TAG_START) - 1, 0, -1):
+        prefix = INTENT_TAG_START[:prefix_len]
+        if buffer.endswith(prefix):
+            return len(buffer) - prefix_len
+    return None
+
+
+def find_trailing_protected_suffix_start(buffer: str) -> int | None:
+    """返回尾部受保护后缀的起始位置，覆盖完整、未闭合及部分 INTENT 标签。"""
+    trailing_intent_tag_start = find_trailing_intent_tag_start(buffer)
+    if trailing_intent_tag_start is not None:
+        return trailing_intent_tag_start
+    return find_trailing_intent_prefix_start(buffer)
+
+
+def split_trailing_protected_suffix(buffer: str) -> tuple[str, str]:
+    """拆分正文与尾部受保护的 INTENT 标签后缀。"""
+    protected_suffix_start = find_trailing_protected_suffix_start(buffer)
+    if protected_suffix_start is None:
+        return buffer, ""
+    return buffer[:protected_suffix_start], buffer[protected_suffix_start:]
+
+
 def select_stream_flush_index(
     buffer: str,
     *,
@@ -139,7 +164,7 @@ def select_stream_flush_index(
     if len(buffer) < min_chunk_chars:
         return None
 
-    protected_suffix_start = find_trailing_intent_tag_start(buffer)
+    protected_suffix_start = find_trailing_protected_suffix_start(buffer)
     searchable_text = (
         buffer[:protected_suffix_start]
         if protected_suffix_start is not None
@@ -517,24 +542,17 @@ class LLMAgent:
         max_chunk_chars: int,
         punctuation_marks: str,
     ) -> tuple[list[tuple[str, int]], str, int]:
-        """从累计缓冲区中提取可立即输出的流式文本分片。"""
-        fragments: list[tuple[str, int]] = []
+        """从累计缓冲区中提取一个可立即输出的流式文本分片。"""
+        flush_index = select_stream_flush_index(
+            buffer,
+            min_chunk_chars=min_chunk_chars,
+            max_chunk_chars=max_chunk_chars,
+            punctuation_marks=punctuation_marks,
+        )
+        if flush_index is None:
+            return [], buffer, index
 
-        while buffer:
-            flush_index = select_stream_flush_index(
-                buffer,
-                min_chunk_chars=min_chunk_chars,
-                max_chunk_chars=max_chunk_chars,
-                punctuation_marks=punctuation_marks,
-            )
-            if flush_index is None:
-                break
-
-            fragments.append((buffer[:flush_index], index))
-            buffer = buffer[flush_index:]
-            index += 1
-
-        return fragments, buffer, index
+        return [(buffer[:flush_index], index)], buffer[flush_index:], index + 1
 
     def _append_stream_chunk(
         self,
@@ -842,9 +860,14 @@ class LLMAgent:
                     yield fragment
 
             await asyncio.wrap_future(background_task)
-
         if buffer:
-            yield buffer, index
+            final_text, protected_suffix = split_trailing_protected_suffix(buffer)
+            if final_text:
+                yield final_text, index
+                index += 1
+
+            if protected_suffix.endswith(INTENT_TAG_END):
+                yield protected_suffix, index
 
     # list checkpoints
     async def list_checkpoints(self, thread_id: str | None = None) -> list:
@@ -901,7 +924,29 @@ async def _main():
         print("AI:", response)
 
         checkpoints = await llm_agent.get_checkpoint_tuple(thread_id=vision_id)
-        print(f"当前用户的对话检查点列表: {checkpoints}")
+
+        # config
+        # checkpoints[0] if checkpoints else None
+
+        # checkpoint
+        # checkpoints[1] if checkpoints else None
+
+        # metadata
+        # checkpoints[2] if checkpoints else None
+
+        # parent_config
+        # checkpoints[3] if checkpoints else None
+
+        # pending_writes
+        # checkpoints[4] if checkpoints else None
+
+        # for checkpoint in checkpoints or []:
+        #     print(checkpoint)
+
+        for message in (
+            checkpoints[1].get("channel_values").get("messages") if checkpoints else []
+        ):
+            print(f"{message.type}: {message.content}")
 
 
 if __name__ == "__main__":
