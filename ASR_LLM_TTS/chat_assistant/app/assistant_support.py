@@ -134,3 +134,54 @@ class AssistantTextProcessor:
             r"<INTENT>.*?</INTENT>$", "", input_string, flags=re.DOTALL
         )
         return cleaned_string.strip()
+
+    @staticmethod
+    def remove_special_symbols(input_string: str) -> str:
+        """移除输入字符串中的特殊符号
+        只保留中文、英文、数字和常用标点符号
+        """
+        if not input_string:
+            return input_string
+
+        cleaned_string = re.sub(
+            r"[^\u4e00-\u9fa5a-zA-Z0-9\s.,!?，。！？]", "", input_string
+        )
+        return cleaned_string.strip()
+
+    def unify_text(self, input_string: str) -> str:
+        """对输入字符串进行统一处理，包括替换特殊字符、移除意图标签和特殊符号"""
+        if not input_string:
+            return input_string
+
+        # text = self.replace_special_characters(input_string)
+        text = self.remove_intent_tags(input_string)
+        text = self.remove_special_symbols(text)
+        return text.strip()
+
+
+if __name__ == "__main__":
+    processor = AssistantTextProcessor(
+        wake_word="小美", fuzzy_similarity_threshold=0.8, word_map=SPECIAL_WORD_MAP
+    )
+
+    test_inputs = [
+        "小美，今天天气怎么样？<INTENT>查询天气</INTENT>",
+        "我想听音乐，小美。<INTENT>播放音乐</INTENT>",
+        "小美“”小美:" "''小美",
+        "**小明，你好！**",
+        "小美，帮我设置个闹钟",
+    ]
+
+    for input_text in test_inputs:
+        print(f"原始输入: {input_text}")
+        pinyin_text = processor.extract_chinese_and_convert_to_pinyin(input_text)
+        print(f"拼音转换: {pinyin_text}")
+        is_match, matched_window, similarity = processor.is_kws_pinyin_match(
+            pinyin_text
+        )
+        print(
+            f"是否匹配: {is_match}, 最佳匹配窗口: '{matched_window}', 相似度: {similarity:.2f}"
+        )
+        unified_text = processor.unify_text(input_text)
+        print(f"统一处理后文本: {unified_text}")
+        print("-" * 50)

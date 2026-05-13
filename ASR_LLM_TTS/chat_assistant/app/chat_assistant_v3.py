@@ -1318,7 +1318,7 @@ class ChatAssistant:
                 self.llm_text += chunk
                 if chunk.strip() and tts_can_play:
                     self.tts_stream_infer(
-                        self.text_processor.remove_intent_tags(chunk.strip()), index
+                        self.text_processor.unify_text(chunk.strip()), index
                     )
             self.__update_llm_text(self.llm_text)
         else:
@@ -1338,7 +1338,7 @@ class ChatAssistant:
             ## -------- 检查 TTS 逻辑状态 ----------
             if not self.check_tts_status():
                 return False
-            self.tts_infer(self.text_processor.remove_intent_tags(self.llm_text))
+            self.tts_infer(self.text_processor.unify_text(self.llm_text))
 
         logger.info("本次交互完成，等待下一次录音")
         return True
