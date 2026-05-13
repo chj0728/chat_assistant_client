@@ -16,7 +16,7 @@ import sqlite3
 import threading
 from pathlib import Path
 from queue import Queue
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Generator
 
 import aiosqlite
 import requests
@@ -508,7 +508,9 @@ class LLMAgent:
     ) -> None:
         """在后台事件循环中执行 agent.astream，并通过线程安全队列向外转发。"""
         try:
-            async for chunk in self._get_agent().astream(
+            async for chunk in (
+                self._get_agent() if vision_id else self.tiny_agent
+            ).astream(
                 {"messages": messages},
                 context=CustomContext(vision_id=vision_id, voice_id=voice_id),
                 config=self._build_runtime_config(thread_id=vision_id),
@@ -759,20 +761,76 @@ class LLMAgent:
 
     # -------- public methods for user --------
 
-    async def chat_response(
+    def chat_response(
         self, user_text: str, vision_id: str | None = None, voice_id: str | None = None
     ) -> str | None:
         """
-        发送用户输入，返回完整回答文本
+        发送用户输入，返回完整回答文本，适合一次性获取完整回复的场景
         """
+        messages = self._build_input_messages(
+            user_text, vision_id=vision_id, voice_id=voice_id
+        )
+        logger.debug(f"构建输入消息-------------->: {[m for m in messages]}")
+        result = (self._get_agent() if vision_id else self.tiny_agent).invoke(
+            {"messages": messages},
+            context=CustomContext(vision_id=vision_id, voice_id=voice_id),
+            config=self._build_runtime_config(thread_id=vision_id),
+            stream_mode="values",
+        )
+        logger.debug(self.callback_handlers[1].usage_metadata)  # 输出使用统计信息
+        last_ai_content = self.__get_last_ai_content(result)
+        return last_ai_content
+
+    def chat_response_stream(
+        self, user_text: str, vision_id: str | None = None, voice_id: str | None = None
+    ) -> Generator[tuple[str, int], Any, None]:
+        """
+        发送用户输入，以同步流式方式返回回答文本的分段内容，适合边说边播的场景
+        """
+        index = 0
         # human_msg = self._build_human_message(user_text, user_id=user_id)
+        messages = self._build_input_messages(
+            user_text, vision_id=vision_id, voice_id=voice_id
+        )
+        logger.debug(f"构建输入消息-------------->: {[m for m in messages]}")
+        buffer = ""
+        min_chunk_chars = 20
+        max_chunk_chars = 50
+        punctuation_marks = "。！？!?；;，,：:"
 
-        # system_msg = SystemMessage("You are a helpful assistant.")
-        # messages = [
-        #     system_msg,
-        #     human_msg,
-        # ]
+        for chunk in (self._get_agent() if vision_id else self.tiny_agent).stream(
+            {"messages": messages},
+            context=CustomContext(vision_id=vision_id, voice_id=voice_id),
+            config=self._build_runtime_config(thread_id=vision_id),
+            stream_mode="messages",
+        ):
 
+            fragments, buffer, index = self._append_stream_chunk(
+                buffer,
+                index,
+                chunk,
+                min_chunk_chars=min_chunk_chars,
+                max_chunk_chars=max_chunk_chars,
+                punctuation_marks=punctuation_marks,
+            )
+            for fragment in fragments:
+                yield fragment
+
+        if buffer:
+            final_text, protected_suffix = split_trailing_protected_suffix(buffer)
+            if final_text:
+                yield final_text, index
+                index += 1
+
+            if protected_suffix.endswith(INTENT_TAG_END):
+                yield protected_suffix, index
+
+    async def async_chat_response(
+        self, user_text: str, vision_id: str | None = None, voice_id: str | None = None
+    ) -> str | None:
+        """
+        发送用户输入，异步返回完整回答文本
+        """
         messages = self._build_input_messages(
             user_text, vision_id=vision_id, voice_id=voice_id
         )
@@ -793,11 +851,11 @@ class LLMAgent:
         last_ai_content = self.__get_last_ai_content(result)
         return last_ai_content
 
-    async def chat_response_stream(
+    async def async_chat_response_stream(
         self, user_text: str, vision_id: str | None = None, voice_id: str | None = None
     ) -> AsyncIterator[tuple[str, int]]:
         """
-        发送用户输入，以流式方式返回回答文本的分段内容，适合边说边播的场景
+        发送用户输入，以异步流式方式返回回答文本的分段内容，适合边说边播的场景
         """
         index = 0
         # human_msg = self._build_human_message(user_text, user_id=user_id)
@@ -811,7 +869,7 @@ class LLMAgent:
         punctuation_marks = "。！？!?；;，,：:"
         if self._use_direct_agent_path():
             logger.debug("直接调用 agent.astream 进行流式对话")
-            chunk_iter = self._get_agent().astream(
+            chunk_iter = (self._get_agent() if vision_id else self.tiny_agent).astream(
                 {"messages": messages},
                 context=CustomContext(vision_id=vision_id, voice_id=voice_id),
                 config=self._build_runtime_config(thread_id=vision_id),
@@ -917,13 +975,27 @@ async def _main():
         user_input = input("User: ").strip()
         if user_input.lower() in ["exit", "quit"]:
             break
-        response = await llm_agent.chat_response(
+
+        # # 异步获取完整回复文本
+        # response = await llm_agent.async_chat_response(
+        #     user_input, vision_id=vision_id, voice_id=voice_id
+        # )
+
+        # # 同步获取完整回复文本
+        # response = llm_agent.chat_response(
+        #     user_input, vision_id=vision_id, voice_id=voice_id
+        # )
+        # print("AI:", response)
+
+        # 同步流式获取回复文本分片
+        print("AI:", end=" ", flush=True)
+        for chunk, _ in llm_agent.chat_response_stream(
             user_input, vision_id=vision_id, voice_id=voice_id
-        )
+        ):
+            print(chunk, end=" ", flush=True)
+        print()  # 换行
 
-        print("AI:", response)
-
-        checkpoints = await llm_agent.get_checkpoint_tuple(thread_id=vision_id)
+        # checkpoints = await llm_agent.get_checkpoint_tuple(thread_id=vision_id)
 
         # config
         # checkpoints[0] if checkpoints else None
@@ -943,10 +1015,10 @@ async def _main():
         # for checkpoint in checkpoints or []:
         #     print(checkpoint)
 
-        for message in (
-            checkpoints[1].get("channel_values").get("messages") if checkpoints else []
-        ):
-            print(f"{message.type}: {message.content}")
+        # for message in (
+        #     checkpoints[1].get("channel_values").get("messages") if checkpoints else []
+        # ):
+        #     print(f"{message.type}: {message.content}")
 
 
 if __name__ == "__main__":

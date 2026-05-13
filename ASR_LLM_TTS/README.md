@@ -25,9 +25,11 @@ pip3 install -r ./ASR_LLM_TTS/requirements.txt -i https://mirrors.tuna.tsinghua.
 # (Recommended)or use uv to manage dependencies and virtual environment
 ## install uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
-uv venv venv --system-site-packages
+uv venv venv --system-site-packages # --python 3.12
 source venv/bin/activate
 uv pip install -r ./ASR_LLM_TTS/requirements.txt -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
+
+uv pip install -U -r ./ASR_LLM_TTS/requirements.txt -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
 ```
 
 ## Build with ROS2

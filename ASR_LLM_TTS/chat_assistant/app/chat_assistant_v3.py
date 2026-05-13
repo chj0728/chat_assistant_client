@@ -5,7 +5,7 @@ import wave
 from dataclasses import asdict
 from pathlib import Path
 from queue import Empty, Full, Queue
-from typing import AsyncIterator
+from typing import AsyncIterator, Iterator
 
 import numpy as np
 import sounddevice as sd
@@ -844,14 +844,15 @@ class ChatAssistant:
 
         return await asyncio.to_thread(self.asr_infer, audio_frames=audio_frames)
 
-    async def async_llm_infer(
+    def llm_infer(
         self, input_text: str, vision_id: str | None = None, voice_id: str | None = None
     ) -> str:
         """
         接收输入文本（可选携带用户 ID），调用 LLM 完成推理，返回生成的文本响应
         Parameters:
             input_text (str): 输入文本
-            user_id (str | None): 可选的用户 ID，用于记忆相同用户的对话上下文，如果为 None 直接与LLM 进行对话
+            vision_id (str | None): 可选的视觉 ID，用于记忆相同用户的对话上下文，如果为 None 直接与LLM 进行对话
+            voice_id (str | None): 可选的语音 ID
         Returns:
             str: LLM 生成的文本响应，失败时返回空字符串
         """
@@ -863,7 +864,7 @@ class ChatAssistant:
         llm_text = ""
         time_now = time.time()
         try:
-            llm_text = await self.llm_client.chat_response(
+            llm_text = self.llm_client.chat_response(
                 input_text, effective_vision_id, effective_voice_id
             )
             if not llm_text:
@@ -882,17 +883,17 @@ class ChatAssistant:
 
             return ""
 
-    async def async_lllm_stream_infer(
+    def llm_stream_infer(
         self, input_text: str, vision_id: str | None = None, voice_id: str | None = None
-    ) -> AsyncIterator[tuple[str, int]]:
+    ) -> Iterator[tuple[str, int]]:
         """
         接收输入文本（可选携带用户 ID），调用 LLM 完成流式推理，逐步返回生成的文本响应片段和对应的索引
         Parameters:
             input_text (str): 输入文本
             vision_id (str | None): 可选的视觉 ID，用于记忆相同用户的对话上下文，如果为 None 直接与LLM 进行对话
-            voice_id (str | None): 可选的语音 ID，用于记忆相同用户的对话上下文，如果为 None 直接与LLM 进行对话
+            voice_id (str | None): 可选的语音 ID
         Returns:
-            Generator[tuple[str, int], None, None]: 生成器，逐步返回LLM 生成的文本响应片段和对应的索引，失败时返回空字符串和当前索引
+            Iterator[tuple[str, int]]: 生成器，逐步返回LLM 生成的文本响应片段和对应的索引，失败时返回空字符串和当前索引
         """
         logger.info("LLM 流式推理中...")
         effective_vision_id = (
@@ -903,7 +904,90 @@ class ChatAssistant:
         llm_response_chunks = []
         index = 0
         try:
-            async for llm_response_chunk, index in self.llm_client.chat_response_stream(
+            for (
+                llm_response_chunk,
+                index,
+            ) in self.llm_client.chat_response_stream(
+                input_text, effective_vision_id, effective_voice_id
+            ):
+                logger.info(
+                    f"LLM 流式推理输出 [{index}]: [{llm_response_chunk}], 耗时: {(time.time() - time_now) * 1000:.2f} ms"
+                )
+                llm_response_chunks.append(llm_response_chunk)
+                time_now = time.time()
+
+                yield llm_response_chunk, index
+
+            self.last_interface_time = time.time()
+
+        except Exception as e:
+            logger.error(f"LLM 流式对话失败: {e}")
+            yield "", index
+
+    async def async_llm_infer(
+        self, input_text: str, vision_id: str | None = None, voice_id: str | None = None
+    ) -> str:
+        """
+        接收输入文本（可选携带用户 ID），调用 LLM 完成推理，返回生成的文本响应
+        Parameters:
+            input_text (str): 输入文本
+            vision_id (str | None): 可选的视觉 ID，用于记忆相同用户的对话上下文，如果为 None 直接与LLM 进行对话
+            voice_id (str | None): 可选的语音 ID
+        Returns:
+            str: LLM 生成的文本响应，失败时返回空字符串
+        """
+        logger.info("LLM 推理中...")
+        effective_vision_id = (
+            vision_id if vision_id is not None else self.current_user_id
+        )
+        effective_voice_id = voice_id if voice_id is not None else None
+        llm_text = ""
+        time_now = time.time()
+        try:
+            llm_text = await self.llm_client.async_chat_response(
+                input_text, effective_vision_id, effective_voice_id
+            )
+            if not llm_text:
+                logger.warning("LLM 返回空响应")
+                llm_text = ""
+            logger.info(
+                f"LLM 推理结果: [{llm_text}], 耗时: {(time.time() - time_now) * 1000:.2f} ms"
+            )
+
+            self.last_interface_time = time.time()
+            return llm_text
+
+        except Exception as e:
+            logger.error(f"LLM 对话失败: {e}")
+            self.last_interface_time = time.time()
+
+            return ""
+
+    async def async_llm_stream_infer(
+        self, input_text: str, vision_id: str | None = None, voice_id: str | None = None
+    ) -> AsyncIterator[tuple[str, int]]:
+        """
+        接收输入文本（可选携带用户 ID），调用 LLM 完成流式推理，逐步返回生成的文本响应片段和对应的索引
+        Parameters:
+            input_text (str): 输入文本
+            vision_id (str | None): 可选的视觉 ID，用于记忆相同用户的对话上下文，如果为 None 直接与LLM 进行对话
+            voice_id (str | None): 可选的语音 ID
+        Returns:
+            AsyncIterator[tuple[str, int]]: 异步生成器，逐步返回LLM 生成的文本响应片段和对应的索引，失败时返回空字符串和当前索引
+        """
+        logger.info("LLM 流式推理中...")
+        effective_vision_id = (
+            vision_id if vision_id is not None else self.current_user_id
+        )
+        effective_voice_id = voice_id if voice_id is not None else None
+        time_now = time.time()
+        llm_response_chunks = []
+        index = 0
+        try:
+            async for (
+                llm_response_chunk,
+                index,
+            ) in self.llm_client.async_chat_response_stream(
                 input_text, effective_vision_id, effective_voice_id
             ):
                 logger.info(
@@ -1027,14 +1111,6 @@ class ChatAssistant:
 
             self.last_interface_time = time.time()
             return True
-
-        # # 判断是否需要重置唤醒词状态
-        # if time.time() - self.last_interface_time > self.reactive_kws_threshold:
-        #     # self.flag_kws = 0
-        #     # if self.llm_agent_state == LLMAgentState.ACTIVE:
-        #     self.llm_agent_state = ComponentState.IDLE
-
-        #     logger.info("长时间未与 LLM 交互，重置 LLM 模块为 IDLE 状态")
 
         if self.llm_agent_state == ComponentState.ACTIVE:
             logger.info("LLM 模块已处于 ACTIVE 状态，无需检测唤醒词")
@@ -1224,7 +1300,19 @@ class ChatAssistant:
             # -------- llm tts stream --------------
             # -------- 先确认当前阶段是否允许播放 TTS，避免分段打断自己 ---------
             tts_can_play = self.check_tts_status()
-            async for chunk, index in self.async_lllm_stream_infer(
+
+            # 异步流式推理和播放
+            # async for chunk, index in self.async_llm_stream_infer(
+            #     self.asr_text, vision_id=vision_id, voice_id=voice_id
+            # ):
+            #     self.llm_text += chunk
+            #     if chunk.strip() and tts_can_play:
+            #         self.tts_stream_infer(
+            #             self.text_processor.remove_intent_tags(chunk.strip()), index
+            #         )
+
+            # 同步流式推理和播放
+            for chunk, index in self.llm_stream_infer(
                 self.asr_text, vision_id=vision_id, voice_id=voice_id
             ):
                 self.llm_text += chunk
@@ -1235,9 +1323,15 @@ class ChatAssistant:
             self.__update_llm_text(self.llm_text)
         else:
             # -------- llm 推理 -----------
-            self.llm_text = await self.async_llm_infer(
+            # 异步推理
+            # self.llm_text = await self.async_llm_infer(
+            #     self.asr_text, vision_id=vision_id, voice_id=voice_id
+            # )
+            # 同步推理
+            self.llm_text = self.llm_infer(
                 self.asr_text, vision_id=vision_id, voice_id=voice_id
             )
+
             self.__update_llm_text(self.llm_text)
 
             # -------- tts 播放 -----------
