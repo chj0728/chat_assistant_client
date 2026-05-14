@@ -389,11 +389,11 @@ class ChatAssistant:
         # 重置状态
         self.__reset_segment_state()
 
-    def __update_llm_text(self, llm_text):
+    def __update_llm_text(self, llm_text, index=0):
         """更新 LLM 文本，并推送到队列。"""
 
         # 更新单个响应数据对象，并推送到单独的 LLM 文本队列
-        self.__push_queue(self.llm_text_queue, llm_text)
+        self.__push_queue(self.llm_text_queue, [{"index": index, "text": llm_text}])
 
         # 更新综合响应数据对象，并推送到综合队列
         self.response_data.llm_text = llm_text
@@ -1010,6 +1010,10 @@ class ChatAssistant:
         """
 
         logger.info("TTS 合成和播放中...")
+
+        text = self.text_processor.unify_text(text)
+        logger.debug(f"统一化处理后请求片段: [{text}]")
+
         time_now = time.time()
         try:
             self.tts_client.speak(text.strip())
@@ -1024,22 +1028,35 @@ class ChatAssistant:
             logger.error(f"TTS 播放失败: {e}")
             return False
 
-    def tts_stream_infer(self, llm_response_chunk, index):
+    def tts_stream_infer(self, llm_response_chunk, index=0):
         """
         负责调用 TTS 完成流式语音片段的合成和推送（非阻塞）
         """
         logger.info(f"TTS 推送流式片段 [{index}]...")
+
+        text = self.text_processor.unify_text(llm_response_chunk)
+        logger.debug(f"统一化处理后请求片段 [{index}]: [{text}]")
+
         time_now = time.time()
         try:
-            # 假设 tts_client.speak 为异步或基于缓冲队列的非阻塞调用
-            self.tts_client.speak(llm_response_chunk.strip(), interrupt=False)
+            assert index >= 0, "index 必须为非负整数"
+
+            # tts_client.speak 为异步或基于缓冲队列的非阻塞调用
             if index == 0:
+
+                self.tts_client.speak(text.strip(), interrupt=True)
+
                 threading.Thread(
                     target=self.tts_cost_time,
                     args=(time_now,),
                     daemon=True,
                     name="tts-stream-startup-monitor",
                 ).start()
+
+            else:
+
+                self.tts_client.speak(text.strip(), interrupt=False)
+
             return True
         except Exception as e:
             logger.error(f"TTS 推送流式片段 [{index}] 失败: {e}")
@@ -1062,7 +1079,7 @@ class ChatAssistant:
                 - start_time
                 - self.tts_client.get_playback_start_delay_sec()
             )
-        logger.info(f"TTS 合成并播放音频延迟: {elapsed_time:.2f} 秒")
+        logger.info(f"TTS 首次合成并播放音频延迟: {elapsed_time:.2f} 秒")
         return True
 
     async def async_tts_infer(self, text):
@@ -1298,10 +1315,10 @@ class ChatAssistant:
 
         if self.llm_stream_infer_enable:
             # -------- llm tts stream --------------
-            # -------- 先确认当前阶段是否允许播放 TTS，避免分段打断自己 ---------
+            ## -------- 先确认当前阶段是否允许播放 TTS，避免分段打断自己 ---------
             tts_can_play = self.check_tts_status()
 
-            # 异步流式推理和播放
+            ## 异步流式推理和播放 require python >=3.11
             # async for chunk, index in self.async_llm_stream_infer(
             #     self.asr_text, vision_id=vision_id, voice_id=voice_id
             # ):
@@ -1311,34 +1328,40 @@ class ChatAssistant:
             #             self.text_processor.remove_intent_tags(chunk.strip()), index
             #         )
 
-            # 同步流式推理和播放
+            ## 同步流式推理和播放
             for chunk, index in self.llm_stream_infer(
                 self.asr_text, vision_id=vision_id, voice_id=voice_id
             ):
+                self.__push_queue(
+                    self.llm_text_queue, [{"index": index, "text": chunk.strip()}]
+                )
+
                 self.llm_text += chunk
                 if chunk.strip() and tts_can_play:
-                    self.tts_stream_infer(
-                        self.text_processor.unify_text(chunk.strip()), index
-                    )
-            self.__update_llm_text(self.llm_text)
+                    self.tts_stream_infer(chunk.strip(), index)
+
+            # self.__update_llm_text(self.llm_text)
+            self.response_data.llm_text = self.llm_text
+            self.__push_queue(self.response_queue, asdict(self.response_data))
+            self.response_data.clear()
+
         else:
-            # -------- llm 推理 -----------
-            # 异步推理
+            # -------- llm tts -----------
+            ## llm异步推理 require python >=3.11
             # self.llm_text = await self.async_llm_infer(
             #     self.asr_text, vision_id=vision_id, voice_id=voice_id
             # )
-            # 同步推理
+            ## llm同步推理
             self.llm_text = self.llm_infer(
                 self.asr_text, vision_id=vision_id, voice_id=voice_id
             )
 
             self.__update_llm_text(self.llm_text)
 
-            # -------- tts 播放 -----------
-            ## -------- 检查 TTS 逻辑状态 ----------
+            ## -------- tts 播放 -----------
             if not self.check_tts_status():
                 return False
-            self.tts_infer(self.text_processor.unify_text(self.llm_text))
+            self.tts_infer(self.llm_text)
 
         logger.info("本次交互完成，等待下一次录音")
         return True

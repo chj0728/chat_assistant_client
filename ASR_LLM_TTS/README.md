@@ -74,8 +74,27 @@ Refer to [chat_assistant/README.md](chat_assistant/README.md) for detailed instr
 
 - 大语言模型推理结果: `/llm_result`
   - 话题名称：读取[配置文件](chat_assistant/config/config.yaml)中的 `llm_publish_topic`
-  - 消息类型：std_msgs/msg/String
-  - 发布大语言模型生成的文本结果
+  - 消息类型：`chat_assistant_interfaces/msg/LLMResponse`
+  - 分段发布大语言模型生成的文本结果，每个消息包含一个文本段和对应的索引，LLM生成的文本会被分成多个段逐步发布，以实现边生成边发布的效果
+  示例：
+    `ros2 topic echo /llm_result`
+
+    ```bash
+    response_index: 0
+    response_text: 你好，有什么可以帮您的吗
+    ---
+    response_index: 1
+    response_text: <INTENT>WAIT_FOR_TALK</INTENT>
+    ---
+    response_index: 0
+    response_text: 智己LS6是2025款智己品牌旗下的全新车型，
+    ---
+    response_index: 1
+    response_text: 具体配置和功能建议您前往官方授权的智己汽车门店进行详细咨询和体验。
+    ---
+    response_index: 2
+    response_text: <INTENT>WAIT_FOR_TALK</INTENT>
+    ```
   
 - 发布综合推理结果（包含ASR和LLM结果）: `/assistant_response`
   - 话题名称：读取[配置文件](chat_assistant/config/config.yaml)中的 `response_publish_topic`
@@ -171,7 +190,7 @@ ros2 service call /idle_assistant std_srvs/srv/Trigger
 ros2 service call /interrupt_audio std_srvs/srv/Trigger
 ```
 
-### 播放音频（传入音频文件路径，播放该音频文件）
+### 播放固定音频文件（传入音频文件路径，播放该音频文件）
 
 - 服务名称：`/play_audio_file`
 - 服务类型：`chat_assistant_interfaces/srv/GetString`
@@ -196,7 +215,7 @@ response:
 chat_assistant_interfaces.srv.GetString_Response(success=True, message='音频播放成功')
 ```
 
-### 语音识别服务（传入音频文件路径，返回识别文本）
+### ASR-语音识别服务（传入音频文件路径，返回识别文本）
 
 - 服务名称：`/asr_infer`
 - 服务类型：`chat_assistant_interfaces/srv/GetString`
@@ -222,7 +241,7 @@ response:
 chat_assistant_interfaces.srv.GetString_Response(success=True, message='你好，这是一个文本转语音的测试。')
 ```
 
-### 大语言模型服务（传入文本，返回生成文本）
+### LLM-大语言模型推理服务（传入文本，返回生成文本）
 
 - 服务名称：`/llm_infer`
 - 服务类型：`chat_assistant_interfaces/srv/GetString`
@@ -291,32 +310,33 @@ response:
 chat_assistant_interfaces.srv.GetString_Response(success=True, message='我记得您喜欢红色<INTENT>WAIT_FOR_TALK</INTENT>')
 ```
 
-### 在线文本转语音服务（传入文本，合成语音并播放）
+### TTS-文本转语音服务（传入文本，合成语音并播放）
 
 - 服务名称：`/tts_infer`
-- 服务类型：`chat_assistant_interfaces/srv/GetString`
+- 服务类型：`chat_assistant_interfaces/srv/RequestTTS`
 - 请求参数
-  - `string input`：输入文本
+  - `uint8 request_index`：索引: 0 表示文本的第一个片段，会打断当前正在播放的语音；大于0表示后续片段，会接在前一个片段后面播放
+  - `string request_text`：文本
   - 返回参数
     - `bool success`：表示服务调用是否成功
     - `string message`：合成结果描述 or 错误信息  
 - 请求示例
 
 ```bash
-ros2 service call /tts_infer chat_assistant_interfaces/srv/GetString "{input: '你好，这是一个文本转语音的测试。'}"
+ros2 service call /tts_infer chat_assistant_interfaces/srv/RequestTTS "{request_index: 0, request_text: '你好，这是一个文本转语音的测试。'}"
 ```
 
 - 响应示例
 
 ```bash
 waiting for service to become available...
-requester: making request: chat_assistant_interfaces.srv.GetString_Request(input='你好，这是一个文本转语音的测试。')
+requester: making request: chat_assistant_interfaces.srv.RequestTTS_Request(request_index=0, request_text='你好，这是一个文本转语音的测试。')
 
 response:
-chat_assistant_interfaces.srv.GetString_Response(success=True, message='TTS 合成并播放音频成功')
+chat_assistant_interfaces.srv.RequestTTS_Response(success=True, message='TTS 合成并播放音频成功')
 ```
 
-### 离线文本转语音服务（传入文本，保存为 WAV 文件）
+### TTS-文本生成WAV服务（传入文本，保存为 WAV 文件）
 
 - 服务名称：`/tts_generate_wav`
 - 服务类型：`chat_assistant_interfaces/srv/GenerateWav`

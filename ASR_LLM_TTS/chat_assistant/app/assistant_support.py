@@ -131,7 +131,7 @@ class AssistantTextProcessor:
             return input_string
 
         cleaned_string = re.sub(
-            r"<INTENT>.*?</INTENT>$", "", input_string, flags=re.DOTALL
+            r"<INTENT>.*?</INTENT>", "", input_string, flags=re.DOTALL
         )
         return cleaned_string.strip()
 

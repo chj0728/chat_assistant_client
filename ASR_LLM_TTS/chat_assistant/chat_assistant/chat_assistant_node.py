@@ -7,8 +7,8 @@ from queue import Empty, Full, Queue
 
 import rclpy
 from app import ChatAssistant
-from chat_assistant_interfaces.msg import Response
-from chat_assistant_interfaces.srv import GenerateWav, GetString
+from chat_assistant_interfaces.msg import LLMResponse, Response
+from chat_assistant_interfaces.srv import GenerateWav, GetString, RequestTTS
 from config import clear_config_cache, load_config
 from langchain.agents.middleware import (
     AgentMiddleware,
@@ -174,7 +174,7 @@ class ChatAssistantNode(Node):
         self.create_service(GetString, "llm_infer", self.handle_llm_infer)
 
         ## 接收文本输入，只调用 TTS 完成文本转语音，并在线播放音频服务
-        self.create_service(GetString, "tts_infer", self.handle_tts_infer)
+        self.create_service(RequestTTS, "tts_infer", self.handle_tts_infer)
 
         ## 接收文本输入，调用 ASR、LLM、TTS 完成一次完整的交互服务
         self.create_service(
@@ -253,7 +253,9 @@ class ChatAssistantNode(Node):
         self.asr_publisher = self.create_publisher(String, self.asr_publish_topic, 10)
 
         ## 发布 llm 生成结果话题
-        self.llm_publisher = self.create_publisher(String, self.llm_publish_topic, 10)
+        self.llm_publisher = self.create_publisher(
+            LLMResponse, self.llm_publish_topic, 10
+        )
 
         ## 发布综合响应结果话题
         self.response_publisher = self.create_publisher(
@@ -395,10 +397,17 @@ class ChatAssistantNode(Node):
         """
         接收文本输入，只调用 TTS 完成文本转语音，并播放音频服务
         """
-        input_text = request.input
+        # input_text = request.input
 
-        logger.info(f"TTS 收到请求，输入文本: [{input_text}]")
-        tts_result = self.chat_assistant.tts_infer(input_text)
+        request_index = (
+            request.request_index if hasattr(request, "request_index") else 0
+        )
+        request_text = request.request_text if hasattr(request, "request_text") else ""
+
+        logger.info(f"TTS 收到请求，输入文本[{request_index}]: [{request_text}]")
+        tts_result = self.chat_assistant.tts_stream_infer(
+            llm_response_chunk=request_text, index=request_index
+        )
 
         # 检查 TTS 结果是否有效
         if tts_result is False:
@@ -608,8 +617,11 @@ def main(args=None):
                 )
 
                 # 发布 llm_response 到话题
-                msg = String()
-                msg.data = llm_response
+                # msg = String()
+                # msg.data = llm_response
+                msg = LLMResponse()
+                msg.response_index = llm_response[0].get("index", 0)
+                msg.response_text = llm_response[0].get("text", "")
                 chat_assistant_node.llm_publisher.publish(msg)
                 # logger.info(f"发布 LLM 生成结果到话题: [{llm_response}]")
 

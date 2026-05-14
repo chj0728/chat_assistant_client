@@ -1,0 +1,6 @@
+uint8 request_index  # index to indicate which TTS request this is
+string request_text  # input string to be processed
+# bool request_interrupt = false  # whether the TTS request is triggered by an interrupt event
+---
+bool success          # indicate successful run of triggered service
+string message        # informational, e.g. for error messages
