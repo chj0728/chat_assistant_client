@@ -12,6 +12,7 @@ description: 该模块定义了用于创建和管理基于大型语言模型（L
 """
 
 import asyncio
+import re
 import sqlite3
 import threading
 from pathlib import Path
@@ -52,13 +53,16 @@ DEFAULT_DB_PATH = (
     Path(__file__).resolve().parent.parent / "db" / "agent_conversations.db"
 )
 DEFAULT_SYSTEM_PROMPT = (
-    "你需要简洁且有礼貌地回答用户的问题，请保持回答简短且有条理，控制在100字以内。\n"
-    "在回答中尽量避免使用标点符号结尾，以便更自然地进行语音合成。\n"
+    "你需要简洁且有礼貌地回答用户的问题，请保持回答简短且有条理，控制在120字以内。\n"
+    "正文中请正常使用中文标点符号来表达停顿和语义边界，便于流式切分和语音合成。\n"
     "如果你不确定答案，可以礼貌地告诉用户你不知道。\n"
     "只有当用户回答退出、结束等相关内容时，调用结束对话的工具函数，礼貌地结束对话。"
 )
 INTENT_TAG_START = "<INTENT>"
 INTENT_TAG_END = "</INTENT>"
+INTENT_TAG_PATTERN = re.compile(
+    rf"{re.escape(INTENT_TAG_START)}.*?{re.escape(INTENT_TAG_END)}", re.DOTALL
+)
 
 
 # config 设置里的回调函数示例，实际使用时可以根据需要进行修改和扩展
@@ -153,6 +157,40 @@ def split_trailing_protected_suffix(buffer: str) -> tuple[str, str]:
     return buffer[:protected_suffix_start], buffer[protected_suffix_start:]
 
 
+def build_visible_text_and_raw_offsets(buffer: str) -> tuple[str, list[int]]:
+    """构造忽略完整 INTENT 标签后的可见文本，以及可见字符到原始下标的映射。"""
+    visible_parts: list[str] = []
+    raw_offsets: list[int] = []
+    cursor = 0
+
+    for match in INTENT_TAG_PATTERN.finditer(buffer):
+        segment = buffer[cursor : match.start()]
+        visible_parts.append(segment)
+        raw_offsets.extend(range(cursor + 1, match.start() + 1))
+        cursor = match.end()
+
+    tail_segment = buffer[cursor:]
+    visible_parts.append(tail_segment)
+    raw_offsets.extend(range(cursor + 1, len(buffer) + 1))
+
+    return "".join(visible_parts), raw_offsets
+
+
+def split_leading_intent_tags(buffer: str) -> tuple[list[str], str]:
+    """拆分位于缓冲区开头的完整 INTENT 标签，保持标签整体输出。"""
+    leading_tags: list[str] = []
+    remaining = buffer
+
+    while True:
+        match = INTENT_TAG_PATTERN.match(remaining)
+        if match is None:
+            break
+        leading_tags.append(match.group(0))
+        remaining = remaining[match.end() :]
+
+    return leading_tags, remaining
+
+
 def select_stream_flush_index(
     buffer: str,
     *,
@@ -161,15 +199,13 @@ def select_stream_flush_index(
     punctuation_marks: str,
 ) -> int | None:
     """选择流式文本的切分位置，在指定窗口内优先按标点切分。"""
-    if len(buffer) < min_chunk_chars:
-        return None
-
     protected_suffix_start = find_trailing_protected_suffix_start(buffer)
-    searchable_text = (
+    searchable_buffer = (
         buffer[:protected_suffix_start]
         if protected_suffix_start is not None
         else buffer
     )
+    searchable_text, raw_offsets = build_visible_text_and_raw_offsets(searchable_buffer)
 
     if len(searchable_text) < min_chunk_chars:
         return None
@@ -184,9 +220,9 @@ def select_stream_flush_index(
         default=-1,
     )
     if last_punctuation >= window_start:
-        flush_index = last_punctuation + 1
+        flush_index = raw_offsets[last_punctuation]
     elif len(searchable_text) >= max_chunk_chars:
-        flush_index = max_chunk_chars
+        flush_index = raw_offsets[max_chunk_chars - 1]
 
     if flush_index is None:
         return None
@@ -638,13 +674,21 @@ class LLMAgent:
             return [], buffer, index
 
         buffer += chunk_text
-        return self._collect_ready_stream_fragments(
+        fragments: list[tuple[str, int]] = []
+        leading_tags, buffer = split_leading_intent_tags(buffer)
+        for tag in leading_tags:
+            fragments.append((tag, index))
+            index += 1
+
+        ready_fragments, buffer, index = self._collect_ready_stream_fragments(
             buffer,
             index,
             min_chunk_chars=min_chunk_chars,
             max_chunk_chars=max_chunk_chars,
             punctuation_marks=punctuation_marks,
         )
+        fragments.extend(ready_fragments)
+        return fragments, buffer, index
 
     def close(self):
         """停止后台事件循环线程并释放长期资源。"""
@@ -886,6 +930,11 @@ class LLMAgent:
                 yield fragment
 
         if buffer:
+            leading_tags, buffer = split_leading_intent_tags(buffer)
+            for tag in leading_tags:
+                yield tag, index
+                index += 1
+
             final_text, protected_suffix = split_trailing_protected_suffix(buffer)
             if final_text:
                 yield final_text, index
@@ -988,6 +1037,11 @@ class LLMAgent:
 
             await asyncio.wrap_future(background_task)
         if buffer:
+            leading_tags, buffer = split_leading_intent_tags(buffer)
+            for tag in leading_tags:
+                yield tag, index
+                index += 1
+
             final_text, protected_suffix = split_trailing_protected_suffix(buffer)
             if final_text:
                 yield final_text, index

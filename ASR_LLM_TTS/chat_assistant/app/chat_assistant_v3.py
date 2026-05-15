@@ -1069,12 +1069,13 @@ class ChatAssistant:
 
                 self.tts_client.speak(text.strip(), interrupt=True)
 
-                threading.Thread(
-                    target=self.tts_cost_time,
-                    args=(time_now,),
-                    daemon=True,
-                    name="tts-stream-startup-monitor",
-                ).start()
+                if text.strip():  # 只有在文本非空时才启动监控线程
+                    threading.Thread(
+                        target=self.tts_cost_time,
+                        args=(time_now,),
+                        daemon=True,
+                        name="tts-stream-startup-monitor",
+                    ).start()
 
             else:
 

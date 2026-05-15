@@ -57,6 +57,63 @@ class TTSClient:
             ws_ping_timeout (Optional[float], optional): WebSocket ping 超时。默认值为 None。
             playback_start_delay_sec (float, optional): 判断起播的延迟时间，单位为秒。默认值为 0.0 秒，即没有延迟。
         """
+        self._apply_init_kwargs(
+            host=host,
+            port=port,
+            timeout_sec=timeout_sec,
+            sample_rate=sample_rate,
+            channels=channels,
+            chunk_size=chunk_size,
+            buffer_size=buffer_size,
+            speaker_id=speaker_id,
+            speed=speed,
+            use_websocket=use_websocket,
+            ws_path=ws_path,
+            ws_ping_interval=ws_ping_interval,
+            ws_ping_timeout=ws_ping_timeout,
+            playback_start_delay_sec=playback_start_delay_sec,
+        )
+        self._initialize_runtime_components()
+
+    @staticmethod
+    def _build_init_kwargs_from_config(config: dict) -> dict:
+        """从配置字典中提取 TTSClient 初始化参数。"""
+        return {
+            "host": config.get("host", "192.168.10.101"),
+            "port": config.get("port", 50000),
+            "timeout_sec": config.get("timeout_sec", 30),
+            "sample_rate": config.get("sample_rate", 16000),
+            "channels": config.get("channels", 1),
+            "chunk_size": config.get("chunk_size", 2048),
+            "buffer_size": config.get("buffer_size", 4096),
+            "speaker_id": config.get("speaker_id", 0),
+            "speed": config.get("speed", 1.0),
+            "use_websocket": config.get("use_websocket", False),
+            "ws_path": config.get("ws_path", "/ws/api/tts"),
+            "ws_ping_interval": config.get("ws_ping_interval"),
+            "ws_ping_timeout": config.get("ws_ping_timeout"),
+            "playback_start_delay_sec": config.get("playback_start_delay_sec", 0.0),
+        }
+
+    def _apply_init_kwargs(
+        self,
+        *,
+        host,
+        port,
+        timeout_sec: float = 30.0,
+        sample_rate: int = 16000,
+        channels: int = 1,
+        chunk_size: int = 2048,
+        buffer_size: int = 4096,
+        speaker_id: int = 0,
+        speed: float = 1.0,
+        use_websocket: bool = False,
+        ws_path: str = "/ws/api/tts",
+        ws_ping_interval: Optional[float] = None,
+        ws_ping_timeout: Optional[float] = None,
+        playback_start_delay_sec: float = 0.0,
+    ) -> None:
+        """将初始化参数写入实例状态。"""
         self.host = host
         self.port = port
         self.timeout = timeout_sec
@@ -102,6 +159,8 @@ class TTSClient:
             threading.Event()
         )  # 用于指示是否进入起播状态，起播状态定义为已连续播放超过起播确认延迟的音频块
 
+    def _initialize_runtime_components(self) -> None:
+        """初始化音频流、工作线程及按需的 WebSocket 运行时。"""
         self.stream = self.__create_output_stream()
         self.stream.start()
         self.tts_thread = self.__start_tts_worker()
@@ -110,22 +169,13 @@ class TTSClient:
     @classmethod
     def from_config(cls, config: dict) -> "TTSClient":
         """从配置字典创建 TTSClient 实例"""
-        return cls(
-            host=config.get("host", "192.168.10.101"),
-            port=config.get("port", 50000),
-            timeout_sec=config.get("timeout_sec", 30),
-            sample_rate=config.get("sample_rate", 16000),
-            channels=config.get("channels", 1),
-            chunk_size=config.get("chunk_size", 2048),
-            buffer_size=config.get("buffer_size", 4096),
-            speaker_id=config.get("speaker_id", 0),
-            speed=config.get("speed", 1.0),
-            use_websocket=config.get("use_websocket", False),
-            ws_path=config.get("ws_path", "/ws/api/tts"),
-            ws_ping_interval=config.get("ws_ping_interval"),
-            ws_ping_timeout=config.get("ws_ping_timeout"),
-            playback_start_delay_sec=config.get("playback_start_delay_sec", 0.0),
-        )
+        return cls(**cls._build_init_kwargs_from_config(config))
+
+    def reset_from_config(self, config: dict) -> None:
+        """根据配置字典重置实例状态，并重新初始化底层运行时资源。"""
+        self.stop()
+        self._apply_init_kwargs(**self._build_init_kwargs_from_config(config))
+        self._initialize_runtime_components()
 
     # ================= 私有接口 =================
 
@@ -487,11 +537,12 @@ class TTSClient:
         self._interrupt_event.clear()
 
         normalized_text = text.strip()
-        if not normalized_text:
-            return
 
         if interrupt:
             self.interrupt()
+
+        if not normalized_text:
+            return
 
         self.text_queue.put(normalized_text)
 
@@ -579,7 +630,14 @@ class TTSClient:
 
 if __name__ == "__main__":
 
-    tts_client = TTSClient(host="192.168.50.107", port=50000, speaker_id=0, speed=1.0)
+    from config import load_config, reload_config
+
+    configs = load_config()
+
+    tts_server_type = configs.get("tts_server", ["tts_local"])[0]
+    logger.info(f"选择的 TTS 服务器类型: {tts_server_type}")
+    tts_cfg = configs.get(tts_server_type, {})
+    tts_client = TTSClient.from_config(tts_cfg)
 
     # 测试 TTS 播放
     tts_client.speak("你好，这是一段测试语音。")
@@ -595,17 +653,20 @@ if __name__ == "__main__":
     )
     logger.info("WAV 文件生成完成")
 
-    tts_ws_client = TTSClient(
-        host="192.168.50.107",
-        port=50000,
-        speaker_id=0,
-        speed=1.0,
-        use_websocket=True,
-    )
-    # 测试 WebSocket TTS 播放
-    tts_ws_client.speak("你好，这是一段通过 WebSocket 接收的测试语音。")
+    time.sleep(3)
+
+    # 测试配置热加载
+    configs = reload_config()
+    tts_server_type = configs.get("tts_server", ["tts_local"])[0]
+    logger.info(f"选择的 TTS 服务器类型: {tts_server_type}")
+    tts_cfg = configs.get(tts_server_type, {})
+
+    tts_client.reset_from_config(tts_cfg)
+
+    tts_client.speak("你好，这是一段通过 WebSocket 接收的测试语音。")
     time.sleep(2)
-    while tts_ws_client.is_active():
+    while tts_client.is_active():
         time.sleep(1)
     logger.info("WebSocket 播放完成")
     time.sleep(2)
+    logger.info("TTS 客户端测试完成")
