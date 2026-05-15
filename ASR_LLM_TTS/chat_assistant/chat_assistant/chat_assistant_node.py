@@ -386,8 +386,7 @@ class ChatAssistantNode(Node):
         self.load_config_and_initialize()
 
         # 重新初始化聊天助手
-        self.chat_assistant.load_config_and_initialize()
-        self.chat_assistant.start_recording()
+        self.chat_assistant.reset(restart_recording=True)
 
         response.success = True
         response.message = "配置文件已重新加载"

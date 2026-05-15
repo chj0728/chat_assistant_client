@@ -62,6 +62,60 @@ class ASRClient:
         :param mic_samplerate: 麦克风采样率
         :param mic_block_seconds: 麦克风每块时长（秒）
         """
+        self._apply_init_kwargs(
+            host=host,
+            port=port,
+            timeout_sec=timeout_sec,
+            use_websocket=use_websocket,
+            ws_path=ws_path,
+            ws_ping_interval=ws_ping_interval,
+            ws_ping_timeout=ws_ping_timeout,
+            samples_per_message=samples_per_message,
+            seconds_per_message=seconds_per_message,
+            asr_queue_size=asr_queue_size,
+            mic_channels=mic_channels,
+            mic_samplerate=mic_samplerate,
+            mic_block_seconds=mic_block_seconds,
+        )
+        self._initialize_runtime_components()
+
+    @staticmethod
+    def _build_init_kwargs_from_config(config: dict) -> dict:
+        """从配置字典中提取 ASRClient 初始化参数。"""
+        return {
+            "host": config.get("host", "192.168.50.125"),
+            "port": config.get("port", 2002),
+            "timeout_sec": config.get("timeout_sec", 30.0),
+            "use_websocket": config.get("use_websocket", False),
+            "ws_path": config.get("ws_path", "/ws/api/asr"),
+            "ws_ping_interval": config.get("ws_ping_interval", None),
+            "ws_ping_timeout": config.get("ws_ping_timeout", None),
+            "samples_per_message": config.get("samples_per_message", 8000),
+            "seconds_per_message": config.get("seconds_per_message", 0.1),
+            "asr_queue_size": config.get("asr_queue_size", 20),
+            "mic_channels": config.get("mic_channels", 1),
+            "mic_samplerate": config.get("mic_samplerate", 16000),
+            "mic_block_seconds": config.get("mic_block_seconds", 0.05),
+        }
+
+    def _apply_init_kwargs(
+        self,
+        *,
+        host="192.168.50.125",
+        port=2002,
+        timeout_sec: float = 30.0,
+        use_websocket: bool = False,
+        ws_path: str = "/ws/api/asr",
+        ws_ping_interval: Optional[float] = None,
+        ws_ping_timeout: Optional[float] = None,
+        samples_per_message: int = 8000,
+        seconds_per_message: float = 0.1,
+        asr_queue_size: int = 20,
+        mic_channels: int = 1,
+        mic_samplerate: int = 16000,
+        mic_block_seconds: float = 0.05,
+    ):
+        """将初始化参数写入实例状态。"""
         self.host = host
         self.port = port
         self.timeout = timeout_sec
@@ -87,6 +141,9 @@ class ASRClient:
         self._mic_started = threading.Event()
         self._mic_stop_event = threading.Event()
 
+    def _initialize_runtime_components(self):
+        """按当前配置初始化 WebSocket 相关运行时。"""
+
         ############# 如果使用 WebSocket 模式，提前启动事件循环线程，避免首次请求时的启动延迟 #############
         if self.use_websocket:
             self.__start_ws_runtime()
@@ -103,21 +160,13 @@ class ASRClient:
     # 传入配置参数初始化ASRClient实例
     @classmethod
     def from_config(cls, config: dict) -> "ASRClient":
-        return cls(
-            host=config.get("host", "192.168.50.125"),
-            port=config.get("port", 2002),
-            timeout_sec=config.get("timeout_sec", 30.0),
-            use_websocket=config.get("use_websocket", False),
-            ws_path=config.get("ws_path", "/ws/api/asr"),
-            ws_ping_interval=config.get("ws_ping_interval", None),
-            ws_ping_timeout=config.get("ws_ping_timeout", None),
-            samples_per_message=config.get("samples_per_message", 8000),
-            seconds_per_message=config.get("seconds_per_message", 0.1),
-            asr_queue_size=config.get("asr_queue_size", 20),
-            mic_channels=config.get("mic_channels", 1),
-            mic_samplerate=config.get("mic_samplerate", 16000),
-            mic_block_seconds=config.get("mic_block_seconds", 0.05),
-        )
+        return cls(**cls._build_init_kwargs_from_config(config))
+
+    def reset_from_config(self, config: dict) -> None:
+        """根据配置字典重置实例状态，并重新初始化底层运行时资源。"""
+        self.close()
+        self._apply_init_kwargs(**self._build_init_kwargs_from_config(config))
+        self._initialize_runtime_components()
 
     ############ 公共接口 ############
     def recognize(self, wav_path: str, use_websocket: Optional[bool] = True) -> str:
@@ -752,26 +801,42 @@ class ASRClient:
 # ===============================
 if __name__ == "__main__":
 
-    ws_client = ASRClient(
-        host="192.168.50.107",
-        port=6006,
-        timeout_sec=30,
-        use_websocket=True,
-    )
+    from config import load_config, reload_config
+
+    configs = load_config()
+    asr_server_type = configs.get("asr_server", ["asr_local"])[0]
+    logger.info(f"选择的 ASR 服务器类型: {asr_server_type}")
+    asr_cfg = configs.get(asr_server_type, {})
+    asr_client = ASRClient.from_config(asr_cfg)
 
     import time
 
     time.sleep(1)  # 等待 WebSocket 连接稳定
     time1 = time.time()
-    ws_text = ws_client.recognize("./wavs/example.wav")
+    ws_text = asr_client.recognize("./wavs/example.wav")
     logger.info(f"ASR WS Result: {ws_text}")
     logger.info(f"ASR WS Recognition Time: {time.time() - time1:.2f} seconds")
 
     time1 = time.time()
-    ws_text = ws_client.recognize("./wavs/example.wav", use_websocket=True)
+    ws_text = asr_client.recognize("./wavs/example.wav", use_websocket=True)
     logger.info(f"ASR WS Result: {ws_text}")
     logger.info(f"ASR WS Recognition Time: {time.time() - time1:.2f} seconds")
 
-    time.sleep(5)  # 等待日志输出完成
+    time.sleep(3)  # 等待日志输出完成
 
-    ws_client.close()
+    # 测试配置热加载
+    configs = reload_config()
+    asr_server_type = configs.get("asr_server", ["asr_local"])[0]
+    logger.info(f"选择的 ASR 服务器类型: {asr_server_type}")
+    asr_cfg = configs.get(asr_server_type, {})
+    asr_client.reset_from_config(asr_cfg)
+    logger.info("ASRClient 已根据新配置重置")
+
+    time.sleep(1)  # 等待 WebSocket 连接稳定
+    time1 = time.time()
+    ws_text = asr_client.recognize("./wavs/example.wav")
+    logger.info(f"ASR WS Result: {ws_text}")
+    logger.info(f"ASR WS Recognition Time: {time.time() - time1:.2f} seconds")
+
+    time.sleep(3)  # 等待日志输出完成
+    logger.info("ASRClient 测试完成")

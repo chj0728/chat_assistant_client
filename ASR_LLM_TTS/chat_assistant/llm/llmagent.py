@@ -291,6 +291,59 @@ class LLMAgent:
             rag_enable (bool): 是否启用 RAG 功能。默认值为 False。启用后会在 调用LLM回复前先进行检索增强。
         """
 
+        self._apply_init_kwargs(
+            host=host,
+            port=port,
+            dynamic_middlewares=dynamic_middlewares,
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
+            max_completion_tokens=max_completion_tokens,
+            enable_thinking=enable_thinking,
+            timeout=timeout,
+            extra_system_prompt=extra_system_prompt,
+            rag_enable=rag_enable,
+        )
+        self._initialize_runtime_components()
+
+    @staticmethod
+    def _build_init_kwargs_from_config(
+        config: dict[str, Any],
+        dynamic_middlewares: list[AgentMiddleware] | None = None,
+    ) -> dict[str, Any]:
+        """从配置字典中提取 LLMAgent 初始化参数。"""
+        llm_cfg = config.get("llm", {})
+        return {
+            "host": llm_cfg.get("host", "localhost"),
+            "port": llm_cfg.get("port", 8000),
+            "temperature": llm_cfg.get("temperature", 0.6),
+            "top_p": llm_cfg.get("top_p", 0.95),
+            "top_k": llm_cfg.get("top_k", 50),
+            "max_completion_tokens": llm_cfg.get("max_completion_tokens", 256),
+            "enable_thinking": llm_cfg.get("enable_thinking", False),
+            "timeout": llm_cfg.get("timeout", 30),
+            "extra_system_prompt": llm_cfg.get("extra_system_prompt", ""),
+            "rag_enable": llm_cfg.get("rag_enable", False),
+            "dynamic_middlewares": dynamic_middlewares,
+        }
+
+    def _apply_init_kwargs(
+        self,
+        *,
+        host,
+        port,
+        dynamic_middlewares: list[AgentMiddleware] | None = None,
+        temperature=0.6,
+        top_p=0.95,
+        top_k=50,
+        max_completion_tokens=256,
+        enable_thinking=False,
+        timeout=30,
+        extra_system_prompt: str | None = None,
+        rag_enable=False,
+    ) -> None:
+        """将初始化参数写入实例状态。"""
+
         self.host = host
         self.port = port
         self.model_id = None
@@ -318,6 +371,9 @@ class LLMAgent:
         )  # 使用 UUID 作为无用户ID 时的 thread_id ，确保每个 LLMAgent 实例的对话上下文独立且唯一
         logger.debug(f"LLM Agent 初始化 - thread_id: {self.thread_id}")
 
+    def _initialize_runtime_components(self) -> None:
+        """初始化与运行时相关的模型、Agent 和 RAG 状态。"""
+
         # 初始化使用统计回调处理器，用于收集和记录模型调用的使用数据，如 token 数量、调用次数等。这些数据可以用于监控模型的使用情况和优化性能。
         ## refer from: https://docs.langchain.com/oss/python/langchain/models#token-usage
         self.callback_handlers = get_callback_handlers()
@@ -341,19 +397,25 @@ class LLMAgent:
         dynamic_middlewares: list[AgentMiddleware] | None = None,
     ) -> "LLMAgent":
         """从配置字典创建 LLMAgent 实例。"""
-        llm_cfg = config.get("llm", {})
         return cls(
-            host=llm_cfg.get("host", "localhost"),
-            port=llm_cfg.get("port", 8000),
-            temperature=llm_cfg.get("temperature", 0.6),
-            top_p=llm_cfg.get("top_p", 0.95),
-            top_k=llm_cfg.get("top_k", 50),
-            max_completion_tokens=llm_cfg.get("max_completion_tokens", 256),
-            enable_thinking=llm_cfg.get("enable_thinking", False),
-            extra_system_prompt=llm_cfg.get("extra_system_prompt", ""),
-            rag_enable=llm_cfg.get("rag_enable", False),
-            dynamic_middlewares=dynamic_middlewares,
+            **cls._build_init_kwargs_from_config(
+                config, dynamic_middlewares=dynamic_middlewares
+            )
         )
+
+    def reset_from_config(
+        self,
+        config: dict[str, Any],
+        dynamic_middlewares: list[AgentMiddleware] | None = None,
+    ) -> None:
+        """根据配置字典重置实例状态，并重新初始化底层运行时资源。"""
+        self.close()
+        self._apply_init_kwargs(
+            **self._build_init_kwargs_from_config(
+                config, dynamic_middlewares=dynamic_middlewares
+            )
+        )
+        self._initialize_runtime_components()
 
     # -------- private methods --------
     def _init_chat_model(self) -> ChatOpenAI:
@@ -586,9 +648,13 @@ class LLMAgent:
 
     def close(self):
         """停止后台事件循环线程并释放长期资源。"""
-        with self._background_lock:
-            background_loop = self._background_loop
-            background_thread = self._background_thread
+        background_lock = getattr(self, "_background_lock", None)
+        if background_lock is None:
+            return
+
+        with background_lock:
+            background_loop = getattr(self, "_background_loop", None)
+            background_thread = getattr(self, "_background_thread", None)
 
         if background_loop is None or background_thread is None:
             return
@@ -641,6 +707,9 @@ class LLMAgent:
             logger.error(f"获取模型列表失败: {e}")
             self.model_id = DEFAULT_MODEL_ID
             self.model_root = None
+            # 如果模型列表接口不可用，后续调用模型时可能会失败，除非默认模型ID在本地可用。根据实际情况调整错误处理逻辑。
+            ## 程序退出或抛出异常可能更合适，避免后续调用时才发现模型不可用的问题。
+            raise RuntimeError("无法获取模型列表，且未设置默认模型ID") from e
             logger.warning(f"使用默认模型ID: {self.model_id}")
 
     def _create_chat_model(
@@ -966,16 +1035,28 @@ class LLMAgent:
 
 
 async def _main():
-    llm_agent = LLMAgent(host="192.168.50.125", port=8000)
+
+    from config import load_config, reload_config
+
+    configs = load_config()
+
+    # llm_agent = LLMAgent(host="192.168.50.125", port=8000)
+    llm_agent = LLMAgent.from_config(configs)
 
     vision_id = input("请输入视觉ID（可选，直接回车跳过）: ").strip() or None
     voice_id = input("请输入语音ID（可选，直接回车跳过）: ").strip() or None
 
     while True:
-        user_input = input("User: ").strip()
+        user_input = input(
+            'User<"quit or exit" to exit, "reset" to reset agent>: '
+        ).strip()
         if user_input.lower() in ["exit", "quit"]:
             break
-
+        if user_input.lower() == "reset":
+            configs = reload_config()
+            llm_agent.reset_from_config(configs)
+            print("Agent 已重置，您可以继续输入对话。")
+            continue
         # # 异步获取完整回复文本
         # response = await llm_agent.async_chat_response(
         #     user_input, vision_id=vision_id, voice_id=voice_id

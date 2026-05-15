@@ -60,6 +60,39 @@ class ChatAssistant:
 
         self.load_config_and_initialize()
 
+    def _reset_interaction_state(self) -> None:
+        """重置交互过程中累积的文本与队列状态。"""
+        self.asr_text = ""
+        self.llm_text = ""
+        self.current_user_id = None
+
+        self.asr_text_queue = Queue(maxsize=MAX_QUEUE_SIZE)
+        self.llm_text_queue = Queue(maxsize=MAX_QUEUE_SIZE)
+        self.response_queue = Queue(maxsize=MAX_QUEUE_SIZE)
+        self.response_data = ResponseData()
+        self.response_data.clear()
+
+    @staticmethod
+    def _shutdown_component(component, component_name: str) -> None:
+        """按组件暴露的 stop/close 接口释放运行时资源。"""
+        if component is None:
+            return
+
+        for method_name in ("stop", "close"):
+            method = getattr(component, method_name, None)
+            if callable(method):
+                try:
+                    method()
+                except Exception as exc:
+                    logger.warning(f"释放 {component_name} 资源失败: {exc}")
+                return
+
+    def _shutdown_clients(self) -> None:
+        """释放已创建的 ASR、LLM、TTS 客户端运行时资源。"""
+        self._shutdown_component(getattr(self, "asr_client", None), "ASRClient")
+        self._shutdown_component(getattr(self, "llm_client", None), "LLMAgent")
+        self._shutdown_component(getattr(self, "tts_client", None), "TTSClient")
+
     def __push_queue(self, data_queue: Queue, value) -> None:
         """将最新文本加入有限队列，保持队列容量受控。"""
         try:
@@ -89,6 +122,7 @@ class ChatAssistant:
         """
         logger.info("ChatAssistant 正在释放资源...")
         self.stop_recording()
+        self._shutdown_clients()
         logger.info("ChatAssistant 资源已释放.")
 
     def start_recording(self):
@@ -140,6 +174,21 @@ class ChatAssistant:
         self._initialize_kws_settings()
         self._initialize_runtime_state()
 
+    def reset(self, restart_recording: bool | None = None) -> None:
+        """重置助手状态并按当前配置重新初始化所有运行时资源。"""
+        was_recording = self.recording_active
+
+        self.stop_recording()
+        self._shutdown_clients()
+        self._reset_interaction_state()
+        self.load_config_and_initialize()
+
+        should_restart_recording = (
+            was_recording if restart_recording is None else restart_recording
+        )
+        if should_restart_recording:
+            self.start_recording()
+
     def _initialize_clients(self) -> None:
         self.asr_client = self._build_asr_client()
         self.llm_client = self._build_llm_client()
@@ -150,27 +199,10 @@ class ChatAssistant:
         logger.info(f"选择的 ASR 服务器类型: {asr_server_type}")
         asr_cfg = self.configs.get(asr_server_type, {})
 
-        # return ASRClient(
-        #     host=asr_cfg.get("host", "192.168.10.101"),
-        #     port=asr_cfg.get("port", 2002),
-        #     timeout_sec=asr_cfg.get("timeout_sec", 30),
-        #     use_websocket=asr_cfg.get("use_websocket", False),
-        # )
         return ASRClient.from_config(config=asr_cfg)
 
     def _build_llm_client(self) -> LLMAgent:
-        # llm_cfg = self.configs.get("llm", {})
-        # llm_client = LLMAgent(
-        #     host=llm_cfg.get("host", "192.168.50.125"),
-        #     port=llm_cfg.get("port", 8000),
-        #     temperature=llm_cfg.get("temperature", 0.3),
-        #     max_completion_tokens=llm_cfg.get("max_completion_tokens", 150),
-        #     enable_thinking=llm_cfg.get("enable_thinking", False),
-        #     dynamic_middlewares=self.dynamic_middlewares,
-        #     timeout=llm_cfg.get("timeout_sec", 10),
-        #     extra_system_prompt=llm_cfg.get("extra_system_prompt", ""),
-        #     rag_enable=llm_cfg.get("rag_enable", False),
-        # )
+
         self.llm_stream_infer_enable = self.configs.get(
             "llm_stream_infer_enable", False
         )
@@ -194,15 +226,6 @@ class ChatAssistant:
             return tts_client
 
         if tts_server_type == "tts_local":
-            # return TTSClient(
-            #     host=tts_cfg.get("host", "192.168.10.101"),
-            #     port=tts_cfg.get("port", 50000),
-            #     timeout_sec=tts_cfg.get("timeout_sec", 30),
-            #     speaker_id=tts_cfg.get("speaker_id", 0),
-            #     speed=tts_cfg.get("speed", 1.0),
-            #     use_websocket=tts_cfg.get("use_websocket", True),
-            #     playback_start_delay_sec=tts_cfg.get("playback_start_delay_sec", 0.0),
-            # )
             return TTSClient.from_config(config=tts_cfg)
         logger.error(f"未知的 TTS 服务器类型: {tts_server_type}")
         raise ValueError(f"未知的 TTS 服务器类型: {tts_server_type}")
