@@ -323,7 +323,7 @@ class LLMAgent:
             self.model_root = None
             # 如果模型列表接口不可用，后续调用模型时可能会失败，除非默认模型ID在本地可用。根据实际情况调整错误处理逻辑。
             ## 程序退出或抛出异常可能更合适，避免后续调用时才发现模型不可用的问题。
-            raise RuntimeError("无法获取模型列表，且未设置默认模型ID") from e
+            # raise RuntimeError("无法获取模型列表，且未设置默认模型ID") from e
             logger.warning(f"使用默认模型ID: {self.model_id}")
 
     def _create_chat_model(
