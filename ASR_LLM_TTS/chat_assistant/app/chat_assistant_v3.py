@@ -12,7 +12,7 @@ import sounddevice as sd
 import webrtcvad
 import yaml
 from asr import ASRClient
-from config import load_config
+from config import get_vad_no_speech_threshold, load_config
 from llm import LLMAgent
 from logger import logger
 from tts import RealtimeTTSPlayer, TTSClient
@@ -27,7 +27,9 @@ from app.assistant_support import (
     ResponseData,
 )
 
-vr = VoiceRecognizer()
+vr = VoiceRecognizer(low_thresh=0.60, high_thresh=0.67, max_prints_per_id=1)
+TAIL_SILENCE_MS = int(get_vad_no_speech_threshold() * 1000)
+logger.info(f"配置的 VAD 无语音阈值: {TAIL_SILENCE_MS} ms")
 
 
 class ChatAssistant:
@@ -1264,7 +1266,8 @@ class ChatAssistant:
                 self.async_asr_infer(audio_frames=audio_frames),
                 vr.recognize_async(
                     self.asr_client.normalize_audio_frames(audio_frames),
-                    vision_user_id=vision_id,
+                    user_id=vision_id,
+                    tail_silence_ms=TAIL_SILENCE_MS,
                 ),
             )
 

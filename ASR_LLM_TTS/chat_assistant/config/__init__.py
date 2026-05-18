@@ -92,3 +92,11 @@ def get_max_tokens(default: int = 2048) -> int:
     max_tokens = config.get("llm", {}).get("max_tokens", default)
     logger.debug(f"LLM Agent 配置 - MAX_TOKENS: {max_tokens}")
     return max_tokens
+
+
+def get_vad_no_speech_threshold(default: float = 0.5) -> float:
+    """从配置中读取VAD无语音阈值(单位: 秒），读取失败时回退默认值。"""
+    config = load_config()
+    threshold = config.get("VAD", {}).get("no_speech_threshold", default)
+    logger.debug(f"ASR 配置 - VAD_NO_SPEECH_THRESHOLD: {threshold} 秒")
+    return threshold
