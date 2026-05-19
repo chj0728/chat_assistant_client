@@ -15,8 +15,9 @@ asr_remote:
 llm_enable: true # 是否启动激活 LLM 模块
 llm_stream_infer_enable: true # 是否启用 LLM 流式推理，开启后可以配合 tts_stream_infer 实现边说边播效果
 llm:
-  host: "192.168.50.125"
-  port: 8000
+  host: "192.168.50.125" # 局域网内 LLM 服务器地址
+  port: 8000 # 局域网内 LLM 服务器端口
+  enable_cloud: false # 是否启用云端 LLM 服务，启用后会使用云端 API 进行推理，确保.env 中的 EAS_TOKEN 和 EAS_ENDPOINT 已正确配置
   timeout_sec: 5
   temperature: 0.3 # 生成文本的随机程度，范围0-1，值越大越随机
   # （max_tokens + max_completion_tokens(限制模型回复tokens) +RAG 检索结果 tokens) 需要在模型的上下文窗口限制内，例如 2048 或 4096，具体取决于所使用的 LLM 模型
@@ -27,21 +28,33 @@ llm:
   enable_thinking: false # 是否启用思考过程
   rag_enable: false # 是否启用 RAG 功能，启用后会在 LLM 回复前先进行检索增强
   extra_system_prompt: |
-    同时你要根据根据用户的输入，判断用户想要进入哪个状态，并在回答末尾附加。
-    可用的状态有：
-    CUSTOMER_ENTER: 客户进店（例如：有人在吗）
-    NEEDS_GUIDANCE: 需要引导参观（例如：参观一下、带我看看、带我逛逛、想看看等）
-    MOVE_TO_WAIT: 退下/不用了（例如：退一下、不用了、退下等）
-    WAIT_FOR_TALK: 等待对话（默认状态）
+    同时你要根据根据用户的输入，判断用户想要进入哪个状态，并在回答开头附加状态标签，格式为：<INTENT>状态</INTENT>
+    可用的状态及示例：
+    - NEEDS_GUIDANCE：需要参观（例如：“参观一下”、“带我看看”、“带我逛逛”、“想看看”）
+    - MOVE_TO_WAIT：退下/不用了（例如：“退一下”、“不用了”、“退下”、“回去吧”、“回去充电吧”）
+    - WAIT_FOR_TALK：等待对话（默认状态，用于普通对话或不确定的情况）
+    - INTERRUPT：中断对话（例如：“好了好了”、“我打断你一下”、“先停一下”）
     示例：{
           "instruction": "能带我参观一下吗？",
           "input": "",
-          "output": "好的，请跟我这边走<INTENT>NEEDS_GUIDANCE</INTENT>",
+          "output": "<INTENT>NEEDS_GUIDANCE</INTENT>好的，请跟我这边走",
           "system": ""
-        }
-    如果不确定，则输出WAIT_FOR_TALK状态
-    
-  # 系统提示语，用于指导 LLM 的行为和回复风格，根据实际需求编写
+         },
+         {
+          "instruction": "给我介绍一下",
+          "input": "",
+          "output": "<INTENT>WAIT_FOR_TALK</INTENT>好的，您想了解哪辆车呢？",
+          "system": ""
+         },
+         {
+          "instruction": "你退下回去充电吧",
+          "input": "",
+          "output": "<INTENT>MOVE_TO_WAIT</INTENT>好的，我先退下了",
+          "system": ""
+         }
+    如果不确定用户意图，则输出 WAIT_FOR_TALK 状态
+    回答应简洁、可追溯，控制在100字以内，并严格以状态标签开头（标签前不要添加其他内容）
+
 #####################################################
 
 ###################### TTS 配置 ######################

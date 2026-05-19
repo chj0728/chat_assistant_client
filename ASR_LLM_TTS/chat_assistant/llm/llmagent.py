@@ -12,13 +12,16 @@ description: 该模块定义了用于创建和管理基于大型语言模型（L
 """
 
 import asyncio
+import os
 import re
 import threading
+import time
 from pathlib import Path
 from queue import Queue
 from typing import Any, AsyncIterator, Generator
 
 import requests
+from dotenv import load_dotenv
 from langchain.agents import create_agent
 from langchain.agents.middleware import (
     AgentMiddleware,
@@ -56,6 +59,19 @@ from llm.custom_text_preprocessor import (
 from llm.custom_tools import get_custom_tools
 
 # ------------------------ 全局常量 ------------------------
+load_dotenv()
+
+
+def GET_EAS_TOKEN_FROM_ENV():
+    """从环境变量获取 EAS_TOKEN，并进行基本验证。"""
+    return os.getenv("EAS_TOKEN", "").strip()
+
+
+def GET_EAS_ENDPOINT_FROM_ENV():
+    """从环境变量获取 EAS_ENDPOINT，并进行基本验证。"""
+    return os.getenv("EAS_ENDPOINT", "").strip()
+
+
 DEFAULT_MODEL_ID = "Qwen/Qwen3"
 DEFAULT_DB_PATH = (
     Path(__file__).resolve().parent.parent / "db" / "agent_conversations.db"
@@ -103,6 +119,7 @@ class LLMAgent:
         timeout=30,
         extra_system_prompt: str | None = None,
         rag_enable=False,
+        enable_cloud=False,
     ):
         """
         初始化 LLMAgent 实例。
@@ -119,6 +136,7 @@ class LLMAgent:
             timeout (int): 请求超时时间（秒）。默认值为 30 秒。
             extra_system_prompt (str | None): 额外的系统提示信息。用于初始化agent时构建的全局系统提示词。默认值为 None。
             rag_enable (bool): 是否启用 RAG 功能。默认值为 False。启用后会在 调用LLM回复前先进行检索增强。
+            enable_cloud (bool): 是否启用云端 LLM 服务，启用后会使用云端 API 进行推理，确保.env 中的 EAS_TOKEN 和 EAS_ENDPOINT 已正确配置。默认值为 False。
         """
 
         self._apply_init_kwargs(
@@ -133,6 +151,7 @@ class LLMAgent:
             timeout=timeout,
             extra_system_prompt=extra_system_prompt,
             rag_enable=rag_enable,
+            enable_cloud=enable_cloud,
         )
         self._initialize_runtime_components()
 
@@ -161,6 +180,7 @@ class LLMAgent:
             "extra_system_prompt": llm_cfg.get("extra_system_prompt", ""),
             "rag_enable": llm_cfg.get("rag_enable", False),
             "dynamic_middlewares": dynamic_middlewares,
+            "enable_cloud": llm_cfg.get("enable_cloud", False),
         }
 
     def _apply_init_kwargs(
@@ -177,6 +197,7 @@ class LLMAgent:
         timeout=30,
         extra_system_prompt: str | None = None,
         rag_enable=False,
+        enable_cloud=False,
     ) -> None:
         """将初始化参数写入实例状态。"""
 
@@ -193,6 +214,7 @@ class LLMAgent:
         self.enable_thinking = enable_thinking
         self.extra_system_prompt = extra_system_prompt
         self.rag_enable = rag_enable
+        self.enable_cloud = enable_cloud
 
         self.dynamic_middlewares = dynamic_middlewares if dynamic_middlewares else []
         self.custom_middlewares = get_custom_middlewares()  # 获取自定义中间件列表
@@ -209,6 +231,9 @@ class LLMAgent:
 
     def _initialize_runtime_components(self) -> None:
         """初始化与运行时相关的模型、Agent 和 RAG 状态。"""
+
+        # 初始化api_key, base_url等模型参数
+        self._init_api_key_and_base_url()
 
         # 初始化使用统计回调处理器，用于收集和记录模型调用的使用数据，如 token 数量、调用次数等。这些数据可以用于监控模型的使用情况和优化性能。
         ## refer from: https://docs.langchain.com/oss/python/langchain/models#token-usage
@@ -257,10 +282,25 @@ class LLMAgent:
     ########################################################
     # 模型和代理初始化相关的私有方法，
     # 包含模型信息拉取、模型实例创建、Agent 创建，以及后台事件循环管理等功能。
+
+    def _init_api_key_and_base_url(self):
+        """根据是否启用云端 LLM 服务，初始化 API 密钥和基础 URL。"""
+        if self.enable_cloud:
+            # 从环境变量获取云端 LLM 服务的 API 密钥和基础 URL，确保在 .env 文件中正确配置 EAS_TOKEN 和 EAS_ENDPOINT
+            self.api_key = SecretStr(GET_EAS_TOKEN_FROM_ENV())
+            self.base_url = GET_EAS_ENDPOINT_FROM_ENV() + "/v1"
+            logger.info("已启用云端 LLM 服务")
+        else:
+            self.api_key = SecretStr("EMPTY")  # 本地部署的模型不需要 API 密钥
+            self.base_url = f"http://{self.host}:{self.port}/v1"
+            logger.info("使用本地部署的 LLM 服务")
+
     def _init_chat_model(self) -> ChatOpenAI:
         """初始化 ChatOpenAI 模型实例，并拉取远端模型信息，失败时回退默认模型。"""
-        self.llm_url = f"http://{self.host}:{self.port}/v1/models"
+        self.llm_url = self.base_url + "/models"
+
         self._load_model_metadata()
+
         return self._create_chat_model(
             temperature=self.temperature,
             top_p=self.top_p,
@@ -277,7 +317,10 @@ class LLMAgent:
         ## Short-term memory: https://docs.langchain.com/oss/python/langchain/short-term-memory
 
         ## 保留一个轻量代理，便于测试或无持久化场景下复用既有装配逻辑
-        self.tiny_agent = self._create_agent_instance(checkpointer=InMemorySaver())
+        self.in_memory_checkpointer = InMemorySaver()
+        self.tiny_agent = self._create_agent_instance(
+            checkpointer=self.in_memory_checkpointer
+        )
 
         self.db_path = DEFAULT_DB_PATH
         self.async_sqlite_saver = None
@@ -309,10 +352,20 @@ class LLMAgent:
     def _load_model_metadata(self) -> None:
         """拉取远端模型信息，失败时回退默认模型。"""
         try:
-            response = requests.get(self.llm_url, timeout=self.timeout)
+            headers = None
+            if self.enable_cloud:
+                token = self.api_key.get_secret_value()
+                if token:
+                    headers = {"Authorization": f"Bearer {token}"}
+
+            response = requests.get(self.llm_url, timeout=self.timeout, headers=headers)
             response.raise_for_status()
             data = response.json()
-            first_model = data["data"][0]
+            model_list = data.get("data", []) if isinstance(data, dict) else []
+            if not model_list:
+                raise ValueError("模型列表为空或返回结构不符合预期")
+
+            first_model = model_list[0]
             self.model_id = first_model["id"]
             self.model_root = first_model.get("root")
             logger.info(f"使用的模型ID: {self.model_id}")
@@ -345,8 +398,8 @@ class LLMAgent:
             temperature=temperature,
             top_p=top_p,
             timeout=self.timeout,
-            api_key=SecretStr("EMPTY"),
-            base_url=f"http://{self.host}:{self.port}/v1",
+            api_key=self.api_key,
+            base_url=self.base_url,
             max_retries=2,
             # vLLM parameters
             ## refer from: https://docs.vllm.ai/en/v0.9.2/api/vllm/entrypoints/openai/protocol.html#vllm.entrypoints.openai.protocol.ChatCompletionRequest
@@ -375,6 +428,9 @@ class LLMAgent:
             checkpointer=checkpointer,
         )
 
+    ########################################################
+
+    ################# 后台事件循环中 Agent 调用的辅助方法 #################
     def _start_background_runtime(self):
         """启动长期存活的后台事件循环，并在其中初始化异步 Agent。"""
         with self._background_lock:
@@ -431,9 +487,6 @@ class LLMAgent:
         await self.async_sqlite_saver.setup()
         self.agent = self._create_agent_instance(checkpointer=self.async_sqlite_saver)
 
-    ########################################################
-
-    ################# 后台事件循环中 Agent 调用的辅助方法 #################
     async def _shutdown_background_runtime(self):
         """在后台事件循环中释放持久化资源。"""
         self.agent = None
@@ -590,6 +643,7 @@ class LLMAgent:
         return HumanMessage(
             content=user_text,
             additional_kwargs={
+                "format_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
                 "vision_id": vision_id,
                 "voice_id": voice_id,
             },
@@ -876,8 +930,8 @@ class LLMAgent:
         for fragment in fragments:
             yield fragment
 
-    # list checkpoints
-    async def list_checkpoints(self, thread_id: str | None = None) -> list:
+    # async list checkpoints
+    async def alist_checkpoints(self, thread_id: str | None = None) -> list:
         """根据线程ID列出对应的对话检查点列表。 如果线程ID未提供，则使用默认线程ID列出检查点。"""
         config: RunnableConfig = {
             "configurable": {
@@ -893,8 +947,8 @@ class LLMAgent:
             self._alist_checkpoints_on_background(config)
         )
 
-    # get_tuple
-    async def get_checkpoint_tuple(self, thread_id: str | None = None) -> tuple | None:
+    # async get_tuple
+    async def aget_checkpoint_tuple(self, thread_id: str | None = None) -> tuple | None:
         """根据线程ID获取对应的对话检查点数据元组。 如果线程ID未提供，则使用默认线程ID获取检查点。"""
         config: RunnableConfig = {
             "configurable": {
@@ -906,6 +960,16 @@ class LLMAgent:
         return await self._run_on_background_loop(
             self._aget_checkpoint_tuple_on_background(config)
         )
+
+    # delete_thread
+    def delete_thread(self, thread_id: str | None = None) -> bool:
+        """根据线程ID删除对应的对话线程数据。 如果线程ID未提供，则删除内存检查点中的默认线程ID的数据。"""
+        if thread_id and self.async_sqlite_saver is not None:
+            self.async_sqlite_saver.delete_thread(thread_id=thread_id)
+            return True
+        else:
+            self.in_memory_checkpointer.delete_thread(thread_id=str(self.thread_id))
+            return True
 
     ########################################################
 
@@ -952,7 +1016,14 @@ async def _main():
             print(chunk, end=" ", flush=True)
         print()  # 换行
 
-        # checkpoints = await llm_agent.get_checkpoint_tuple(thread_id=vision_id)
+        # checkpoints = await llm_agent.aget_checkpoint_tuple(thread_id=vision_id)
+        # for checkpoint in checkpoints or []:
+        #     print(checkpoint)
+
+        # for message in (
+        #     checkpoints[1].get("channel_values").get("messages") if checkpoints else []
+        # ):
+        #     print(f"{message.type}: {message.content}")
 
         # config
         # checkpoints[0] if checkpoints else None
@@ -968,14 +1039,6 @@ async def _main():
 
         # pending_writes
         # checkpoints[4] if checkpoints else None
-
-        # for checkpoint in checkpoints or []:
-        #     print(checkpoint)
-
-        # for message in (
-        #     checkpoints[1].get("channel_values").get("messages") if checkpoints else []
-        # ):
-        #     print(f"{message.type}: {message.content}")
 
 
 if __name__ == "__main__":
