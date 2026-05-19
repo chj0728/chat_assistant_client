@@ -477,12 +477,39 @@ class TTSClient:
             assert self._ws is not None
 
             try:
+                # 清空上一次请求可能残留的消息，避免干扰当前请求的处理
+                while True:
+                    try:
+                        message = await asyncio.wait_for(self._ws.recv(), timeout=0.1)
+
+                    except (asyncio.TimeoutError, ConnectionClosed):
+                        break
+
+                # 发送当前请求
                 await self._ws.send(json.dumps(payload, ensure_ascii=False))
 
+                # 接收并处理音频数据和事件
                 while True:
+
+                    ## 在每次接收消息前检查停止/打断事件
                     if self._stop_event.is_set() or self._interrupt_event.is_set():
+
+                        logger.info("TTS WebSocket 收到停止/打断信号")
+
+                        # while True:
+                        #     try:
+                        #         message = await asyncio.wait_for(
+                        #             self._ws.recv(), timeout=0.1
+                        #         )
+                        #         event = json.loads(message)
+                        #         if event.get("event") == "done":
+                        #             logger.info("清空残留消息完成")
+                        #             break
+                        #     except (asyncio.TimeoutError, ConnectionClosed):
+                        #         break
                         return
 
+                    ## 正常接收消息
                     message = await self._ws.recv()
 
                     if isinstance(message, bytes):
