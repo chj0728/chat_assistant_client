@@ -26,8 +26,12 @@ llm:
   max_completion_tokens: 120 # 只限制 生成内容（completion） 的 token 数量，不是输入（prompt）+输出（completion）的总token数，根据实际情况调整
 
   enable_thinking: false # 是否启用思考过程
-  rag_enable: false # 是否启用 RAG 功能，启用后会在 LLM 回复前先进行检索增强
-  extra_system_prompt: |
+  rag_enable: true # 是否启用 RAG 功能，启用后会在 LLM 回复前先进行检索增强
+  default_system_prompt: |
+    你需要简洁且有礼貌地回答用户的问题，请保持回答简短且有条理。
+    正文中请正常使用中文标点符号来表达停顿和语义边界，便于流式切分和语音合成。
+    如果你不确定答案，可以礼貌地告诉用户你不知道。
+    只有当用户回答退出、结束等相关内容时，调用结束对话的工具函数，礼貌地结束对话。
     同时你要根据根据用户的输入，判断用户想要进入哪个状态，并在回答开头附加状态标签，格式为：<INTENT>状态</INTENT>
     可用的状态及示例：
     - NEEDS_GUIDANCE：需要参观（例如：“参观一下”、“带我看看”、“带我逛逛”、“想看看”）

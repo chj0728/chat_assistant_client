@@ -8,6 +8,8 @@ reference:
 
 from dataclasses import dataclass
 
+from config import get_default_system_prompt
+
 
 @dataclass
 class CustomContext:
@@ -18,10 +20,15 @@ class CustomContext:
     vision_id: str | None = "default_vision"
     voice_id: str | None = "default_voice"
     session_id: str = "default_session"
+    default_system_prompt: str | None = (
+        get_default_system_prompt()
+    )  # 从配置中获取默认系统提示词
+    rag_prompt: str | None = None  # RAG 检索结果，可以在生成提示词时使用
     # 其他字段...
 
 
 def get_custom_context_cls() -> type[CustomContext]:
     """获取自定义上下文类，可以根据需要从其他地方获取数据来填充上下文。"""
-    # 这里可以添加一些逻辑来获取实际的上下文数据，比如从数据库、缓存等
-    return CustomContext
+    context_cls = CustomContext
+    context_cls.default_system_prompt = get_default_system_prompt()
+    return context_cls

@@ -9,15 +9,20 @@ reference:
     - https://docs.langchain.com/oss/python/langchain/runtime#inside-middleware
 """
 
+from collections.abc import Callable
 from typing import Any
 
 from config import get_max_messages
 from langchain.agents import AgentState
 from langchain.agents.middleware import (
+    ModelRequest,
+    ModelResponse,
     after_agent,
     after_model,
     before_agent,
     before_model,
+    dynamic_prompt,
+    wrap_model_call,
 )
 from langchain.messages import RemoveMessage
 from langchain_core.messages import (
@@ -114,6 +119,68 @@ def trim_messages_before_model(
     return {"messages": [RemoveMessage(id=REMOVE_ALL_MESSAGES), *trimmed_messages]}
 
 
+@before_model
+def move_the_system_to_beginning(
+    state: AgentState, runtime: Runtime[CustomContext]
+) -> dict[str, Any] | None:
+    """将System message移动到最前端"""
+    messages = state["messages"]
+
+    if not messages:
+        return None
+
+    system_messages = [m for m in messages if isinstance(m, SystemMessage)]
+    if not system_messages:
+        return None
+
+    non_system_messages = [m for m in messages if not isinstance(m, SystemMessage)]
+    reordered_messages = [*system_messages, *non_system_messages]
+
+    if reordered_messages == messages:
+        return None
+
+    logger.debug(
+        "\n=======> Before Model Middleware:\n Reordered messages with SystemMessage at the beginning:\n "
+    )
+    for i, m in enumerate(reordered_messages):
+        logger.info(f"Message {i}: {m}")
+
+    return {"messages": [RemoveMessage(id=REMOVE_ALL_MESSAGES), *reordered_messages]}
+
+
+@wrap_model_call
+def update_system_prompt_dynamically(
+    request: ModelRequest,
+    handler: Callable[[ModelRequest], ModelResponse],
+) -> ModelResponse:
+    """根据上下文动态更新系统提示词"""
+    # 当前模型调用的上下文信息
+    if request.system_message is None:
+        logger.warning("模型调用请求中没有系统消息，无法动态更新系统提示词")
+        return handler(request)
+    else:
+        default_system_prompt = list(request.system_message.content_blocks)
+        logger.debug(f"默认系统提示词内容块：{default_system_prompt}")
+        return handler(request)
+
+
+@dynamic_prompt
+def dynamic_system_prompt(request: ModelRequest) -> str:
+    """根据上下文动态生成系统提示词"""
+    dynamic_system_prompt = ""
+    if request.runtime.context:
+
+        default_system_prompt = request.runtime.context.default_system_prompt
+        logger.debug(f"默认系统提示词内容块：{default_system_prompt}")
+
+        rag_prompt = request.runtime.context.rag_prompt
+        logger.debug(f"RAG 提示词内容块：{rag_prompt}")
+
+        dynamic_system_prompt = (default_system_prompt or "") + (rag_prompt or "")
+
+    return dynamic_system_prompt
+
+
 @after_model
 def delete_system_message_after_model(
     state: AgentState, runtime: Runtime
@@ -149,8 +216,11 @@ def test_after_agent(state: AgentState, runtime: Runtime) -> None:
 def get_custom_middlewares() -> list:
     """获取自定义中间件列表"""
     return [
+        dynamic_system_prompt,
+        # update_system_prompt_dynamically,
         test_before_agent,
         trim_messages_before_model,
+        # move_the_system_to_beginning,
         delete_system_message_after_model,
         test_after_agent,
     ]

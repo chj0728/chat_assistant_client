@@ -422,7 +422,7 @@ class LLMAgent:
         return create_agent(
             self.llm_model,
             tools=self.custom_tools,
-            system_prompt=self.global_system_msg,
+            system_prompt=None,  # self.global_system_msg,
             middleware=self.custom_middlewares + self.dynamic_middlewares,
             context_schema=CustomContext,  # 获取自定义上下文类并传入 Agent
             checkpointer=checkpointer,
@@ -657,28 +657,38 @@ class LLMAgent:
         self, user_text: str, vision_id: str | None = None, voice_id: str | None = None
     ) -> list:
         """构造输入消息列表，包含单次RAG增强时的系统提示和用户输入。"""
-        if self.rag_enable and self.rag_client is not None:
-            return [
-                self._build_system_message(
-                    self.rag_client.query(
-                        query=user_text,
-                        vision_user_id=vision_id,
-                        voice_user_id=voice_id,
-                    ).get("prompt", "")
-                ),
-                self._build_human_message(
-                    user_text, vision_id=vision_id, voice_id=voice_id
-                ),
-            ]
+        # if self.rag_enable and self.rag_client is not None:
+        #     return [
+        #         self._build_system_message(
+        #             self.rag_client.query(
+        #                 query=user_text,
+        #                 vision_user_id=vision_id,
+        #                 voice_user_id=voice_id,
+        #             ).get("prompt", "")
+        #         ),
+        #         self._build_human_message(
+        #             user_text, vision_id=vision_id, voice_id=voice_id
+        #         ),
+        #     ]
 
         return [
             self._build_human_message(user_text, vision_id=vision_id, voice_id=voice_id)
         ]
 
     def _build_runtime_context(
-        self, vision_id: str | None = None, voice_id: str | None = None
+        self, user_text: str, vision_id: str | None = None, voice_id: str | None = None
     ) -> CustomContext:
         """构造请求上下文。"""
+        if self.rag_enable and self.rag_client is not None:
+            rag_prompt = self.rag_client.query(
+                query=user_text,
+                vision_user_id=vision_id,
+                voice_user_id=voice_id,
+            ).get("prompt", "")
+            logger.debug(f"RAG 增强提示词: {rag_prompt}")
+            return CustomContext(
+                vision_id=vision_id, voice_id=voice_id, rag_prompt=rag_prompt
+            )
         return CustomContext(vision_id=vision_id, voice_id=voice_id)
 
     def _prepare_request(
@@ -691,7 +701,9 @@ class LLMAgent:
         logger.debug(f"构建输入消息-------------->: {[m for m in messages]}")
         return (
             messages,
-            self._build_runtime_context(vision_id=vision_id, voice_id=voice_id),
+            self._build_runtime_context(
+                user_text, vision_id=vision_id, voice_id=voice_id
+            ),
             self._build_runtime_config(thread_id=vision_id),
         )
 

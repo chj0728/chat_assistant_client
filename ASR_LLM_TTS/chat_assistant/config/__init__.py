@@ -100,3 +100,11 @@ def get_vad_no_speech_threshold(default: float = 0.5) -> float:
     threshold = config.get("VAD", {}).get("no_speech_threshold", default)
     logger.debug(f"ASR 配置 - VAD_NO_SPEECH_THRESHOLD: {threshold} 秒")
     return threshold
+
+
+def get_default_system_prompt(default: str = "") -> str:
+    """从配置中读取默认系统提示词，读取失败时回退默认值。"""
+    config = load_config()
+    default_system_prompt = config.get("llm", {}).get("default_system_prompt", default)
+    logger.debug(f"LLM Agent 配置 - DEFAULT_SYSTEM_PROMPT:\n{default_system_prompt}")
+    return default_system_prompt
