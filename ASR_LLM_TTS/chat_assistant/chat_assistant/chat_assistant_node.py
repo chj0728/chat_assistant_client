@@ -570,7 +570,7 @@ class ChatAssistantNode(Node):
             elif tool_event == ToolEvent.END_CONVERSATION.value:
                 logger.info("Main loop handling tool event: END_CONVERSATION")
                 # 在这里添加结束对话的具体实现代码
-                self.chat_assistant.deactivate_llm_agent()
+                # self.chat_assistant.deactivate_llm_agent()
 
         except Empty:
             pass

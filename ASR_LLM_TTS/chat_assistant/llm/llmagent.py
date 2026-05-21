@@ -62,14 +62,14 @@ from llm.custom_tools import get_custom_tools
 load_dotenv()
 
 
-def GET_EAS_TOKEN_FROM_ENV():
-    """从环境变量获取 EAS_TOKEN，并进行基本验证。"""
-    return os.getenv("EAS_TOKEN", "").strip()
+def GET_API_TOKEN_FROM_ENV():
+    """从环境变量获取 API_TOKEN，并进行基本验证。"""
+    return os.getenv("API_TOKEN", "").strip()
 
 
-def GET_EAS_ENDPOINT_FROM_ENV():
-    """从环境变量获取 EAS_ENDPOINT，并进行基本验证。"""
-    return os.getenv("EAS_ENDPOINT", "").strip()
+def GET_API_ENDPOINT_FROM_ENV():
+    """从环境变量获取 API_ENDPOINT，并进行基本验证。"""
+    return os.getenv("API_ENDPOINT", "").strip()
 
 
 DEFAULT_MODEL_ID = "Qwen/Qwen3"
@@ -250,6 +250,9 @@ class LLMAgent:
         # 初始化 RAG 客户端实例
         self._init_rag_client()
 
+        # 启动后台循环监听线程 ，GET self.base_url/health
+        self._start_health_check_loop()
+
     @classmethod
     def from_config(
         cls,
@@ -286,13 +289,15 @@ class LLMAgent:
     def _init_api_key_and_base_url(self):
         """根据是否启用云端 LLM 服务，初始化 API 密钥和基础 URL。"""
         if self.enable_cloud:
-            # 从环境变量获取云端 LLM 服务的 API 密钥和基础 URL，确保在 .env 文件中正确配置 EAS_TOKEN 和 EAS_ENDPOINT
-            self.api_key = SecretStr(GET_EAS_TOKEN_FROM_ENV())
-            self.base_url = GET_EAS_ENDPOINT_FROM_ENV() + "/v1"
+            # 从环境变量获取云端 LLM 服务的 API 密钥和基础 URL，确保在 .env 文件中正确配置 API_TOKEN 和 API_ENDPOINT
+            self.api_key = SecretStr(GET_API_TOKEN_FROM_ENV())
+            self.endpoint = GET_API_ENDPOINT_FROM_ENV()
+            self.base_url = self.endpoint + "/v1"
             logger.info("已启用云端 LLM 服务")
         else:
             self.api_key = SecretStr("EMPTY")  # 本地部署的模型不需要 API 密钥
-            self.base_url = f"http://{self.host}:{self.port}/v1"
+            self.endpoint = f"http://{self.host}:{self.port}"
+            self.base_url = self.endpoint + "/v1"
             logger.info("使用本地部署的 LLM 服务")
 
     def _init_chat_model(self) -> ChatOpenAI:
@@ -316,12 +321,16 @@ class LLMAgent:
         ## Agents: https://docs.langchain.com/oss/python/langchain/agents
         ## Short-term memory: https://docs.langchain.com/oss/python/langchain/short-term-memory
 
-        ## 保留一个轻量代理，便于测试或无持久化场景下复用既有装配逻辑
+        ## 创建一个使用内存检查点的代理实例，适用于需要持久化对话上下文的场景
         self.in_memory_checkpointer = InMemorySaver()
         self.tiny_agent = self._create_agent_instance(
             checkpointer=self.in_memory_checkpointer
         )
 
+        ## 创建单次响应代理实例，用于处理无需持久化的单次对话
+        self.single_response_agent = self._create_agent_instance(checkpointer=None)
+
+        ## 创建持久化代理实例，适用于需要将对话上下文存储到数据库的场景
         self.db_path = DEFAULT_DB_PATH
         self.async_sqlite_saver = None
         self._async_sqlite_conn = None
@@ -427,6 +436,36 @@ class LLMAgent:
             context_schema=CustomContext,  # 获取自定义上下文类并传入 Agent
             checkpointer=checkpointer,
         )
+
+    def _start_health_check_loop(self):
+        """启动一个后台线程，定期检查 LLM 服务的健康状态。"""
+
+        def health_check_loop():
+
+            headers = None
+            if self.enable_cloud:
+                token = self.api_key.get_secret_value()
+                if token:
+                    headers = {"Authorization": f"Bearer {token}"}
+
+            while True:
+                try:
+                    response = requests.get(
+                        self.endpoint + "/health", headers=headers, timeout=self.timeout
+                    )
+                    if response.status_code == 200:
+                        logger.debug("LLM 服务健康检查成功")
+                    else:
+                        logger.warning(
+                            f"LLM 服务健康检查失败，状态码: {response.status_code}"
+                        )
+                except Exception as e:
+                    logger.error(f"LLM 服务健康检查异常: {e}")
+                time.sleep(5)  # 每5秒检查一次
+
+        threading.Thread(
+            target=health_check_loop, name="llm-health-check", daemon=True
+        ).start()
 
     ########################################################
 
@@ -656,7 +695,7 @@ class LLMAgent:
     def _build_input_messages(
         self, user_text: str, vision_id: str | None = None, voice_id: str | None = None
     ) -> list:
-        """构造输入消息列表，包含单次RAG增强时的系统提示和用户输入。"""
+        """构造输入用户输入消息列表"""
         # if self.rag_enable and self.rag_client is not None:
         #     return [
         #         self._build_system_message(
@@ -675,17 +714,33 @@ class LLMAgent:
             self._build_human_message(user_text, vision_id=vision_id, voice_id=voice_id)
         ]
 
-    def _build_runtime_context(
+    def _build_rag_prompt(
         self, user_text: str, vision_id: str | None = None, voice_id: str | None = None
-    ) -> CustomContext:
-        """构造请求上下文。"""
+    ) -> str:
+        """构造 RAG 增强提示词。"""
         if self.rag_enable and self.rag_client is not None:
-            rag_prompt = self.rag_client.query(
+
+            res = self.rag_client.query(
                 query=user_text,
                 vision_user_id=vision_id,
                 voice_user_id=voice_id,
-            ).get("prompt", "")
+            )
+
+            rag_prompt = res.get("prompt", "")
             logger.debug(f"RAG 增强提示词: {rag_prompt}")
+
+            return rag_prompt
+        return ""
+
+    def _build_runtime_context(
+        self, user_text: str, vision_id: str | None = None, voice_id: str | None = None
+    ) -> CustomContext:
+        """构建运行时上下文。"""
+
+        rag_prompt = self._build_rag_prompt(
+            user_text, vision_id=vision_id, voice_id=voice_id
+        )
+        if rag_prompt:
             return CustomContext(
                 vision_id=vision_id, voice_id=voice_id, rag_prompt=rag_prompt
             )
@@ -695,16 +750,24 @@ class LLMAgent:
         self, user_text: str, vision_id: str | None = None, voice_id: str | None = None
     ) -> tuple[list, CustomContext, RunnableConfig]:
         """统一构造消息、上下文和运行时配置。"""
+
         messages = self._build_input_messages(
             user_text, vision_id=vision_id, voice_id=voice_id
         )
         logger.debug(f"构建输入消息-------------->: {[m for m in messages]}")
+
+        custom_context = self._build_runtime_context(
+            user_text, vision_id=vision_id, voice_id=voice_id
+        )
+        logger.debug(f"构建运行时上下文-------------->: {custom_context}")
+
+        runtime_config = self._build_runtime_config(thread_id=vision_id)
+        logger.debug(f"构建运行时配置-------------->: {runtime_config}")
+
         return (
             messages,
-            self._build_runtime_context(
-                user_text, vision_id=vision_id, voice_id=voice_id
-            ),
-            self._build_runtime_config(thread_id=vision_id),
+            custom_context,
+            runtime_config,
         )
 
     def _select_stream_agent(self, vision_id: str | None = None) -> Any:
@@ -797,11 +860,24 @@ class LLMAgent:
     ##################################################################
 
     ##################### 对外接口方法 #####################
+    def single_response(self, user_text: str) -> str | None:
+        """发送用户输入，返回完整回答文本，适合一次性获取完整回复的场景。该方法不支持视觉和语音相关的上下文信息。"""
+        human_msg = self._build_human_message(user_text)
+
+        result = self.single_response_agent.invoke(
+            {"messages": [human_msg]},
+            context=CustomContext(default_system_prompt=None),
+            config=self._build_runtime_config(),
+            stream_mode="values",
+        )
+        last_ai_content = self._get_last_ai_content(result)
+        return last_ai_content
+
     def chat_response(
         self, user_text: str, vision_id: str | None = None, voice_id: str | None = None
     ) -> str | None:
         """
-        发送用户输入，返回完整回答文本，适合一次性获取完整回复的场景
+        发送用户输入，查询RAG 增强提示词，并返回完整回答文本，适合一次性获取完整回复的场景。
         """
         messages, context, runtime_config = self._prepare_request(
             user_text, vision_id=vision_id, voice_id=voice_id
@@ -820,7 +896,7 @@ class LLMAgent:
         self, user_text: str, vision_id: str | None = None, voice_id: str | None = None
     ) -> Generator[tuple[str, int], Any, None]:
         """
-        发送用户输入，以同步流式方式返回回答文本的分段内容，适合边说边播的场景
+        发送用户输入，查询RAG 增强提示词，并以同步流式方式返回回答文本的分段内容，适合边说边播的场景。
         """
         index = 0
         messages, context, runtime_config = self._prepare_request(
@@ -855,7 +931,7 @@ class LLMAgent:
         self, user_text: str, vision_id: str | None = None, voice_id: str | None = None
     ) -> str | None:
         """
-        发送用户输入，异步返回完整回答文本
+        发送用户输入，查询RAG 增强提示词，并异步返回完整回答文本
         """
         messages, _, _ = self._prepare_request(
             user_text, vision_id=vision_id, voice_id=voice_id
@@ -880,7 +956,7 @@ class LLMAgent:
         self, user_text: str, vision_id: str | None = None, voice_id: str | None = None
     ) -> AsyncIterator[tuple[str, int]]:
         """
-        发送用户输入，以异步流式方式返回回答文本的分段内容，适合边说边播的场景
+        发送用户输入，查询RAG 增强提示词，并以异步流式方式返回回答文本的分段内容，适合边说边播的场景
         """
         index = 0
         messages, context, runtime_config = self._prepare_request(
@@ -1015,18 +1091,18 @@ async def _main():
         # )
 
         # # 同步获取完整回复文本
-        # response = llm_agent.chat_response(
-        #     user_input, vision_id=vision_id, voice_id=voice_id
-        # )
-        # print("AI:", response)
+        response = llm_agent.chat_response(
+            user_input, vision_id=vision_id, voice_id=voice_id
+        )
+        print("AI:", response)
 
         # 同步流式获取回复文本分片
-        print("AI:", end=" ", flush=True)
-        for chunk, _ in llm_agent.chat_response_stream(
-            user_input, vision_id=vision_id, voice_id=voice_id
-        ):
-            print(chunk, end=" ", flush=True)
-        print()  # 换行
+        # print("AI:", end=" ", flush=True)
+        # for chunk, _ in llm_agent.chat_response_stream(
+        #     user_input, vision_id=vision_id, voice_id=voice_id
+        # ):
+        #     print(chunk, end=" ", flush=True)
+        # print()  # 换行
 
         # checkpoints = await llm_agent.aget_checkpoint_tuple(thread_id=vision_id)
         # for checkpoint in checkpoints or []:
