@@ -103,7 +103,7 @@ VAD:
 
 ################# 唤醒词检测配置 #################
 KWS:
-  enable: true # 是否启用唤醒词检测
+  enable: false # 是否启用唤醒词检测
   failed_kws_counts : 1 # 连续未检测到唤醒词次数达到此值时，推送提示语音
   failed_kws_threshold: 30 # 连续未检测到唤醒词次数 达到 failed_kws_counts 后，推送提示语音的时间间隔 (秒)
   reactive_kws_threshold: 100 # 重置 需要唤醒词检测 激活 LLM 时间间隔 (秒) 

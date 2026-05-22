@@ -864,12 +864,25 @@ class LLMAgent:
         """发送用户输入，返回完整回答文本，适合一次性获取完整回复的场景。该方法不支持视觉和语音相关的上下文信息。"""
         human_msg = self._build_human_message(user_text)
 
+        custom_context = CustomContext(default_system_prompt=None)
+        if self.rag_enable and self.rag_client is not None:
+
+            # 在单次响应场景下直接调用 RAG 客户端获取增强提示词，并将其存储在上下文中，供 Agent 在生成回复时使用。
+            res = self.rag_client.query(query=user_text)
+
+            rag_prompt = res.get("prompt", "")
+            custom_context.rag_prompt = rag_prompt
+            logger.debug(f"RAG 增强提示词: {rag_prompt}")
+
+            return rag_prompt
+
         result = self.single_response_agent.invoke(
             {"messages": [human_msg]},
-            context=CustomContext(default_system_prompt=None),
+            context=custom_context,
             config=self._build_runtime_config(),
             stream_mode="values",
         )
+
         last_ai_content = self._get_last_ai_content(result)
         return last_ai_content
 
