@@ -47,6 +47,7 @@ class ChatAssistant:
         self.asr_text = ""
         self.llm_text = ""
         self.current_user_id = None
+        self.current_user_face_status = False
 
         self.asr_text_queue = Queue(maxsize=MAX_QUEUE_SIZE)
         self.llm_text_queue = Queue(maxsize=MAX_QUEUE_SIZE)
@@ -70,7 +71,7 @@ class ChatAssistant:
         self.asr_text = ""
         self.llm_text = ""
         self.current_user_id = None
-
+        self.current_user_face_status = False
         self.asr_text_queue = Queue(maxsize=MAX_QUEUE_SIZE)
         self.llm_text_queue = Queue(maxsize=MAX_QUEUE_SIZE)
         self.response_queue = Queue(maxsize=MAX_QUEUE_SIZE)
@@ -317,6 +318,10 @@ class ChatAssistant:
         self.asr_client_state = self._initial_component_state("asr_enable")
         self.llm_agent_state = self._initial_component_state("llm_enable")
         self.tts_client_state = self._initial_component_state("tts_enable")
+
+        self.enable_user_face_info = self.configs.get("ros_cfg", {}).get(
+            "enable_user_face_info", False
+        )
 
         self.energy_instability_check = self.configs.get(
             "energy_instability_check", True
@@ -745,6 +750,13 @@ class ChatAssistant:
             user_id.strip() if isinstance(user_id, str) and user_id.strip() else None
         )
         logger.debug(f"当前用户 ID 已设置为: {self.current_user_id}")
+
+    def set_current_user_face_status(self, face_status: bool | None):
+        """
+        设置当前 用户 人脸识别状态
+        """
+        self.current_user_face_status = face_status
+        logger.debug(f"当前用户在场状态已设置为: {self.current_user_face_status}")
 
     def generate_wav(self, text, output_path) -> bool:
         """
@@ -1246,6 +1258,12 @@ class ChatAssistant:
         #     f"测试异步 ASR 结果: {asr_result}, LLM 结果: {llm_result}, TTS 结果: {tts_result}, 耗时: {(time.time() - now) * 1000:.2f} ms"
         # )
         # return True
+
+        # -------------  检查人脸信息 -------------
+        if self.enable_user_face_info and not self.current_user_face_status:
+            logger.warning("未检测到有效人脸信息，跳过本次交互")
+            self.last_interface_time = time.time()
+            return False
 
         logger.info("\n\n开始一次完整的交互流程...")
         voice_id = None

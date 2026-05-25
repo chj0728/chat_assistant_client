@@ -122,6 +122,10 @@ ros_cfg:
 
   user_id_subscribe_topic: "user_id" # 用户ID订阅话题
   user_id_stale_timeout_sec: 3 # 用户ID过期时间，超过此时间未更新则认为用户离开，回退为 None (秒)
+
+  enable_user_face_info: false # 是否启用用户人脸信息订阅功能，启用后会订阅 user_face_subscribe_topic 话题获取用户人脸状态
+  user_face_subscribe_topic: "is_faced" # 用户人脸信息订阅话题 (bool:True 表示检测到人脸，False 表示未检测到人脸)
+  user_face_stale_timeout_sec: 3 # 用户人脸信息过期时间，超过此时间未更新则认为用户离开，回退为 None (秒)
 ##############################################
 
 enable_replace_special_characters: false # 是否启用替换特殊字符功能

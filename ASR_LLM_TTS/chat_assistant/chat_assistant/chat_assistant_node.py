@@ -134,6 +134,10 @@ class ChatAssistantNode(Node):
         self.last_user_id_msg_time = None
         self.user_id_stale_timeout_sec = 1.0
 
+        self.current_user_face_status = False
+        self.last_user_face_msg_time = None
+        self.user_face_stale_timeout_sec = 1.0
+
         self.declare_parameter("config_path_value", "config/config.yaml")
 
         self.init_params()
@@ -245,12 +249,20 @@ class ChatAssistantNode(Node):
             "resolved_user_name_topic", "resolved_user_name"
         )
 
+        # 订阅用户ID话题相关参数
         self.user_id_subscribe_topic = ros_cfg.get(
             "user_id_subscribe_topic", "user_id_topic"
         )
-
         self.user_id_stale_timeout_sec = float(
             ros_cfg.get("user_id_stale_timeout_sec", 1.0)
+        )
+
+        # 新增用户人脸信息订阅相关参数
+        self.user_face_subscribe_topic = ros_cfg.get(
+            "user_face_subscribe_topic", "is_faced"
+        )
+        self.user_face_stale_timeout_sec = float(
+            ros_cfg.get("user_face_stale_timeout_sec", 1.0)
         )
 
         # 创建话题发布者
@@ -282,22 +294,10 @@ class ChatAssistantNode(Node):
             String, self.user_id_subscribe_topic, self.handle_user_id, 1
         )
 
-    def get_latest_user_id(self):
-        """
-        获取最新用户ID；当订阅数据超时未更新时，返回 None
-        """
-        if self.last_user_id_msg_time is None:
-            return None
-
-        if (time.time() - self.last_user_id_msg_time) > self.user_id_stale_timeout_sec:
-            if self.current_user_id is not None:
-                logger.debug("用户ID订阅数据超时，回退为 None")
-            self.current_user_id = None
-            self.last_user_id_msg_time = None
-            self.chat_assistant.set_current_user_id(None)
-            return None
-
-        return self.current_user_id
+        ## 订阅用户人脸信息话题
+        self.create_subscription(
+            Bool, self.user_face_subscribe_topic, self.handle_user_face, 1
+        )
 
     def handle_chat_assistant_infer(self, request, response):
         """
@@ -585,6 +585,42 @@ class ChatAssistantNode(Node):
         except Empty:
             pass
 
+    def get_latest_user_id(self):
+        """
+        获取最新用户ID；当订阅数据超时未更新时，返回 None
+        """
+        if self.last_user_id_msg_time is None:
+            return None
+
+        if (time.time() - self.last_user_id_msg_time) > self.user_id_stale_timeout_sec:
+            if self.current_user_id is not None:
+                logger.debug("用户ID订阅数据超时，回退为 None")
+            self.current_user_id = None
+            self.last_user_id_msg_time = None
+            self.chat_assistant.set_current_user_id(None)
+            return None
+
+        return self.current_user_id
+
+    def get_latest_user_face_status(self):
+        """
+        获取最新用户人脸状态；当订阅数据超时未更新时，返回 False（表示未检测到人脸）
+        """
+        if self.last_user_face_msg_time is None:
+            return False
+
+        if (
+            time.time() - self.last_user_face_msg_time
+        ) > self.user_face_stale_timeout_sec:
+            if self.current_user_face_status is not False:
+                logger.debug("用户人脸信息订阅数据超时，回退为 False")
+            self.current_user_face_status = False
+            self.last_user_face_msg_time = None
+            self.chat_assistant.set_current_user_face_status(False)
+            return False
+
+        return self.current_user_face_status
+
     def handle_user_id(self, msg):
         """
         处理订阅到的用户 vision_id 消息，更新当前用户 ID，并记录消息接收时间以便后续判断数据是否过期
@@ -593,6 +629,15 @@ class ChatAssistantNode(Node):
         self.current_user_id = msg.data.strip() if msg.data else None
         logger.debug(f"收到用户vision_id消息: {self.current_user_id}")
         self.chat_assistant.set_current_user_id(self.current_user_id)
+
+    def handle_user_face(self, msg):
+        """
+        处理订阅到的用户人脸信息消息，更新当前用户人脸状态，并记录消息接收时间以便后续判断数据是否过期
+        """
+        self.last_user_face_msg_time = time.time()
+        self.current_user_face_status = msg.data
+        logger.debug(f"收到用户人脸信息消息: {self.current_user_face_status}")
+        self.chat_assistant.set_current_user_face_status(self.current_user_face_status)
 
 
 def main(args=None):
@@ -608,6 +653,8 @@ def main(args=None):
 
             # 定期检查订阅用户ID是否超时，超时后回退为 None
             chat_assistant_node.get_latest_user_id()
+            # 定期检查订阅用户人脸信息是否超时，超时后回退为 False
+            chat_assistant_node.get_latest_user_face_status()
 
             if chat_assistant_node.chat_assistant.asr_text_queue.empty() is False:
                 asr_text = chat_assistant_node.chat_assistant.asr_text_queue.get(
