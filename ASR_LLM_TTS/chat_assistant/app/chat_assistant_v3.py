@@ -51,6 +51,9 @@ class ChatAssistant:
         self.asr_text_queue = Queue(maxsize=MAX_QUEUE_SIZE)
         self.llm_text_queue = Queue(maxsize=MAX_QUEUE_SIZE)
 
+        # 储存解析的 用户姓名 队列
+        self.resolved_user_names_queue = Queue(maxsize=MAX_QUEUE_SIZE)
+
         # 同时包括 asr_text 和 llm_text
         self.response_queue = Queue(maxsize=MAX_QUEUE_SIZE)
         self.response_data = ResponseData()
@@ -71,6 +74,7 @@ class ChatAssistant:
         self.asr_text_queue = Queue(maxsize=MAX_QUEUE_SIZE)
         self.llm_text_queue = Queue(maxsize=MAX_QUEUE_SIZE)
         self.response_queue = Queue(maxsize=MAX_QUEUE_SIZE)
+        self.resolved_user_names_queue = Queue(maxsize=MAX_QUEUE_SIZE)
         self.response_data = ResponseData()
         self.response_data.clear()
 
@@ -1389,6 +1393,24 @@ class ChatAssistant:
             if not self.check_tts_status():
                 return False
             self.tts_infer(self.llm_text)
+
+        # ------------ 查询是否需要再次query to resolve -----------------
+        if self.llm_client.get_query_to_resolve():
+
+            logger.info("需要再次查询以解析名称")
+
+            # 重置 query_to_resolve 标志，避免重复查询
+            self.llm_client.set_query_to_resolve(False)
+
+            # 调用 LLM 进行查询以解析名称，获取结果后推送到 resolved_user_names_queue 队列
+            resolve_name = self.llm_client.single_response(
+                self.asr_text, is_obtain_name=True
+            )
+            # resolve_name = "default_name"  # 测试代码，固定返回名称
+            self.__push_queue(self.resolved_user_names_queue, resolve_name)
+
+            logger.info(f"解析得到名称: {resolve_name}")
+        ###############################################################
 
         logger.info("本次交互完成，等待下一次录音")
         return True

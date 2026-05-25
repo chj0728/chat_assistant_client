@@ -241,9 +241,14 @@ class ChatAssistantNode(Node):
             "tts_active_topic", "sound_detected_default"
         )
 
+        self.resolved_user_name_topic = ros_cfg.get(
+            "resolved_user_name_topic", "resolved_user_name"
+        )
+
         self.user_id_subscribe_topic = ros_cfg.get(
             "user_id_subscribe_topic", "user_id_topic"
         )
+
         self.user_id_stale_timeout_sec = float(
             ros_cfg.get("user_id_stale_timeout_sec", 1.0)
         )
@@ -265,6 +270,11 @@ class ChatAssistantNode(Node):
         ## 发布 TTS 播放状态话题
         self.tts_status_publisher = self.create_publisher(
             Bool, self.tts_active_topic, 1
+        )
+
+        ## 发布解析后的用户名称话题
+        self.resolved_user_name_publisher = self.create_publisher(
+            String, self.resolved_user_name_topic, 10
         )
 
         ## 订阅用户ID话题
@@ -647,6 +657,20 @@ def main(args=None):
                 tts_msg = Bool()
                 tts_msg.data = False
                 chat_assistant_node.tts_status_publisher.publish(tts_msg)
+
+            if (
+                chat_assistant_node.chat_assistant.resolved_user_names_queue.empty()
+                is False
+            ):
+                resolved_user_name = (
+                    chat_assistant_node.chat_assistant.resolved_user_names_queue.get(
+                        timeout=0.05
+                    )
+                )
+                msg = String()
+                msg.data = resolved_user_name
+                chat_assistant_node.resolved_user_name_publisher.publish(msg)
+                logger.info(f"发布解析后的用户名: {resolved_user_name}")
 
             # global call_flag
             # if call_flag:

@@ -37,7 +37,7 @@ from langchain_core.runnables import RunnableConfig
 # from langgraph.store.sqlite import SqliteStore
 # from uuid import uuid7
 # from langsmith import uuid7_from_datetime
-from langchain_core.utils.uuid import uuid7
+# from langchain_core.utils.uuid import uuid7
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
@@ -224,9 +224,8 @@ class LLMAgent:
             content=build_global_system_prompt(self.extra_system_prompt)
         )
 
-        self.thread_id = (
-            uuid7()
-        )  # 使用 UUID 作为无用户ID 时的 thread_id ，确保每个 LLMAgent 实例的对话上下文独立且唯一
+        # self.thread_id = uuid7()  # 使用 UUID 作为无用户ID 时的 thread_id
+        self.thread_id = "default_memory_checkpointer"
         logger.debug(f"LLM Agent 初始化 - thread_id: {self.thread_id}")
 
     def _initialize_runtime_components(self) -> None:
@@ -726,10 +725,13 @@ class LLMAgent:
                 voice_user_id=voice_id,
             )
 
-            rag_prompt = res.get("prompt", "")
-            logger.debug(f"RAG 增强提示词: {rag_prompt}")
+            self.rag_prompt = res.get("prompt", "")
+            logger.debug(f"RAG 增强提示词: {self.rag_prompt}")
 
-            return rag_prompt
+            self.query_to_resolve: bool = res.get("second", False)
+            logger.debug(f"Query to resolve name: {self.query_to_resolve}")
+
+            return self.rag_prompt
         return ""
 
     def _build_runtime_context(
@@ -860,7 +862,17 @@ class LLMAgent:
     ##################################################################
 
     ##################### 对外接口方法 #####################
-    def single_response(self, user_text: str) -> str | None:
+    def get_query_to_resolve(self) -> bool:
+        """返回是否需要查询以解析名称的标志。"""
+        return getattr(self, "query_to_resolve", False)
+
+    def set_query_to_resolve(self, value: bool) -> None:
+        """设置是否需要查询以解析名称的标志。"""
+        self.query_to_resolve = value
+
+    def single_response(
+        self, user_text: str, is_obtain_name: bool = False
+    ) -> str | None:
         """发送用户输入，返回完整回答文本，适合一次性获取完整回复的场景。该方法不支持视觉和语音相关的上下文信息。"""
         human_msg = self._build_human_message(user_text)
 
@@ -868,7 +880,7 @@ class LLMAgent:
         if self.rag_enable and self.rag_client is not None:
 
             # 在单次响应场景下直接调用 RAG 客户端获取增强提示词，并将其存储在上下文中，供 Agent 在生成回复时使用。
-            res = self.rag_client.query(query=user_text)
+            res = self.rag_client.query(query=user_text, is_obtain_name=is_obtain_name)
 
             rag_prompt = res.get("prompt", "")
             custom_context.rag_prompt = rag_prompt
