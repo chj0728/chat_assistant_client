@@ -873,10 +873,16 @@ class LLMAgent:
     def single_response(
         self, user_text: str, is_obtain_name: bool = False
     ) -> str | None:
-        """发送用户输入，返回完整回答文本，适合一次性获取完整回复的场景。该方法不支持视觉和语音相关的上下文信息。"""
+        """发送用户输入，返回LLM解析后的用户名称，适合一次性获取解析结果的场景。
+
+        params:
+            user_text: 用户输入文本
+            is_obtain_name: RAG 启用的情况下，获取用于解析名称的增强提示词。默认为 False。
+        """
         human_msg = self._build_human_message(user_text)
 
         custom_context = CustomContext(default_system_prompt=None)
+
         if self.rag_enable and self.rag_client is not None:
 
             # 在单次响应场景下直接调用 RAG 客户端获取增强提示词，并将其存储在上下文中，供 Agent 在生成回复时使用。
@@ -885,8 +891,6 @@ class LLMAgent:
             rag_prompt = res.get("prompt", "")
             custom_context.rag_prompt = rag_prompt
             logger.debug(f"RAG 增强提示词: {rag_prompt}")
-
-            return rag_prompt
 
         result = self.single_response_agent.invoke(
             {"messages": [human_msg]},
@@ -902,7 +906,7 @@ class LLMAgent:
         self, user_text: str, vision_id: str | None = None, voice_id: str | None = None
     ) -> str | None:
         """
-        发送用户输入，查询RAG 增强提示词，并返回完整回答文本，适合一次性获取完整回复的场景。
+        发送用户输入，获取 RAG 增强提示词，并返回LLM生成的回答文本。
         """
         messages, context, runtime_config = self._prepare_request(
             user_text, vision_id=vision_id, voice_id=voice_id
@@ -921,7 +925,7 @@ class LLMAgent:
         self, user_text: str, vision_id: str | None = None, voice_id: str | None = None
     ) -> Generator[tuple[str, int], Any, None]:
         """
-        发送用户输入，查询RAG 增强提示词，并以同步流式方式返回回答文本的分段内容，适合边说边播的场景。
+        发送用户输入，获取 RAG 增强提示词，并以同步流式方式返回LLM生成的分段内容。
         """
         index = 0
         messages, context, runtime_config = self._prepare_request(
@@ -956,7 +960,7 @@ class LLMAgent:
         self, user_text: str, vision_id: str | None = None, voice_id: str | None = None
     ) -> str | None:
         """
-        发送用户输入，查询RAG 增强提示词，并异步返回完整回答文本
+        发送用户输入，获取 RAG 增强提示词，并异步返回LLM生成的完整回答文本。
         """
         messages, _, _ = self._prepare_request(
             user_text, vision_id=vision_id, voice_id=voice_id
@@ -981,7 +985,7 @@ class LLMAgent:
         self, user_text: str, vision_id: str | None = None, voice_id: str | None = None
     ) -> AsyncIterator[tuple[str, int]]:
         """
-        发送用户输入，查询RAG 增强提示词，并以异步流式方式返回回答文本的分段内容，适合边说边播的场景
+        发送用户输入，获取 RAG 增强提示词，并以异步流式方式返回LLM生成的分段内容。
         """
         index = 0
         messages, context, runtime_config = self._prepare_request(
