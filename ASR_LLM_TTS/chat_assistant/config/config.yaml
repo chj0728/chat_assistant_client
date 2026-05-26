@@ -21,9 +21,9 @@ llm:
   timeout_sec: 5
   temperature: 0.3 # 生成文本的随机程度，范围0-1，值越大越随机
   # （max_tokens + max_completion_tokens(限制模型回复tokens) +RAG 检索结果 tokens) 需要在模型的上下文窗口限制内，例如 2048 或 4096，具体取决于所使用的 LLM 模型
-  max_tokens: 200 # 历史消息和生成文本的最大 token 数量，用于控制上下文长度，避免超过模型限制，根据实际情况调整
-  max_messages: 10 # 上下文消息数量限制，根据实际情况调整
-  max_completion_tokens: 120 # 只限制 生成内容（completion） 的 token 数量，不是输入（prompt）+输出（completion）的总token数，根据实际情况调整
+  max_tokens: 150 # 历史消息的最大 token 数量，配合 max_messages 控制上下文长度，根据实际情况调整
+  max_messages: 15 # 历史消息的最大条数，配合 max_tokens 控制上下文长度，根据实际情况调整
+  max_completion_tokens: 100 # 只限制 生成内容（completion） 的 token 数量，不是输入（prompt）+输出（completion）的总token数，根据实际情况调整
 
   enable_thinking: false # 是否启用思考过程
   rag_enable: true # 是否启用 RAG 功能，启用后会在 LLM 回复前先进行检索增强
@@ -93,7 +93,7 @@ Audio:
 VAD:
   output_dir: "output" # VAD 结果保存目录
   mode : 2 # 0：最宽松，允许更多非语音通过  1：平衡模式 2：较严格，减少非语音通过  3：最严格，过滤更多非语音
-  no_speech_threshold: 0.5 # 静音持续多长时间后认为一句话结束 (秒)
+  no_speech_threshold: 0.6 # 静音持续多长时间后认为一句话结束 (秒)
   # reactive_kws_threshold: 100  # 重置唤醒词检测 激活 LLM 时间间隔 (秒) 
   decibel_threshold: -35 # 分贝阈值，低于此值认为是静音 (dB)
   min_recording_duration: 0.4 # 最短有效录音时长 (秒)

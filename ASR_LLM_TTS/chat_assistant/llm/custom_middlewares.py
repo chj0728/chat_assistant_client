@@ -12,7 +12,7 @@ reference:
 from collections.abc import Callable
 from typing import Any
 
-from config import get_max_messages
+from config import get_max_messages, get_max_tokens
 from langchain.agents import AgentState
 from langchain.agents.middleware import (
     ModelRequest,
@@ -29,6 +29,7 @@ from langchain_core.messages import (
     SystemMessage,
     trim_messages,
 )
+from langchain_core.messages.utils import count_tokens_approximately
 from langgraph.graph.message import REMOVE_ALL_MESSAGES
 from langgraph.runtime import Runtime
 from logger import logger
@@ -70,27 +71,29 @@ def trim_messages_before_model(
 
     # logger.debug(f"runtime.context------------>: \n{runtime.context}")
 
-    # refer from: https://juejin.cn/post/7534535266226192430
-    # # 使用 token 数量限制的方式来控制对话历史长度
-    # trimmed_tokens_messages = trim_messages(
-    #     messages,
-    #     max_tokens=get_max_tokens(),  # 保留消息的最大token数量，超过时会删除最旧的消息，直到总token数在限制内
-    #     strategy="last",  # 保留最近的消息，删除最旧的消息
-    #     token_counter=count_tokens_approximately,  # 计算消息token数量的函数
-    #     # Most chat models expect that chat history starts with either:
-    #     # (1) a HumanMessage or
-    #     # (2) a SystemMessage followed by a HumanMessage
-    #     start_on="human",
-    #     # Usually, we want to keep the SystemMessage
-    #     # if it's present in the original history.
-    #     # The SystemMessage has special instructions for the model.
-    #     include_system=True,
-    #     allow_partial=False,
-    # )
+    # refer from:
+    #   - https://juejin.cn/post/7534535266226192430
+    #   - https://reference.langchain.com/python/langchain-core/messages/utils/count_tokens_approximately
+    ## 使用 token 数量限制的方式来控制对话历史长度
+    trimmed_tokens_messages = trim_messages(
+        messages,
+        max_tokens=get_max_tokens(),  # 保留消息的最大token数量，超过时会删除最旧的消息，直到总token数在限制内
+        strategy="last",  # 保留最近的消息，删除最旧的消息
+        token_counter=count_tokens_approximately,  # 计算消息token数量的函数
+        # Most chat models expect that chat history starts with either:
+        # (1) a HumanMessage or
+        # (2) a SystemMessage followed by a HumanMessage
+        start_on="human",
+        # Usually, we want to keep the SystemMessage
+        # if it's present in the original history.
+        # The SystemMessage has special instructions for the model.
+        include_system=True,
+        allow_partial=False,
+    )
 
     ## 使用消息数量限制的方式来控制对话历史长度
     trimmed_messages = trim_messages(
-        messages,
+        trimmed_tokens_messages,
         # When `len` is passed in as the token counter function,
         # max_tokens will count the number of messages in the chat history.
         max_tokens=get_max_messages(),
