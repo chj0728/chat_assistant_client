@@ -206,6 +206,11 @@ class ChatAssistantNode(Node):
             GenerateWav, "tts_generate_wav", self.handle_tts_generate_wav
         )
 
+        ## 删除指定用户 ID 的对话上下文服务
+        self.create_service(
+            GetString, "delete_user_context", self.handle_delete_user_context
+        )
+
     def init_params(self):
 
         self.config_path_value = (
@@ -584,6 +589,34 @@ class ChatAssistantNode(Node):
 
         except Empty:
             pass
+
+    def handle_delete_user_context(self, request, response):
+        """
+        删除指定用户 ID 的对话上下文服务
+        """
+        user_id_to_delete = request.user_id.strip()
+
+        # if not user_id_to_delete:
+        #     response.success = False
+        #     response.message = "未提供有效的用户 ID"
+        #     logger.error(response.message)
+        #     return response
+
+        logger.info(f"收到删除用户上下文请求，用户 ID: {user_id_to_delete}")
+        delete_result = self.chat_assistant.delete_user_context(user_id_to_delete)
+
+        if delete_result is False:
+            response.success = False
+            response.message = (
+                f"未能找到用户 ID {user_id_to_delete} 的上下文，或删除失败"
+            )
+            logger.error(response.message)
+            return response
+
+        response.success = True
+        response.message = f"用户 ID {user_id_to_delete} 的上下文已成功删除"
+        logger.info(response.message)
+        return response
 
     def get_latest_user_id(self):
         """

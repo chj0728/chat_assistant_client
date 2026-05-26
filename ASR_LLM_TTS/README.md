@@ -388,6 +388,31 @@ response:
 chat_assistant_interfaces.srv.GetString_Response(success=True, message='聊天助手完整交互已完成')
 ```
 
+### 删除用户上下文服务（传入用户ID，删除该用户的上下文记忆）
+
+- 服务名称：`/delete_user_context`
+- 服务类型：`chat_assistant_interfaces/srv/GetString`
+- 请求参数
+  - `string user_id`：用户ID
+  - 返回参数
+    - `bool success`：表示服务调用是否成功
+    - `string message`：删除结果描述 or 错误信息
+- 请求示例
+
+```bash
+ros2 service call /delete_user_context chat_assistant_interfaces/srv/GetString "{input: '',user_id: '1'}"
+```
+
+- 响应示例
+
+```bash
+waiting for service to become available...
+requester: making request: chat_assistant_interfaces.srv.GetString_Request(input='', user_id='1')
+
+response:
+chat_assistant_interfaces.srv.GetString_Response(success=True, message='用户 ID 1 的上下文已成功删除')
+```
+
 ## Testing
 
 ```bash

@@ -27,7 +27,7 @@ from app.assistant_support import (
     ResponseData,
 )
 
-vr = VoiceRecognizer(low_thresh=0.60, high_thresh=0.67, max_prints_per_id=1)
+# vr = VoiceRecognizer(low_thresh=0.60, high_thresh=0.67, max_prints_per_id=1)
 TAIL_SILENCE_MS = int(get_vad_no_speech_threshold() * 1000)
 logger.info(f"配置的 VAD 无语音阈值: {TAIL_SILENCE_MS} ms")
 
@@ -63,6 +63,10 @@ class ChatAssistant:
         self.input_stream = None
         self.recorder_thread = None
         self.recording_active = False
+
+        self.voice_recognizer = VoiceRecognizer(
+            low_thresh=0.60, high_thresh=0.67, max_prints_per_id=1
+        )
 
         self.load_config_and_initialize()
 
@@ -1228,6 +1232,17 @@ class ChatAssistant:
         #     logger.info("未启用唤醒词激活功能")
         #     return True
 
+    def delete_user_context(self, user_id: str):
+        """
+        删除指定用户 ID 的对话上下文
+        """
+        try:
+            self.llm_client.delete_thread(thread_id=user_id)
+            logger.info(f"已删除用户 ID {user_id} 的对话上下文")
+            return True
+        except Exception as e:
+            logger.error(f"删除用户 ID {user_id} 的对话上下文失败: {e}")
+            return False
     ##########################################################
 
     ####################### 核心交互流程 #######################
@@ -1286,7 +1301,7 @@ class ChatAssistant:
             now = time.time()
             self.asr_text, vr_results = await asyncio.gather(
                 self.async_asr_infer(audio_frames=audio_frames),
-                vr.recognize_async(
+                self.voice_recognizer.recognize_async(
                     self.asr_client.normalize_audio_frames(audio_frames),
                     user_id=vision_id,
                     tail_silence_ms=TAIL_SILENCE_MS,
