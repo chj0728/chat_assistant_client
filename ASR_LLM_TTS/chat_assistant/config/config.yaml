@@ -19,7 +19,7 @@ llm:
   port: 8000 # 局域网内 LLM 服务器端口
   enable_cloud: false # 是否启用云端 LLM 服务，启用后会使用云端 API 进行推理，确保.env 中的 EAS_TOKEN 和 EAS_ENDPOINT 已正确配置
   timeout_sec: 5
-  temperature: 0.3 # 生成文本的随机程度，范围0-1，值越大越随机
+  temperature: 0.6 # 生成文本的随机程度，范围0-1，值越大越随机
   # （max_tokens + max_completion_tokens(限制模型回复tokens) +RAG 检索结果 tokens) 需要在模型的上下文窗口限制内，例如 2048 或 4096，具体取决于所使用的 LLM 模型
   max_tokens: 150 # 历史消息的最大 token 数量，配合 max_messages 控制上下文长度，根据实际情况调整
   max_messages: 15 # 历史消息的最大条数，配合 max_tokens 控制上下文长度，根据实际情况调整
@@ -39,15 +39,15 @@ llm:
     - WAIT_FOR_TALK：等待对话（默认状态，用于普通对话或不确定的情况）
     - INTERRUPT：中断对话（例如：“好了好了”、“我打断你一下”、“先停一下”）
     示例：{
-          "instruction": "能带我参观一下吗？",
+          "instruction": "能带我参观一下智己汽车店吗？",
           "input": "",
           "output": "<INTENT>NEEDS_GUIDANCE</INTENT>好的，请跟我这边走",
           "system": ""
          },
          {
-          "instruction": "给我介绍一下",
+          "instruction": "你能给我介绍一下智己ls6么？",
           "input": "",
-          "output": "<INTENT>WAIT_FOR_TALK</INTENT>好的，您想了解哪辆车呢？",
+          "output": "<INTENT>WAIT_FOR_TALK</INTENT>好的，我来为你介绍一下智己ls6",
           "system": ""
          },
          {

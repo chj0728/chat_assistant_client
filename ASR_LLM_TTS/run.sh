@@ -17,6 +17,8 @@ fi
 ENABLE_SCRIPT=true
 SHELL_DIR=$(dirname "$(readlink -f "$0")")
 WORK_DIR=$(cd "$SHELL_DIR/chat_assistant" && pwd)
+LOGS_DIR="$WORK_DIR/logs"
+LOG_RETENTION_COUNT=40
 RESTART_DELAY=1
 # =================================================
 
@@ -98,6 +100,30 @@ cleanup_legacy_nodes() {
     done
 }
 
+cleanup_old_logs() {
+    if [[ ! -d "$LOGS_DIR" ]]; then
+        echo "[INFO] Log directory not found, skip cleanup: $LOGS_DIR"
+        return
+    fi
+
+    local log_entries=()
+    mapfile -d '' log_entries < <(find "$LOGS_DIR" -maxdepth 1 -mindepth 1 \( -type f -o -type d \) -name 'asr_llm_tts.*' -printf '%T@\t%p\0' | sort -z -nr)
+
+    local total_logs=${#log_entries[@]}
+    if (( total_logs <= LOG_RETENTION_COUNT )); then
+        echo "[INFO] Log cleanup skipped, found $total_logs archived logs"
+        return
+    fi
+
+    echo "[INFO] Cleaning archived logs, keeping latest $LOG_RETENTION_COUNT of $total_logs entries"
+    for ((i=LOG_RETENTION_COUNT; i<total_logs; i++)); do
+        local entry="${log_entries[$i]}"
+        local log_path="${entry#*$'\t'}"
+        echo "[INFO] Removing old log: $(basename "$log_path")"
+        rm -rf "$log_path"
+    done
+}
+
 start_all_nodes() {
     for node_info in "${NODES[@]}"; do
         local name="${node_info%%|*}"
@@ -130,6 +156,9 @@ source ../venv/bin/activate
 
 cd "$WORK_DIR"
 echo "Current path: $(pwd)"
+
+# 清理历史归档日志
+cleanup_old_logs
 
 # 清理记录在日志中的历史遗留进程
 cleanup_legacy_nodes
