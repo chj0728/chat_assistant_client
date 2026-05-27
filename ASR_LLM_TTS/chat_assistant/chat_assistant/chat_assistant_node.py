@@ -135,7 +135,8 @@ class ChatAssistantNode(Node):
         self.user_id_stale_timeout_sec = 1.0
 
         self.current_user_face_status = False
-        self.last_user_face_msg_time = None
+        self.last_user_face_msg_time = time.time()
+        self.last_user_face_true_time = time.time()
         self.user_face_stale_timeout_sec = 1.0
 
         self.declare_parameter("config_path_value", "config/config.yaml")
@@ -639,18 +640,17 @@ class ChatAssistantNode(Node):
         """
         获取最新用户人脸状态；当订阅数据超时未更新时，返回 False（表示未检测到人脸）
         """
-        if self.last_user_face_msg_time is None:
-            return False
-
         if (
-            time.time() - self.last_user_face_msg_time
-        ) > self.user_face_stale_timeout_sec:
-            if self.current_user_face_status is not False:
-                logger.debug("用户人脸信息订阅数据超时，回退为 False")
-            self.current_user_face_status = False
-            self.last_user_face_msg_time = None
+            (time.time() - self.last_user_face_msg_time)
+            > self.user_face_stale_timeout_sec
+            and self.current_user_face_status is True
+        ):
+            logger.debug("用户人脸信息订阅数据超时，回退为 False")
+
             self.chat_assistant.set_current_user_face_status(False)
-            return False
+            self.current_user_face_status = False
+
+            return self.current_user_face_status
 
         return self.current_user_face_status
 
@@ -668,9 +668,21 @@ class ChatAssistantNode(Node):
         处理订阅到的用户人脸信息消息，更新当前用户人脸状态，并记录消息接收时间以便后续判断数据是否过期
         """
         self.last_user_face_msg_time = time.time()
-        self.current_user_face_status = msg.data
-        logger.debug(f"收到用户人脸信息消息: {self.current_user_face_status}")
-        self.chat_assistant.set_current_user_face_status(self.current_user_face_status)
+        logger.debug(f"收到用户人脸信息消息: {msg.data}")
+
+        if msg.data:
+            self.last_user_face_true_time = time.time()
+
+            self.chat_assistant.set_current_user_face_status(True)
+            self.current_user_face_status = True
+        else:
+
+            if (
+                time.time() - self.last_user_face_true_time
+                > self.user_face_stale_timeout_sec
+            ):
+                self.chat_assistant.set_current_user_face_status(False)
+                self.current_user_face_status = False
 
 
 def main(args=None):

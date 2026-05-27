@@ -1243,6 +1243,7 @@ class ChatAssistant:
         except Exception as e:
             logger.error(f"删除用户 ID {user_id} 的对话上下文失败: {e}")
             return False
+
     ##########################################################
 
     ####################### 核心交互流程 #######################
