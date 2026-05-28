@@ -4,6 +4,7 @@ import time
 from enum import Enum
 from pathlib import Path
 from queue import Empty, Full, Queue
+from typing import Any
 
 import rclpy
 from app import ChatAssistant
@@ -139,78 +140,23 @@ class ChatAssistantNode(Node):
         self.last_user_face_true_time = time.time()
         self.user_face_stale_timeout_sec = 1.0
 
+        self.asr_publisher: Any = None
+        self.llm_publisher: Any = None
+        self.response_publisher: Any = None
+        self.tts_status_publisher: Any = None
+        self.resolved_user_name_publisher: Any = None
+
         self.declare_parameter("config_path_value", "config/config.yaml")
+
+        self._publisher_handles = []
+        self._subscription_handles = []
 
         self.init_params()
 
         self.audio_cb_group = ReentrantCallbackGroup()
         self.interrupt_cb_group = ReentrantCallbackGroup()
 
-        # 创建服务
-        ## 重新加载配置文件参数
-        self.create_service(Trigger, "reload_config", self.handle_reload_config)
-
-        ## 激活聊天助手服务
-        self.create_service(
-            Trigger, "activate_assistant", self.handle_activate_assistant
-        )
-        ## 将聊天助手置于空闲状态服务
-        self.create_service(Trigger, "idle_assistant", self.handle_idle_assistant)
-
-        ## 激活ASR服务
-        self.create_service(Trigger, "activate_asr", self.handle_activate_asr)
-        ## 将ASR置于空闲状态服务
-        self.create_service(Trigger, "idle_asr", self.handle_idle_asr)
-
-        ## 激活LLM
-        self.create_service(Trigger, "activate_llm", self.handle_activate_llm)
-        ## 置于空闲状态，停用LLM
-        self.create_service(Trigger, "idle_llm", self.handle_idle_llm)
-
-        ## 激活TTS
-        self.create_service(Trigger, "activate_tts", self.handle_activate_tts)
-        ## 置于空闲状态，停用TTS
-        self.create_service(Trigger, "idle_tts", self.handle_idle_tts)
-
-        ## 接收audio_path，只调用 ASR 完成语音识别，返回文本结果服务
-        self.create_service(GetString, "asr_infer", self.handle_asr_infer)
-
-        ## 接收文本输入，只调用 LLM 完成文本生成，返回文本结果服务
-        self.create_service(GetString, "llm_infer", self.handle_llm_infer)
-
-        ## 接收文本输入，只调用 TTS 完成文本转语音，并在线播放音频服务
-        self.create_service(RequestTTS, "tts_infer", self.handle_tts_infer)
-
-        ## 接收文本输入，调用 ASR、LLM、TTS 完成一次完整的交互服务
-        self.create_service(
-            GetString, "chat_assistant_infer", self.handle_chat_assistant_infer
-        )
-
-        ## 接收audio_path，直接播放音频服务
-        self.create_service(
-            GetString,
-            "play_audio_file",
-            self.handle_play_audio,
-            callback_group=self.audio_cb_group,
-        )
-
-        ## 打断当前播放音频服务
-        self.create_service(
-            Trigger,
-            "interrupt_audio",
-            self.handle_interrupt_audio,
-            callback_group=self.interrupt_cb_group,
-        )
-
-        ## 接收文本输入和音频保存路径，调用 TTS 完成文本转语音，保存音频文件服务
-        self.create_service(
-            GenerateWav, "tts_generate_wav", self.handle_tts_generate_wav
-        )
-
-        ## 删除指定用户 ID 的对话上下文服务
-        self.create_service(
-            GetString, "delete_user_context", self.handle_delete_user_context
-        )
+        self._create_services()
 
     def init_params(self):
 
@@ -237,6 +183,8 @@ class ChatAssistantNode(Node):
         加载配置文件参数
         初始化 ROS 相关参数和话题发布者
         """
+        self._destroy_topic_interfaces()
+
         self.configs = load_config(self.config_path) if self.config_path else {}
 
         ros_cfg = self.configs.get("ros_cfg", {})
@@ -271,39 +219,80 @@ class ChatAssistantNode(Node):
             ros_cfg.get("user_face_stale_timeout_sec", 1.0)
         )
 
-        # 创建话题发布者
-        ## 发布asr识别结果话题
-        self.asr_publisher = self.create_publisher(String, self.asr_publish_topic, 10)
+        self._create_topic_interfaces()
 
-        ## 发布 llm 生成结果话题
-        self.llm_publisher = self.create_publisher(
-            LLMResponse, self.llm_publish_topic, 10
-        )
+    def _create_services(self):
+        service_specs = [
+            (Trigger, "reload_config", self.handle_reload_config, {}),
+            (Trigger, "activate_assistant", self.handle_activate_assistant, {}),
+            (Trigger, "idle_assistant", self.handle_idle_assistant, {}),
+            (Trigger, "activate_asr", self.handle_activate_asr, {}),
+            (Trigger, "idle_asr", self.handle_idle_asr, {}),
+            (Trigger, "activate_llm", self.handle_activate_llm, {}),
+            (Trigger, "idle_llm", self.handle_idle_llm, {}),
+            (Trigger, "activate_tts", self.handle_activate_tts, {}),
+            (Trigger, "idle_tts", self.handle_idle_tts, {}),
+            (GetString, "asr_infer", self.handle_asr_infer, {}),
+            (GetString, "llm_infer", self.handle_llm_infer, {}),
+            (RequestTTS, "tts_infer", self.handle_tts_infer, {}),
+            (GetString, "chat_assistant_infer", self.handle_chat_assistant_infer, {}),
+            (
+                GetString,
+                "play_audio_file",
+                self.handle_play_audio,
+                {"callback_group": self.audio_cb_group},
+            ),
+            (
+                Trigger,
+                "interrupt_audio",
+                self.handle_interrupt_audio,
+                {"callback_group": self.interrupt_cb_group},
+            ),
+            (GenerateWav, "tts_generate_wav", self.handle_tts_generate_wav, {}),
+            (GetString, "delete_user_context", self.handle_delete_user_context, {}),
+        ]
 
-        ## 发布综合响应结果话题
-        self.response_publisher = self.create_publisher(
-            Response, self.response_publish_topic, 10
-        )
+        for service_type, service_name, callback, kwargs in service_specs:
+            self.create_service(service_type, service_name, callback, **kwargs)
 
-        ## 发布 TTS 播放状态话题
-        self.tts_status_publisher = self.create_publisher(
-            Bool, self.tts_active_topic, 1
-        )
+    def _create_topic_interfaces(self):
+        publisher_specs = [
+            ("asr_publisher", String, self.asr_publish_topic, 10),
+            ("llm_publisher", LLMResponse, self.llm_publish_topic, 10),
+            ("response_publisher", Response, self.response_publish_topic, 10),
+            ("tts_status_publisher", Bool, self.tts_active_topic, 1),
+            (
+                "resolved_user_name_publisher",
+                String,
+                self.resolved_user_name_topic,
+                10,
+            ),
+        ]
 
-        ## 发布解析后的用户名称话题
-        self.resolved_user_name_publisher = self.create_publisher(
-            String, self.resolved_user_name_topic, 10
-        )
+        subscription_specs = [
+            (String, self.user_id_subscribe_topic, self.handle_user_id, 1),
+            (Bool, self.user_face_subscribe_topic, self.handle_user_face, 1),
+        ]
 
-        ## 订阅用户ID话题
-        self.create_subscription(
-            String, self.user_id_subscribe_topic, self.handle_user_id, 1
-        )
+        for attribute_name, message_type, topic_name, qos_depth in publisher_specs:
+            publisher = self.create_publisher(message_type, topic_name, qos_depth)
+            setattr(self, attribute_name, publisher)
+            self._publisher_handles.append(publisher)
 
-        ## 订阅用户人脸信息话题
-        self.create_subscription(
-            Bool, self.user_face_subscribe_topic, self.handle_user_face, 1
-        )
+        for message_type, topic_name, callback, qos_depth in subscription_specs:
+            subscription = self.create_subscription(
+                message_type, topic_name, callback, qos_depth
+            )
+            self._subscription_handles.append(subscription)
+
+    def _destroy_topic_interfaces(self):
+        for subscription in self._subscription_handles:
+            self.destroy_subscription(subscription)
+        self._subscription_handles.clear()
+
+        for publisher in self._publisher_handles:
+            self.destroy_publisher(publisher)
+        self._publisher_handles.clear()
 
     def handle_chat_assistant_infer(self, request, response):
         """
