@@ -1133,14 +1133,14 @@ async def _main():
         #     print(chunk, end=" ", flush=True)
         # print()  # 换行
 
-        # checkpoints = await llm_agent.aget_checkpoint_tuple(thread_id=vision_id)
-        # for checkpoint in checkpoints or []:
-        #     print(checkpoint)
+        checkpoints = await llm_agent.aget_checkpoint_tuple(thread_id=vision_id)
+        for checkpoint in checkpoints or []:
+            print(checkpoint)
 
-        # for message in (
-        #     checkpoints[1].get("channel_values").get("messages") if checkpoints else []
-        # ):
-        #     print(f"{message.type}: {message.content}")
+        for message in (
+            checkpoints[1].get("channel_values").get("messages") if checkpoints else []
+        ):
+            print(f"{message.type}--->: {message.content}")
 
         # config
         # checkpoints[0] if checkpoints else None
