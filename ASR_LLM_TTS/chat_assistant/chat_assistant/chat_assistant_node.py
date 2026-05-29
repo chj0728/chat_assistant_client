@@ -1,16 +1,11 @@
-import asyncio
 import os
 import time
-from enum import Enum
 from pathlib import Path
-from queue import Empty, Full, Queue
 from typing import Any
 
 import rclpy
 from app import ChatAssistant
-from chat_assistant_interfaces.msg import LLMResponse, Response
-from chat_assistant_interfaces.srv import GenerateWav, GetString, RequestTTS
-from config import clear_config_cache, load_config
+from config import load_config
 from langchain.agents.middleware import (
     AgentMiddleware,
     ModelRequest,
@@ -21,29 +16,16 @@ from logger import logger
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import ExternalShutdownException, MultiThreadedExecutor
 from rclpy.node import Node
-from std_msgs.msg import Bool, String
-from std_srvs.srv import Trigger
 
-
-class ToolEvent(Enum):
-    WAVE_HANDS = 0  # 代表挥手回应事件
-    END_CONVERSATION = 1  # 代表结束对话事件
-
-
-MAX_QUEUE_SIZE = 10
-tool_event_queue = Queue(maxsize=MAX_QUEUE_SIZE)
-
-
-def push_queue(data_queue: Queue, value) -> None:
-    """将最新文本加入有限队列，保持队列容量受控。"""
-    try:
-        data_queue.put_nowait(value)
-    except Full:
-        try:
-            data_queue.get_nowait()
-        except Empty:
-            pass
-        data_queue.put_nowait(value)
+from chat_assistant.node_handlers import (
+    ChatAssistantLoopMixin,
+    ChatAssistantServiceHandlersMixin,
+    ChatAssistantStateHandlersMixin,
+    ToolEvent,
+    push_queue,
+    tool_event_queue,
+)
+from chat_assistant.node_interfaces import NodeRosConfig, RosInterfaceRegistryMixin
 
 
 @tool(description="当有人问候的时候，挥手回应")
@@ -127,7 +109,13 @@ dynamic_middlewares = [
 ]
 
 
-class ChatAssistantNode(Node):
+class ChatAssistantNode(
+    ChatAssistantServiceHandlersMixin,
+    ChatAssistantStateHandlersMixin,
+    ChatAssistantLoopMixin,
+    RosInterfaceRegistryMixin,
+    Node,
+):
     def __init__(self):
         super().__init__("chat_assistant_node")
 
@@ -148,6 +136,7 @@ class ChatAssistantNode(Node):
 
         self.declare_parameter("config_path_value", "config/config.yaml")
 
+        self.ros_interface_config = NodeRosConfig()
         self._publisher_handles = []
         self._subscription_handles = []
 
@@ -187,491 +176,17 @@ class ChatAssistantNode(Node):
 
         self.configs = load_config(self.config_path) if self.config_path else {}
 
-        ros_cfg = self.configs.get("ros_cfg", {})
-
-        self.asr_publish_topic = ros_cfg.get("asr_publish_topic", "asr_result")
-        self.llm_publish_topic = ros_cfg.get("llm_publish_topic", "llm_result")
-        self.response_publish_topic = ros_cfg.get(
-            "response_publish_topic", "assistant_response"
+        self.ros_interface_config = NodeRosConfig.from_mapping(
+            self.configs.get("ros_cfg", {})
         )
-
-        self.tts_active_topic = ros_cfg.get(
-            "tts_active_topic", "sound_detected_default"
+        self.user_id_stale_timeout_sec = (
+            self.ros_interface_config.user_id_stale_timeout_sec
         )
-
-        self.resolved_user_name_topic = ros_cfg.get(
-            "resolved_user_name_topic", "resolved_user_name"
-        )
-
-        # 订阅用户ID话题相关参数
-        self.user_id_subscribe_topic = ros_cfg.get(
-            "user_id_subscribe_topic", "user_id_topic"
-        )
-        self.user_id_stale_timeout_sec = float(
-            ros_cfg.get("user_id_stale_timeout_sec", 1.0)
-        )
-
-        # 新增用户人脸信息订阅相关参数
-        self.user_face_subscribe_topic = ros_cfg.get(
-            "user_face_subscribe_topic", "is_faced"
-        )
-        self.user_face_stale_timeout_sec = float(
-            ros_cfg.get("user_face_stale_timeout_sec", 1.0)
+        self.user_face_stale_timeout_sec = (
+            self.ros_interface_config.user_face_stale_timeout_sec
         )
 
         self._create_topic_interfaces()
-
-    def _create_services(self):
-        service_specs = [
-            (Trigger, "reload_config", self.handle_reload_config, {}),
-            (Trigger, "activate_assistant", self.handle_activate_assistant, {}),
-            (Trigger, "idle_assistant", self.handle_idle_assistant, {}),
-            (Trigger, "activate_asr", self.handle_activate_asr, {}),
-            (Trigger, "idle_asr", self.handle_idle_asr, {}),
-            (Trigger, "activate_llm", self.handle_activate_llm, {}),
-            (Trigger, "idle_llm", self.handle_idle_llm, {}),
-            (Trigger, "activate_tts", self.handle_activate_tts, {}),
-            (Trigger, "idle_tts", self.handle_idle_tts, {}),
-            (GetString, "asr_infer", self.handle_asr_infer, {}),
-            (GetString, "llm_infer", self.handle_llm_infer, {}),
-            (RequestTTS, "tts_infer", self.handle_tts_infer, {}),
-            (GetString, "chat_assistant_infer", self.handle_chat_assistant_infer, {}),
-            (
-                GetString,
-                "play_audio_file",
-                self.handle_play_audio,
-                {"callback_group": self.audio_cb_group},
-            ),
-            (
-                Trigger,
-                "interrupt_audio",
-                self.handle_interrupt_audio,
-                {"callback_group": self.interrupt_cb_group},
-            ),
-            (GenerateWav, "tts_generate_wav", self.handle_tts_generate_wav, {}),
-            (GetString, "delete_user_context", self.handle_delete_user_context, {}),
-        ]
-
-        for service_type, service_name, callback, kwargs in service_specs:
-            self.create_service(service_type, service_name, callback, **kwargs)
-
-    def _create_topic_interfaces(self):
-        publisher_specs = [
-            ("asr_publisher", String, self.asr_publish_topic, 10),
-            ("llm_publisher", LLMResponse, self.llm_publish_topic, 10),
-            ("response_publisher", Response, self.response_publish_topic, 10),
-            ("tts_status_publisher", Bool, self.tts_active_topic, 1),
-            (
-                "resolved_user_name_publisher",
-                String,
-                self.resolved_user_name_topic,
-                10,
-            ),
-        ]
-
-        subscription_specs = [
-            (String, self.user_id_subscribe_topic, self.handle_user_id, 1),
-            (Bool, self.user_face_subscribe_topic, self.handle_user_face, 1),
-        ]
-
-        for attribute_name, message_type, topic_name, qos_depth in publisher_specs:
-            publisher = self.create_publisher(message_type, topic_name, qos_depth)
-            setattr(self, attribute_name, publisher)
-            self._publisher_handles.append(publisher)
-
-        for message_type, topic_name, callback, qos_depth in subscription_specs:
-            subscription = self.create_subscription(
-                message_type, topic_name, callback, qos_depth
-            )
-            self._subscription_handles.append(subscription)
-
-    def _destroy_topic_interfaces(self):
-        for subscription in self._subscription_handles:
-            self.destroy_subscription(subscription)
-        self._subscription_handles.clear()
-
-        for publisher in self._publisher_handles:
-            self.destroy_publisher(publisher)
-        self._publisher_handles.clear()
-
-    def handle_chat_assistant_infer(self, request, response):
-        """
-        接收文本输入，调用 ASR、LLM、TTS 完成一次完整的交互服务
-        """
-        input_text = request.input
-        request_user_id = request.user_id if hasattr(request, "user_id") else None
-        request_user_id = request_user_id.strip() if request_user_id else None
-        user_id = request_user_id if request_user_id else self.get_latest_user_id()
-
-        logger.info(
-            f"收到聊天助手完整交互请求，输入文本: {input_text}，user_id: {user_id}"
-        )
-        asyncio.run(
-            self.chat_assistant.Inference(input_text=input_text, user_id=user_id)
-        )
-
-        response.success = True
-        response.message = "聊天助手完整交互已完成"
-        logger.info("聊天助手完整交互已完成")
-        return response
-
-    def handle_interrupt_audio(self, request, response):
-        """
-        打断当前播放音频服务
-        """
-        logger.info("收到打断当前播放音频请求")
-        self.chat_assistant.interrupt()
-        response.success = True
-        response.message = "已打断当前播放音频"
-        return response
-
-    def handle_play_audio(self, request, response):
-        """
-        接收audio_path，直接播放音频服务
-        """
-        audio_path = request.input
-
-        # 检查 audio_path 是否有效存在
-        if os.path.exists(audio_path) is False:
-            response.success = False
-            response.message = f"音频路径无效: {audio_path}"
-            logger.error(response.message)
-            return response
-
-        logger.info(f"收到播放音频请求，音频路径: {audio_path}")
-        play_result = self.chat_assistant.play_audio(audio_path)
-
-        # 检查播放结果是否有效
-        if play_result is False:
-            response.success = False
-            response.message = "音频未能成功播放"
-            logger.error(response.message)
-            return response
-
-        response.success = True
-        response.message = "音频播放成功"
-        logger.info("音频播放成功")
-        return response
-
-    def handle_tts_generate_wav(self, request, response):
-        """
-        接收文本输入和音频保存路径，调用 TTS 完成文本转语音，保存音频文件服务
-        """
-        input_text = request.input_text
-        output_path = request.input_filename
-        # 创建保存目录（如果不存在）
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-        logger.info(
-            f"收到 TTS 生成 WAV 文件请求\n输入文本:[{input_text}]\n保存路径: {output_path}"
-        )
-        tts_result = self.chat_assistant.generate_wav(input_text, output_path)
-
-        # 检查 TTS 结果是否有效
-        if tts_result is False:
-            response.success = False
-            response.message = "TTS 未能成功生成 WAV 文件"
-            logger.error(response.message)
-            return response
-
-        response.success = True
-        response.message = f"WAV 文件已保存到 {output_path}"
-        logger.info("请求 TTS 生成 WAV 文件成功")
-        return response
-
-    def handle_reload_config(self, request, response):
-        """
-        重新加载配置文件参数服务
-        """
-        logger.info("收到重新加载配置文件请求")
-
-        clear_config_cache()
-
-        # 重新加载ros参数
-        self.load_config_and_initialize()
-
-        # 重新初始化聊天助手
-        self.chat_assistant.reset(restart_recording=True)
-
-        response.success = True
-        response.message = "配置文件已重新加载"
-        return response
-
-    def handle_tts_infer(self, request, response):
-        """
-        接收文本输入，只调用 TTS 完成文本转语音，并播放音频服务
-        """
-        # input_text = request.input
-
-        request_index = (
-            request.request_index if hasattr(request, "request_index") else 0
-        )
-        request_text = request.request_text if hasattr(request, "request_text") else ""
-
-        logger.info(f"TTS 收到请求，输入文本[{request_index}]: [{request_text}]")
-        tts_result = self.chat_assistant.tts_stream_infer(
-            llm_response_chunk=request_text, index=request_index
-        )
-
-        # 检查 TTS 结果是否有效
-        if tts_result is False:
-            response.success = False
-            response.message = "TTS 播放超时 或者 TTS 播放音频太短"
-            return response
-
-        response.success = True
-        response.message = "TTS 请求成功"
-        logger.info("TTS 请求成功")
-        return response
-
-    def handle_llm_infer(self, request, response):
-        """
-        接收文本输入（可选用户ID），只调用 LLM 完成文本生成，返回文本结果服务
-        """
-        input_text = request.input
-        request_user_id = request.user_id if hasattr(request, "user_id") else None
-        request_user_id = request_user_id.strip() if request_user_id else None
-        user_id = request_user_id if request_user_id else self.get_latest_user_id()
-
-        logger.info(f"LLM 收到请求，输入文本: [{input_text}], user_id: [{user_id}]")
-        llm_result = asyncio.run(
-            self.chat_assistant.async_llm_infer(input_text, vision_id=user_id)
-        )
-
-        # 检查 LLM 结果是否有效
-        if llm_result is None:
-            response.success = False
-            response.message = "LLM 未能生成有效文本"
-            logger.error(response.message)
-            return response
-
-        response.success = True
-        response.message = llm_result
-        logger.info("LLM 请求成功")
-        return response
-
-    def handle_asr_infer(self, request, response):
-        """
-        接收audio_path，只调用 ASR 完成语音识别，返回文本结果服务
-        """
-        audio_path = request.input
-
-        # 检查 audio_path 是否有效存在
-        if os.path.exists(audio_path) is False:
-            response.success = False
-            response.message = f"音频路径无效: {audio_path}"
-            logger.error(response.message)
-            return response
-
-        logger.info(f"ASR 收到请求，音频路径: {audio_path}")
-        asr_result = self.chat_assistant.asr_infer(audio_path)
-
-        # 检查 ASR 结果是否有效
-        if asr_result is None:
-            response.success = False
-            response.message = "ASR 未能识别出有效文本"
-            logger.error(response.message)
-            return response
-
-        response.success = True
-        response.message = asr_result
-        logger.info("ASR 请求成功")
-        return response
-
-    def handle_activate_assistant(self, request, response):
-        """
-        激活LLM 和TTS服务
-        """
-        logger.info("激活LLM 和TTS服务")
-        self.chat_assistant.activate_llm_agent()
-        self.chat_assistant.activate_tts_client()
-        response.success = True
-        response.message = "LLM 和 TTS 已激活"
-        return response
-
-    def handle_idle_assistant(self, request, response):
-        """
-        将LLM 和TTS置于空闲状态服务
-        """
-        logger.info("将LLM 和TTS置于空闲状态")
-        self.chat_assistant.deactivate_llm_agent()
-        self.chat_assistant.deactivate_tts_client()
-        response.success = True
-        response.message = "LLM 和 TTS 已置于空闲状态"
-        return response
-
-    def handle_activate_asr(self, request, response):
-        """
-        激活ASR服务
-        """
-        logger.info("激活ASR")
-        self.chat_assistant.activate_asr_client()
-        response.success = True
-        response.message = "ASR已激活"
-        return response
-
-    def handle_idle_asr(self, request, response):
-        """
-        将ASR置于空闲状态服务
-        """
-        logger.info("将ASR置于空闲状态")
-        self.chat_assistant.deactivate_asr_client()
-        response.success = True
-        response.message = "ASR已置于空闲状态"
-        return response
-
-    def handle_activate_llm(self, request, response):
-        """
-        激活LLM服务
-        """
-        logger.info("激活LLM")
-        self.chat_assistant.activate_llm_agent()
-        response.success = True
-        response.message = "LLM已激活"
-        return response
-
-    def handle_idle_llm(self, request, response):
-        """
-        将LLM置于空闲状态服务
-        """
-        logger.info("将LLM置于空闲状态")
-        self.chat_assistant.deactivate_llm_agent()
-        response.success = True
-        response.message = "LLM已置于空闲状态"
-        return response
-
-    def handle_activate_tts(self, request, response):
-        """
-        激活TTS服务
-        """
-        logger.info("激活TTS")
-        self.chat_assistant.activate_tts_client()
-        response.success = True
-        response.message = "TTS已激活"
-        return response
-
-    def handle_idle_tts(self, request, response):
-        """
-        将TTS置于空闲状态服务
-        """
-        logger.info("将TTS置于空闲状态")
-        self.chat_assistant.deactivate_tts_client()
-        response.success = True
-        response.message = "TTS已置于空闲状态"
-        return response
-
-    def handle_tool_events(self):
-        """
-        处理工具事件队列中的事件
-        """
-        global tool_event_queue
-        try:
-            tool_event = tool_event_queue.get_nowait()
-
-            if tool_event == ToolEvent.WAVE_HANDS.value:
-                logger.info("Main loop handling tool event: WAVE_HANDS")
-                # 在这里添加挥手回应的具体实现代码
-
-            elif tool_event == ToolEvent.END_CONVERSATION.value:
-                logger.info("Main loop handling tool event: END_CONVERSATION")
-                # 在这里添加结束对话的具体实现代码
-                # self.chat_assistant.deactivate_llm_agent()
-
-        except Empty:
-            pass
-
-    def handle_delete_user_context(self, request, response):
-        """
-        删除指定用户 ID 的对话上下文服务
-        """
-        user_id_to_delete = request.user_id.strip()
-
-        # if not user_id_to_delete:
-        #     response.success = False
-        #     response.message = "未提供有效的用户 ID"
-        #     logger.error(response.message)
-        #     return response
-
-        logger.info(f"收到删除用户上下文请求，用户 ID: {user_id_to_delete}")
-        delete_result = self.chat_assistant.delete_user_context(user_id_to_delete)
-
-        if delete_result is False:
-            response.success = False
-            response.message = (
-                f"未能找到用户 ID {user_id_to_delete} 的上下文，或删除失败"
-            )
-            logger.error(response.message)
-            return response
-
-        response.success = True
-        response.message = f"用户 ID {user_id_to_delete} 的上下文已成功删除"
-        logger.info(response.message)
-        return response
-
-    def get_latest_user_id(self):
-        """
-        获取最新用户ID；当订阅数据超时未更新时，返回 None
-        """
-        if self.last_user_id_msg_time is None:
-            return None
-
-        if (time.time() - self.last_user_id_msg_time) > self.user_id_stale_timeout_sec:
-            if self.current_user_id is not None:
-                logger.debug("用户ID订阅数据超时，回退为 None")
-            self.current_user_id = None
-            self.last_user_id_msg_time = None
-            self.chat_assistant.set_current_user_id(None)
-            return None
-
-        return self.current_user_id
-
-    def get_latest_user_face_status(self):
-        """
-        获取最新用户人脸状态；当订阅数据超时未更新时，返回 False（表示未检测到人脸）
-        """
-        if (
-            (time.time() - self.last_user_face_msg_time)
-            > self.user_face_stale_timeout_sec
-            and self.current_user_face_status is True
-        ):
-            logger.debug("用户人脸信息订阅数据超时，回退为 False")
-
-            self.chat_assistant.set_current_user_face_status(False)
-            self.current_user_face_status = False
-
-            return self.current_user_face_status
-
-        return self.current_user_face_status
-
-    def handle_user_id(self, msg):
-        """
-        处理订阅到的用户 vision_id 消息，更新当前用户 ID，并记录消息接收时间以便后续判断数据是否过期
-        """
-        self.last_user_id_msg_time = time.time()
-        self.current_user_id = msg.data.strip() if msg.data else None
-        logger.debug(f"收到用户vision_id消息: {self.current_user_id}")
-        self.chat_assistant.set_current_user_id(self.current_user_id)
-
-    def handle_user_face(self, msg):
-        """
-        处理订阅到的用户人脸信息消息，更新当前用户人脸状态，并记录消息接收时间以便后续判断数据是否过期
-        """
-        self.last_user_face_msg_time = time.time()
-        logger.debug(f"收到用户人脸信息消息: {msg.data}")
-
-        if msg.data:
-            self.last_user_face_true_time = time.time()
-
-            self.chat_assistant.set_current_user_face_status(True)
-            self.current_user_face_status = True
-        else:
-
-            if (
-                time.time() - self.last_user_face_true_time
-                > self.user_face_stale_timeout_sec
-            ):
-                self.chat_assistant.set_current_user_face_status(False)
-                self.current_user_face_status = False
 
 
 def main(args=None):
@@ -684,84 +199,7 @@ def main(args=None):
 
     try:
         while rclpy.ok():
-
-            # 定期检查订阅用户ID是否超时，超时后回退为 None
-            chat_assistant_node.get_latest_user_id()
-            # 定期检查订阅用户人脸信息是否超时，超时后回退为 False
-            chat_assistant_node.get_latest_user_face_status()
-
-            if chat_assistant_node.chat_assistant.asr_text_queue.empty() is False:
-                asr_text = chat_assistant_node.chat_assistant.asr_text_queue.get(
-                    timeout=0.05
-                )
-
-                # 发布 asr_text 到话题
-                msg = String()
-                msg.data = asr_text
-                chat_assistant_node.asr_publisher.publish(msg)
-                # logger.info(f"发布 ASR 识别结果到话题: [{asr_text}]")
-
-            if chat_assistant_node.chat_assistant.llm_text_queue.empty() is False:
-                llm_response = chat_assistant_node.chat_assistant.llm_text_queue.get(
-                    timeout=0.05
-                )
-
-                # 发布 llm_response 到话题
-                # msg = String()
-                # msg.data = llm_response
-                msg = LLMResponse()
-                msg.response_index = llm_response[0].get("index", 0)
-                msg.response_text = llm_response[0].get("text", "")
-                chat_assistant_node.llm_publisher.publish(msg)
-                # logger.info(f"发布 LLM 生成结果到话题: [{llm_response}]")
-
-            if chat_assistant_node.chat_assistant.response_queue.empty() is False:
-                response_data = chat_assistant_node.chat_assistant.response_queue.get(
-                    timeout=0.05
-                )
-
-                # 发布 综合响应结果 到话题
-                response_msg = Response()
-                response_msg.asr_text = response_data.get("asr_text", "")
-                response_msg.llm_text = response_data.get("llm_text", "")
-                chat_assistant_node.response_publisher.publish(response_msg)
-                logger.info(
-                    f"发布 综合响应结果 到话题: ASR Text: [{response_msg.asr_text}], LLM Text: [{response_msg.llm_text}]"
-                )
-
-            if chat_assistant_node.chat_assistant.check_tts_active():
-                # 发布 TTS 播放状态 到话题
-                tts_msg = Bool()
-                tts_msg.data = True
-                chat_assistant_node.tts_status_publisher.publish(tts_msg)
-            else:
-                tts_msg = Bool()
-                tts_msg.data = False
-                chat_assistant_node.tts_status_publisher.publish(tts_msg)
-
-            if (
-                chat_assistant_node.chat_assistant.resolved_user_names_queue.empty()
-                is False
-            ):
-                resolved_user_name = (
-                    chat_assistant_node.chat_assistant.resolved_user_names_queue.get(
-                        timeout=0.05
-                    )
-                )
-                msg = String()
-                msg.data = resolved_user_name
-                chat_assistant_node.resolved_user_name_publisher.publish(msg)
-                logger.info(f"发布解析后的用户名: {resolved_user_name}")
-
-            # global call_flag
-            # if call_flag:
-            #     call_flag = False
-            #     logger.info("Main loop detected middleware call.")
-
-            # handle tool events
-            chat_assistant_node.handle_tool_events()
-
-            # rclpy.spin_once(chat_assistant_node, timeout_sec=0.05)
+            chat_assistant_node.process_runtime_once()
             executor.spin_once(timeout_sec=0.05)
 
     # except KeyboardInterrupt:
