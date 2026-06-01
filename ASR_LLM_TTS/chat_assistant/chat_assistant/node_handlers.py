@@ -75,8 +75,8 @@ class ChatAssistantNodeOwner(Protocol):
     last_user_face_true_time: float
     user_face_stale_timeout_sec: float
 
-    def load_config_and_initialize(self) -> None:
-        """加载配置文件并进行必要的初始化"""
+    def reload_config_and_initialize(self) -> None:
+        """重新加载配置文件并进行必要的初始化"""
         ...
 
     def get_latest_user_id(self) -> Any:
@@ -203,7 +203,7 @@ class ChatAssistantServiceHandlersMixin:
         logger.info("收到重新加载配置文件请求")
 
         clear_config_cache()
-        self.load_config_and_initialize()
+        self.reload_config_and_initialize()
         self.chat_assistant.reset(restart_recording=True)
 
         response.success = True
@@ -398,8 +398,8 @@ class ChatAssistantTopicHandlersMixin:
             self.current_user_face_status = False
 
 
-class ChatAssistantStateLoopMixin:
-    """定义 ChatAssistantNode 的主循环处理函数，定期检查和处理工具事件、用户 ID 和人脸状态的更新，
+class ChatAssistantStateHandlersMixin:
+    """定义 ChatAssistantNode 的状态处理函数，定期检查和处理工具事件、用户 ID 和人脸状态的更新，
     并发布 ASR、LLM、综合响应、TTS 状态和解析后的用户名等信息。"""
 
     def process_runtime_once(self: ChatAssistantNodeOwner) -> None:
@@ -507,3 +507,13 @@ class ChatAssistantStateLoopMixin:
             msg.data = resolved_user_name
             self.resolved_user_name_publisher.publish(msg)
             logger.info(f"发布解析后的用户名: {resolved_user_name}")
+
+
+class ChatAssistantHandlers(
+    ChatAssistantServiceHandlersMixin,
+    ChatAssistantTopicHandlersMixin,
+    ChatAssistantStateHandlersMixin,
+):
+    """将服务处理函数、话题处理函数和状态处理函数组合到一个类中，供 ChatAssistantNode 继承使用。"""
+
+    ...

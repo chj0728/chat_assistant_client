@@ -1,8 +1,12 @@
+import time
 from dataclasses import dataclass
 from typing import Any, Mapping, Optional, Protocol, cast
 
 from chat_assistant_interfaces.msg import LLMResponse, Response
 from chat_assistant_interfaces.srv import GenerateWav, GetString, RequestTTS
+from config import load_config
+from logger import logger
+from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.node import Node
 from std_msgs.msg import Bool, String
 from std_srvs.srv import Trigger
@@ -231,3 +235,69 @@ class RosInterfaceRegistryMixin:
         for publisher in self._publisher_handles:
             node.destroy_publisher(publisher)
         self._publisher_handles.clear()
+
+
+class RosInterfaceRegistry(RosInterfaceRegistryMixin):
+    """ROS接口注册类，继承自RosInterfaceRegistryMixin，提供完整的ROS接口注册功能。"""
+
+    def __init__(self):
+
+        self.asr_publisher: Any = None
+        self.llm_publisher: Any = None
+        self.response_publisher: Any = None
+        self.tts_status_publisher: Any = None
+        self.resolved_user_name_publisher: Any = None
+
+        self.current_user_id = None
+        self.last_user_id_msg_time = None
+        self.user_id_stale_timeout_sec = 1.0
+
+        self.current_user_face_status = False
+        self.last_user_face_msg_time = time.time()
+        self.last_user_face_true_time = time.time()
+        self.user_face_stale_timeout_sec = 1.0
+
+        self.ros_interface_config = NodeRosConfig()
+        self._publisher_handles = []
+        self._subscription_handles = []
+        self.audio_cb_group = ReentrantCallbackGroup()
+        self.interrupt_cb_group = ReentrantCallbackGroup()
+
+        self.init_parameters()
+        self.init_ros_interfaces()
+
+    def init_ros_interfaces(self):
+        """初始化ROS接口，创建服务、发布者和订阅者。"""
+        self._create_services()
+        self._create_topic_interfaces()
+
+    def init_parameters(self):
+        """初始化参数，加载配置文件并设置相关参数。"""
+
+        self.ros_interface_config = NodeRosConfig.from_mapping(
+            load_config().get("ros_cfg", {})
+        )
+
+        self.user_id_stale_timeout_sec = (
+            self.ros_interface_config.user_id_stale_timeout_sec
+        )
+        logger.info(f"用户ID过期时间阈值: {self.user_id_stale_timeout_sec} 秒")
+
+        self.user_face_stale_timeout_sec = (
+            self.ros_interface_config.user_face_stale_timeout_sec
+        )
+        logger.info(f"用户人脸信息过期时间阈值: {self.user_face_stale_timeout_sec} 秒")
+
+    def reset_ros_interfaces(self):
+        """重置ROS接口，销毁现有接口并根据最新配置重新创建。"""
+        self._destroy_topic_interfaces()
+        self.init_parameters()
+        self._create_topic_interfaces()
+
+    def reload_config_and_initialize(self):
+        """
+        重新加载配置文件参数
+        初始化 ROS 相关参数和话题发布者
+        """
+
+        self.reset_ros_interfaces()

@@ -292,12 +292,13 @@ class ChatAssistant:
             fuzzy_similarity_threshold=self.kws_fuzzy_similarity_threshold,
             word_map=self.word_map,
         )
-        self.set_kws_pinyin = self.text_processor.wake_word_pinyin
-        logger.info(f"设置的唤醒词: {self.set_kws}, 拼音: {self.set_kws_pinyin}")
 
+        self.set_kws_pinyin = self.text_processor.wake_word_pinyin
         self.kws_enabled = kws_cfg.get("enable", True)
-        if not self.kws_enabled:
-            logger.info("未启用唤醒词激活功能")
+        if self.kws_enabled:
+            logger.info("唤醒词功能已启用")
+            logger.info(f"设置的唤醒词: {self.set_kws}, 拼音: {self.set_kws_pinyin}")
+
         self.flag_kws = 0
         self.failed_enable_kws_count = 0
         self.failed_kws_counts = kws_cfg.get("failed_kws_counts", 2)
