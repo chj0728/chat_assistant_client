@@ -1,4 +1,3 @@
-import os
 import time
 from pathlib import Path
 from typing import Any
@@ -6,118 +5,35 @@ from typing import Any
 import rclpy
 from app import ChatAssistant
 from config import load_config
-from langchain.agents.middleware import (
-    AgentMiddleware,
-    ModelRequest,
-)
-from langchain.agents.middleware.types import ToolCallRequest
-from langchain.tools import tool
 from logger import logger
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import ExternalShutdownException, MultiThreadedExecutor
 from rclpy.node import Node
 
 from chat_assistant.node_handlers import (
-    ChatAssistantLoopMixin,
     ChatAssistantServiceHandlersMixin,
-    ChatAssistantStateHandlersMixin,
-    ToolEvent,
-    push_queue,
-    tool_event_queue,
+    ChatAssistantStateLoopMixin,
+    ChatAssistantTopicHandlersMixin,
 )
 from chat_assistant.node_interfaces import NodeRosConfig, RosInterfaceRegistryMixin
-
-
-@tool(description="当有人问候的时候，挥手回应")
-def response_wave_hands_tool():
-    # """挥手回应的工具函数"""
-    logger.info("调用工具函数->机器人挥了挥手，表示问候！")
-
-    global tool_event_queue
-    push_queue(tool_event_queue, ToolEvent.WAVE_HANDS.value)
-    return
-
-
-@tool(
-    description="只有当用户回答退出、结束等相关内容时，调用结束对话工具，礼貌地结束对话"
-)
-def end_conversation_tool():
-    # """结束对话的工具函数"""
-    logger.info("调用工具函数->机器人礼貌地结束了对话。")
-    global tool_event_queue
-    push_queue(tool_event_queue, ToolEvent.END_CONVERSATION.value)
-    return
-
-
-@tool(description="调整默认扬声器音量")
-def adjust_speaker_volume_tool(volume: int):
-    # """调整系统默认扬声器音量的工具函数"""
-    logger.info(f"调用工具函数->调整系统默认扬声器音量为 {volume}。")
-
-    if volume > 0 and volume <= 10:
-        volume = int(volume * 10)  # 将0-10的音量转换为0-100的百分比
-    elif volume < 0:
-        volume = 0
-    elif volume > 100:
-        volume = 100
-    # 在这里添加实际的音量调整逻辑
-    # pactl set-sink-volume @DEFAULT_SINK@ {volume}%
-    os.system(f"pactl set-sink-volume @DEFAULT_SINK@ {volume}%")
-
-    return
-
-
-class DynamicToolMiddleware(AgentMiddleware):
-    """
-    动态工具中间件示例，用于在运行时注册和调用工具
-    """
-
-    def wrap_model_call(self, request: ModelRequest, handler):
-        # 添加动态工具请求处理
-        updated = request.override(
-            tools=[
-                *request.tools,
-                response_wave_hands_tool,
-                end_conversation_tool,
-                adjust_speaker_volume_tool,
-            ]
-        )
-        # logger.info("动态工具中间件: 添加挥手回应和结束对话工具")
-        return handler(updated)
-
-    def wrap_tool_call(self, request: ToolCallRequest, handler):
-        # 处理特定工具调用
-        if request.tool_call["name"] == "response_wave_hands_tool":
-            logger.info("动态工具中间件: 检测到挥手回应工具调用")
-            return handler(request.override(tool=response_wave_hands_tool))
-
-        if request.tool_call["name"] == "end_conversation_tool":
-            logger.info("动态工具中间件: 检测到结束对话工具调用")
-            return handler(request.override(tool=end_conversation_tool))
-
-        if request.tool_call["name"] == "adjust_speaker_volume_tool":
-            logger.info("动态工具中间件: 检测到调整扬声器音量工具调用")
-            return handler(request.override(tool=adjust_speaker_volume_tool))
-
-        return handler(request)
-
-
-# call_flag = False
-
-dynamic_middlewares = [
-    # DynamicToolMiddleware(),
-]
+from chat_assistant.node_tools import dynamic_middlewares
 
 
 class ChatAssistantNode(
     ChatAssistantServiceHandlersMixin,
-    ChatAssistantStateHandlersMixin,
-    ChatAssistantLoopMixin,
+    ChatAssistantTopicHandlersMixin,
+    ChatAssistantStateLoopMixin,
     RosInterfaceRegistryMixin,
     Node,
 ):
     def __init__(self):
         super().__init__("chat_assistant_node")
+
+        self.asr_publisher: Any = None
+        self.llm_publisher: Any = None
+        self.response_publisher: Any = None
+        self.tts_status_publisher: Any = None
+        self.resolved_user_name_publisher: Any = None
 
         self.current_user_id = None
         self.last_user_id_msg_time = None
@@ -128,23 +44,14 @@ class ChatAssistantNode(
         self.last_user_face_true_time = time.time()
         self.user_face_stale_timeout_sec = 1.0
 
-        self.asr_publisher: Any = None
-        self.llm_publisher: Any = None
-        self.response_publisher: Any = None
-        self.tts_status_publisher: Any = None
-        self.resolved_user_name_publisher: Any = None
-
-        self.declare_parameter("config_path_value", "config/config.yaml")
-
         self.ros_interface_config = NodeRosConfig()
         self._publisher_handles = []
         self._subscription_handles = []
-
-        self.init_params()
-
         self.audio_cb_group = ReentrantCallbackGroup()
         self.interrupt_cb_group = ReentrantCallbackGroup()
 
+        self.declare_parameter("config_path_value", "config/config.yaml")
+        self.init_params()
         self._create_services()
 
     def init_params(self):
@@ -201,12 +108,6 @@ def main(args=None):
         while rclpy.ok():
             chat_assistant_node.process_runtime_once()
             executor.spin_once(timeout_sec=0.05)
-
-    # except KeyboardInterrupt:
-    #     if rclpy.ok():  # 检查上下文是否仍然有效
-    #         logger.info("KeyboardInterrupt detected, shutting down...")
-    #     else:
-    #         logger.info("rclpy context is no longer valid, shutting down...")
 
     except (KeyboardInterrupt, ExternalShutdownException):
         chat_assistant_node.chat_assistant.stop_recording()

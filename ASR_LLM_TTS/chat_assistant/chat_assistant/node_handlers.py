@@ -37,32 +37,84 @@ def push_queue(data_queue: Queue, value: Any) -> None:
 
 
 class ChatAssistantNodeOwner(Protocol):
+    """定义 ChatAssistantNode 所需的属性和方法协议，便于在多个 mixin 类中引用和实现
+
+    Args:
+      chat_assistant (ChatAssistant): 聊天助手核心对象，提供 ASR、LLM、TTS 等功能接口
+
+      asr_publisher (Publisher): ASR 结果发布器
+      llm_publisher (Publisher): LLM 结果发布器
+      response_publisher (Publisher): 综合响应结果发布器
+      tts_status_publisher (Publisher): TTS 状态发布器
+      resolved_user_name_publisher (Publisher): 解析后的用户名发布器
+
+      current_user_id (Any): 当前用户 ID，基于订阅数据更新
+      last_user_id_msg_time (Any): 上次接收到用户 ID 消息的时间戳，用于判断数据是否过期
+      user_id_stale_timeout_sec (float): 用户 ID 数据过期时间阈值，单位秒
+
+      current_user_face_status (bool): 当前用户人脸状态，基于订阅数据更新
+      last_user_face_msg_time (float): 上次接收到用户人脸信息消息的时间戳，用于判断数据是否过期
+      last_user_face_true_time (float): 上次接收到用户人脸状态为 True 的时间戳，用于判断人脸状态是否过期
+      user_face_stale_timeout_sec (float): 用户人脸状态数据过期时间阈值，单位秒
+    """
+
     chat_assistant: "ChatAssistant"
+
     asr_publisher: Publisher
     llm_publisher: Publisher
     response_publisher: Publisher
     tts_status_publisher: Publisher
     resolved_user_name_publisher: Publisher
+
     current_user_id: Any
     last_user_id_msg_time: Any
     user_id_stale_timeout_sec: float
+
     current_user_face_status: bool
     last_user_face_msg_time: float
     last_user_face_true_time: float
     user_face_stale_timeout_sec: float
 
-    def load_config_and_initialize(self) -> None: ...
-    def get_latest_user_id(self) -> Any: ...
-    def get_latest_user_face_status(self) -> bool: ...
-    def handle_tool_events(self) -> None: ...
-    def _publish_pending_asr_text(self) -> None: ...
-    def _publish_pending_llm_text(self) -> None: ...
-    def _publish_pending_response(self) -> None: ...
-    def _publish_tts_status(self) -> None: ...
-    def _publish_pending_resolved_user_name(self) -> None: ...
+    def load_config_and_initialize(self) -> None:
+        """加载配置文件并进行必要的初始化"""
+        ...
+
+    def get_latest_user_id(self) -> Any:
+        """获取最新用户 ID，考虑数据过期情况"""
+        ...
+
+    def get_latest_user_face_status(self) -> bool:
+        """获取最新用户人脸状态，考虑数据过期情况"""
+        ...
+
+    def handle_tool_events(self) -> None:
+        """处理工具事件队列中的事件"""
+        ...
+
+    def _publish_pending_asr_text(self) -> None:
+        """发布待发布的 ASR 文本"""
+        ...
+
+    def _publish_pending_llm_text(self) -> None:
+        """发布待发布的 LLM 文本"""
+        ...
+
+    def _publish_pending_response(self) -> None:
+        """发布待发布的综合响应结果"""
+        ...
+
+    def _publish_tts_status(self) -> None:
+        """发布 TTS 状态"""
+        ...
+
+    def _publish_pending_resolved_user_name(self) -> None:
+        """发布待发布的解析后的用户名"""
+        ...
 
 
 class ChatAssistantServiceHandlersMixin:
+    """定义 ChatAssistantNode 的服务处理函数，处理来自 ROS 服务的请求并调用聊天助手核心对象的方法完成相应的功能。"""
+
     def handle_chat_assistant_infer(self: ChatAssistantNodeOwner, request, response):
         """
         接收文本输入，调用 ASR、LLM、TTS 完成一次完整的交互服务
@@ -314,7 +366,54 @@ class ChatAssistantServiceHandlersMixin:
         return response
 
 
-class ChatAssistantStateHandlersMixin:
+class ChatAssistantTopicHandlersMixin:
+    """定义 ChatAssistantNode 的话题处理函数，处理来自 ROS 订阅的话题消息并调用聊天助手核心对象的方法完成相应的功能。"""
+
+    def handle_user_id(self: ChatAssistantNodeOwner, msg):
+        """
+        处理订阅到的用户 vision_id 消息，更新当前用户 ID，并记录消息接收时间以便后续判断数据是否过期
+        """
+        self.last_user_id_msg_time = time.time()
+        self.current_user_id = msg.data.strip() if msg.data else None
+        logger.debug(f"收到用户vision_id消息: {self.current_user_id}")
+        self.chat_assistant.set_current_user_id(self.current_user_id)
+
+    def handle_user_face(self: ChatAssistantNodeOwner, msg):
+        """
+        处理订阅到的用户人脸信息消息，更新当前用户人脸状态，并记录消息接收时间以便后续判断数据是否过期
+        """
+        self.last_user_face_msg_time = time.time()
+        logger.debug(f"收到用户人脸信息消息: {msg.data}")
+
+        if msg.data:
+            self.last_user_face_true_time = time.time()
+            self.chat_assistant.set_current_user_face_status(True)
+            self.current_user_face_status = True
+            return
+
+        if (
+            time.time() - self.last_user_face_true_time
+        ) > self.user_face_stale_timeout_sec:
+            self.chat_assistant.set_current_user_face_status(False)
+            self.current_user_face_status = False
+
+
+class ChatAssistantStateLoopMixin:
+    """定义 ChatAssistantNode 的主循环处理函数，定期检查和处理工具事件、用户 ID 和人脸状态的更新，
+    并发布 ASR、LLM、综合响应、TTS 状态和解析后的用户名等信息。"""
+
+    def process_runtime_once(self: ChatAssistantNodeOwner) -> None:
+
+        self.handle_tool_events()
+        self.get_latest_user_id()
+        self.get_latest_user_face_status()
+
+        self._publish_pending_asr_text()
+        self._publish_pending_llm_text()
+        self._publish_pending_response()
+        self._publish_tts_status()
+        self._publish_pending_resolved_user_name()
+
     def handle_tool_events(self: ChatAssistantNodeOwner):
         """
         处理工具事件队列中的事件
@@ -365,46 +464,6 @@ class ChatAssistantStateHandlersMixin:
             return self.current_user_face_status
 
         return self.current_user_face_status
-
-    def handle_user_id(self: ChatAssistantNodeOwner, msg):
-        """
-        处理订阅到的用户 vision_id 消息，更新当前用户 ID，并记录消息接收时间以便后续判断数据是否过期
-        """
-        self.last_user_id_msg_time = time.time()
-        self.current_user_id = msg.data.strip() if msg.data else None
-        logger.debug(f"收到用户vision_id消息: {self.current_user_id}")
-        self.chat_assistant.set_current_user_id(self.current_user_id)
-
-    def handle_user_face(self: ChatAssistantNodeOwner, msg):
-        """
-        处理订阅到的用户人脸信息消息，更新当前用户人脸状态，并记录消息接收时间以便后续判断数据是否过期
-        """
-        self.last_user_face_msg_time = time.time()
-        logger.debug(f"收到用户人脸信息消息: {msg.data}")
-
-        if msg.data:
-            self.last_user_face_true_time = time.time()
-            self.chat_assistant.set_current_user_face_status(True)
-            self.current_user_face_status = True
-            return
-
-        if (
-            time.time() - self.last_user_face_true_time
-        ) > self.user_face_stale_timeout_sec:
-            self.chat_assistant.set_current_user_face_status(False)
-            self.current_user_face_status = False
-
-
-class ChatAssistantLoopMixin:
-    def process_runtime_once(self: ChatAssistantNodeOwner) -> None:
-        self.get_latest_user_id()
-        self.get_latest_user_face_status()
-        self._publish_pending_asr_text()
-        self._publish_pending_llm_text()
-        self._publish_pending_response()
-        self._publish_tts_status()
-        self._publish_pending_resolved_user_name()
-        self.handle_tool_events()
 
     def _publish_pending_asr_text(self: ChatAssistantNodeOwner) -> None:
         if self.chat_assistant.asr_text_queue.empty() is False:
