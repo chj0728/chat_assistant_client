@@ -1,13 +1,15 @@
-import requests
-
 from datetime import datetime
 from zoneinfo import ZoneInfo
+
+import requests
 
 
 def get_shanghai_time():
     """获取当前上海时间"""
     now = datetime.now(ZoneInfo("Asia/Shanghai"))
-    return f"当前上海时间是{now.strftime('%Y-%m-%d %H:%M:%S')}"
+
+    # 回答 几点几分 的格式，去掉秒数，感觉更自然一些
+    return f"当前时间是{now.hour}点{now.minute}分"
 
 
 def get_current_location():
@@ -23,7 +25,7 @@ def get_current_location():
         return f"当前位于{city}"
     else:
 
-        return "上海市嘉定区曹安公路的同济大学国家大学科技园"
+        return "上海市"
 
 
 def get_weather_info():

@@ -891,7 +891,11 @@ class ChatAssistant:
         return await asyncio.to_thread(self.asr_infer, audio_frames=audio_frames)
 
     def llm_infer(
-        self, input_text: str, vision_id: str | None = None, voice_id: str | None = None
+        self,
+        input_text: str,
+        vision_id: str | None = None,
+        voice_id: str | None = None,
+        is_active_ask: bool = False,
     ) -> str:
         """
         接收输入文本（可选携带用户 ID），调用 LLM 完成推理，返回生成的文本响应
@@ -911,7 +915,10 @@ class ChatAssistant:
         time_now = time.time()
         try:
             llm_text = self.llm_client.chat_response(
-                input_text, effective_vision_id, effective_voice_id
+                input_text,
+                effective_vision_id,
+                effective_voice_id,
+                is_active_ask=is_active_ask,
             )
             if not llm_text:
                 logger.warning("LLM 返回空响应")
@@ -1113,7 +1120,7 @@ class ChatAssistant:
         """
         计算 TTS 合成并播放音频的延迟时间
         """
-        if not self.tts_client.wait_until_playback_starts(timeout_sec=5.0):
+        if not self.tts_client.wait_until_playback_starts(timeout_sec=10.0):
             logger.error("TTS 播放超时 或者 TTS 播放音频太短")
             return False
 

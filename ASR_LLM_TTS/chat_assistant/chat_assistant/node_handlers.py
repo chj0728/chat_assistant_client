@@ -242,10 +242,18 @@ class ChatAssistantServiceHandlersMixin:
         request_user_id = request.user_id if hasattr(request, "user_id") else None
         request_user_id = request_user_id.strip() if request_user_id else None
         user_id = request_user_id if request_user_id else self.get_latest_user_id()
+        is_active_ask = (
+            request.is_active_ask if hasattr(request, "is_active_ask") else False
+        )
 
-        logger.info(f"LLM 收到请求，输入文本: [{input_text}], user_id: [{user_id}]")
-        llm_result = asyncio.run(
-            self.chat_assistant.async_llm_infer(input_text, vision_id=user_id)
+        logger.info(
+            f"LLM 收到请求，输入文本: [{input_text}], user_id: [{user_id}], is_active_ask: [{is_active_ask}]"
+        )
+        # llm_result = asyncio.run(
+        #     self.chat_assistant.async_llm_infer(input_text, vision_id=user_id)
+        # )
+        llm_result = self.chat_assistant.llm_infer(
+            input_text, vision_id=user_id, is_active_ask=is_active_ask
         )
 
         if llm_result is None:

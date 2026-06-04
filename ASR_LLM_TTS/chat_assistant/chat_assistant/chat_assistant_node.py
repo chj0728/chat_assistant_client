@@ -24,7 +24,7 @@ class ChatAssistantNode(
         self.init_chat_assistant()
 
     def init_chat_assistant(self):
-        """初始化聊天助手核心对象，加载配置文件并设置相关参数。"""
+        """初始化聊天助手核心对象, 并传入动态工具中间件。"""
 
         self.config_path = get_default_config_path()
         logger.info(f"默认配置文件路径: {self.config_path}")

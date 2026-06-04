@@ -18,6 +18,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/GetString.srv"
   "srv/GenerateWav.srv"
   "srv/RequestTTS.srv"
+  "srv/RequestLLM.srv"
   "msg/Response.msg"
   "msg/LLMResponse.msg"
   DEPENDENCIES geometry_msgs
