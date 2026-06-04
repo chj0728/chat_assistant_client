@@ -512,7 +512,7 @@ class ChatAssistantStateHandlersMixin:
                 timeout=0.05
             )
             msg = String()
-            msg.data = resolved_user_name
+            msg.data = resolved_user_name or ""
             self.resolved_user_name_publisher.publish(msg)
             logger.info(f"发布解析后的用户名: {resolved_user_name}")
 
