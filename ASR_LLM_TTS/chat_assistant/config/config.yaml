@@ -63,7 +63,7 @@ llm:
 
 ###################### TTS 配置 ######################
 tts_enable: false # 是否启动激活 TTS 模块
-tts_server: ['tts_local'] # 可选值: "tts_local"（本地 jestson orin 设备提供的 TTS 服务） "tts_remote"（远程服务器提供的 TTS 服务 ）
+tts_server_type: ['tts_local'] # 可选值: "tts_local"（本地 jestson orin 设备提供的 TTS 服务） "tts_remote"（远程服务器提供的 TTS 服务 ）
 tts_local:
   host: "192.168.10.101" # 本地 TTS 服务器地址，通常是 Jetson Orin 设备的 IP 地址
   port: 50000
@@ -77,8 +77,35 @@ tts_remote:
   host: "192.168.50.220" # 远程 TTS 服务器地址
   port: 50000
   voice_type: "longshu_zh" # 可选值: "default"(女性活泼), "zh"(男性非标准) , "hard_zh"(男性业余), "longshu_zh"(男性专业), "longwan_zh"（女性专业）
-#######################################################
 
+TTS:
+  tts_server_type: "tts_remote" # 默认使用本地 TTS 服务器 ，如果需要切换到远程服务器，修改为 tts_remote
+
+  # 音频播放参数
+  channels: 1 # 单声道
+  chunk_size: 2048 # 每次读取的音频块大小（帧数）
+  buffer_size: 4096 # 音频缓冲区大小（帧数）
+  sample_rate: 24000 # 采样率（Hz），需要与 TTS 服务器的输出采样率一致，确保音频播放正常
+
+  # tts_local
+  host: "192.168.10.101" # 本地 TTS 服务器地址，通常是 Jetson Orin 设备的 IP 地址
+  port: 50000
+  speaker_id: 0
+  speed: 1
+  use_websocket: true # 是否使用 WebSocket 连接 TTS 服务器，确保服务器支持 WebSocket
+  ws_path: "/ws/api/tts" # WebSocket 连接路径，确保服务器的 WebSocket 服务监听在此路径
+  timeout_sec: 5 # TTS 请求超时时间，单位秒，根据实际情况调整
+  playback_start_delay_sec: 0.5 # 起播确认延迟时间，单位秒，根据实际情况调整，影响 tts_active_topic 发布时机
+
+  # tts_remote
+  ## https://help.aliyun.com/zh/model-studio/qwen-tts-voice-list?spm=a2c4g.11186623.0.0.4b081457cdvDn3#0ad0bfdd635ar
+  voice_type: "Ethan" # Ethan(标准普通话，带部分北方口音。阳光、温暖、活力、朝气（男性）)  # Cherry(阳光积极、亲切自然小姐姐（女性）) 
+  remote_url: 'wss://dashscope.aliyuncs.com/api-ws/v1/realtime'
+  
+  ## server_commit(由服务端智能处理文本分段与合成时机，适合大段文本的连续合成场景。客户端只需持续追加文本，无需关注分段和提交。)
+  ## commit(由客户端主动提交文本缓冲区以触发合成，适合需要精确控制合成时机的场景（如对话式 AI 逐轮合成）。)
+  remote_mode: "commit" 
+  api_key: "sk-518aac827a894b1fb0fbdb0147c1d84f" # 阿里云 API Key，使用远程 TTS 服务时需要配置
 
 ################# 音频采集参数 #################
 Audio:

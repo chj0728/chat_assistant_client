@@ -16,7 +16,11 @@ from config import get_vad_no_speech_threshold, load_config
 from llm import LLMAgent
 from logger import logger
 from tts import RealtimeTTSPlayer, TTSClient
-from voice.voice_recognizer import VoiceRecognizer
+
+try:
+    from voice.voice_recognizer import VoiceRecognizer
+except ImportError:
+    VoiceRecognizer = None
 
 from app.assistant_support import (
     MAX_QUEUE_SIZE,
@@ -64,9 +68,12 @@ class ChatAssistant:
         self.recorder_thread = None
         self.recording_active = False
 
-        self.voice_recognizer = VoiceRecognizer(
-            low_thresh=0.60, high_thresh=0.67, max_prints_per_id=1
-        )
+        if VoiceRecognizer is not None:
+            self.voice_recognizer = VoiceRecognizer(
+                low_thresh=0.60, high_thresh=0.67, max_prints_per_id=1
+            )
+        else:
+            self.voice_recognizer = None
 
         self.load_config_and_initialize()
 
@@ -224,22 +231,27 @@ class ChatAssistant:
         )
 
     def _build_tts_client(self):
-        tts_server_type = self.configs.get("tts_server", ["tts_local"])[0]
+        # tts_server_type = self.configs.get("tts_server_type", ["tts_local"])[0]
+        # logger.info(f"选择的 TTS 服务器类型: {tts_server_type}")
+        # tts_cfg = self.configs.get(tts_server_type, {})
+
+        # if tts_server_type == "tts_remote":
+        #     tts_client = RealtimeTTSPlayer(
+        #         host=tts_cfg.get("host", "192.168.50.220"),
+        #         port=tts_cfg.get("port", 50000),
+        #     )
+        #     tts_client.change_preset(tts_cfg.get("voice_type", "default"))
+        #     return tts_client
+
+        # if tts_server_type == "tts_local":
+        #     return TTSClient.from_config(config=tts_cfg)
+        # logger.error(f"未知的 TTS 服务器类型: {tts_server_type}")
+        # raise ValueError(f"未知的 TTS 服务器类型: {tts_server_type}")
+
+        tts_cfg = self.configs.get("TTS", {})
+        tts_server_type = tts_cfg.get("tts_server_type", "tts_local")
         logger.info(f"选择的 TTS 服务器类型: {tts_server_type}")
-        tts_cfg = self.configs.get(tts_server_type, {})
-
-        if tts_server_type == "tts_remote":
-            tts_client = RealtimeTTSPlayer(
-                host=tts_cfg.get("host", "192.168.50.220"),
-                port=tts_cfg.get("port", 50000),
-            )
-            tts_client.change_preset(tts_cfg.get("voice_type", "default"))
-            return tts_client
-
-        if tts_server_type == "tts_local":
-            return TTSClient.from_config(config=tts_cfg)
-        logger.error(f"未知的 TTS 服务器类型: {tts_server_type}")
-        raise ValueError(f"未知的 TTS 服务器类型: {tts_server_type}")
+        return TTSClient.from_config(config=tts_cfg)
 
     def _initialize_audio_settings(self) -> None:
         audio_cfg = self.configs.get("Audio", {})
@@ -1310,10 +1322,14 @@ class ChatAssistant:
             now = time.time()
             self.asr_text, vr_results = await asyncio.gather(
                 self.async_asr_infer(audio_frames=audio_frames),
-                self.voice_recognizer.recognize_async(
-                    self.asr_client.normalize_audio_frames(audio_frames),
-                    user_id=vision_id,
-                    tail_silence_ms=TAIL_SILENCE_MS,
+                (
+                    self.voice_recognizer.recognize_async(
+                        self.asr_client.normalize_audio_frames(audio_frames),
+                        user_id=vision_id,
+                        tail_silence_ms=TAIL_SILENCE_MS,
+                    )
+                    if self.voice_recognizer is not None
+                    else asyncio.sleep(0)
                 ),
             )
 

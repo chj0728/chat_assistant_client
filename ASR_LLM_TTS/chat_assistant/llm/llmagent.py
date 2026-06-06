@@ -176,7 +176,7 @@ class LLMAgent:
             "top_k": llm_cfg.get("top_k", 50),
             "max_completion_tokens": llm_cfg.get("max_completion_tokens", 256),
             "enable_thinking": llm_cfg.get("enable_thinking", False),
-            "timeout": llm_cfg.get("timeout", 30),
+            "timeout": llm_cfg.get("timeout_sec", 30),
             "extra_system_prompt": llm_cfg.get("extra_system_prompt", ""),
             "rag_enable": llm_cfg.get("rag_enable", False),
             "dynamic_middlewares": dynamic_middlewares,

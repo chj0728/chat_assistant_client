@@ -1,5 +1,5 @@
 import time
-from typing import Any, Optional, Self
+from typing import Any, Optional  # , Self
 
 from logger import logger
 
@@ -60,19 +60,21 @@ class TTSClient(TTSBase):
 
     @staticmethod
     def _build_init_kwargs_from_config(config: dict) -> dict:
-        tts_server_type = config.get("tts_server_type", config.get("type", "tts_local"))
-        remote_host = config.get("host", "dashscope.aliyuncs.com")
-        remote_port = config.get("port")
-        remote_scheme = config.get("remote_scheme", "wss")
-        remote_path = config.get("remote_path", "/api-ws/v1/realtime")
-        remote_url = config.get("remote_url")
-        if remote_url is None:
-            if remote_port:
-                remote_url = (
-                    f"{remote_scheme}://{remote_host}:{remote_port}{remote_path}"
-                )
-            else:
-                remote_url = f"{remote_scheme}://{remote_host}{remote_path}"
+
+        tts_server_type = config.get("tts_server_type", "tts_local")
+
+        # remote_host = config.get("host", "dashscope.aliyuncs.com")
+        # remote_port = config.get("port")
+        # remote_scheme = config.get("remote_scheme", "wss")
+        # remote_path = config.get("remote_path", "/api-ws/v1/realtime")
+        # remote_url = config.get("remote_url")
+        # if remote_url is None:
+        #     if remote_port:
+        #         remote_url = (
+        #             f"{remote_scheme}://{remote_host}:{remote_port}{remote_path}"
+        #         )
+        #     else:
+        #         remote_url = f"{remote_scheme}://{remote_host}{remote_path}"
 
         return {
             "host": config.get("host", "192.168.10.101"),
@@ -94,7 +96,9 @@ class TTSClient(TTSBase):
             "voice_type": config.get("voice_type", config.get("voice", "Cherry")),
             "api_key": config.get("api_key"),
             "model": config.get("model", "qwen3-tts-flash-realtime"),
-            "remote_url": remote_url,
+            "remote_url": config.get(
+                "remote_url", "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
+            ),
             "remote_mode": config.get("remote_mode", "commit"),
         }
 
@@ -180,7 +184,7 @@ class TTSClient(TTSBase):
         return f"http://{self.host}:{self.port}{path}"
 
     @classmethod
-    def from_config(cls, config: dict) -> Self:
+    def from_config(cls, config: dict) -> "TTSClient":
         return cls(**cls._build_init_kwargs_from_config(config))
 
     def reset_from_config(self, config: dict) -> None:

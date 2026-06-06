@@ -2,6 +2,7 @@ import queue
 import threading
 import time
 import wave
+from typing import Any
 
 import numpy as np
 from logger import logger
@@ -11,14 +12,32 @@ try:
 except ImportError:  # pragma: no cover - exercised only in minimal test envs
     playsound = None
 
-from .stream import AudioQueueOutputStream
+from .stream import AudioQueueOutputStream, AudioStreamOwner
 
 WORKER_POLL_TIMEOUT_SEC = 0.1
 INTERRUPT_GRACE_PERIOD_SEC = 0.2
 LOCAL_AUDIO_STOP_WAIT_SEC = 0.1
 
 
-class TTSBase:
+class TTSBase(AudioStreamOwner):
+    """TTS 基类，同时声明 AudioStreamOwner 所需的播放状态接口。"""
+
+    audio_queue: queue.Queue[bytes]
+    is_sounding: bool
+    _audio_active_started_ts: float
+    _audio_lock: threading.Lock
+    _last_audio_chunk_ts: float
+    _playback_start_delay_sec: float
+    _playback_hangover_sec: float
+    _playback_buffer: np.ndarray
+    _stop_event: threading.Event
+    _interrupt_event: threading.Event
+    _playback_started_event: threading.Event
+
+    sound: Any
+    stream: AudioQueueOutputStream | None
+    tts_thread: threading.Thread | None
+
     def _apply_base_init_kwargs(
         self,
         *,
@@ -52,7 +71,9 @@ class TTSBase:
         self._last_audio_chunk_ts = 0.0
         self._playback_start_delay_sec = playback_start_delay_sec
         self._playback_hangover_sec = 0.0
-        self._playback_buffer = np.empty((0, self.channels), dtype=np.dtype(playback_dtype))
+        self._playback_buffer = np.empty(
+            (0, self.channels), dtype=np.dtype(playback_dtype)
+        )
 
         self._stop_event = threading.Event()
         self._interrupt_event = threading.Event()
@@ -122,9 +143,7 @@ class TTSBase:
         self.text_queue.put(normalized_text)
 
     def is_active(self):
-        return self.is_sounding or (
-            self.sound is not None and self.sound.is_alive()
-        )
+        return self.is_sounding or (self.sound is not None and self.sound.is_alive())
 
     def play_audio(self, file_path, block=False):
         try:
