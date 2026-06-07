@@ -1,7 +1,7 @@
 from typing import Any, cast
 
 import numpy as np
-from tts.ttsclient import TTSClient
+from chat_assistant_client.ASR_LLM_TTS.chat_assistant.tts.tts_client import TTSClient
 
 
 class DummyStream:

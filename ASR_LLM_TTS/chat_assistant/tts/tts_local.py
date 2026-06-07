@@ -15,53 +15,34 @@ except ImportError:  # pragma: no cover - exercised only in minimal test envs
     websockets = None
     ConnectionClosed = Exception
 
-from .ttsbase import WORKER_POLL_TIMEOUT_SEC
+from .backend_base import TTSBackendContext, TTSRuntime
 
 WS_STARTUP_WAIT_SEC = 1.0
 
 
-class LocalTTSBackend:
-    def __init__(self, client) -> None:
-        self.client = client
+class LocalTTSRuntime(TTSRuntime):
+    def __init__(self, context: TTSBackendContext) -> None:
+        self._context = context
         self._ws_loop: Optional[asyncio.AbstractEventLoop] = None
         self._ws = None
         self._ws_thread: Optional[threading.Thread] = None
         self._ws_started = threading.Event()
 
+    ####### TTSRuntime 接口实现 ######
     def initialize_if_needed(self) -> None:
-        if not self.client.use_websocket:
+        if not self._context.use_websocket:
             return
 
         self._start_ws_runtime()
         time.sleep(WS_STARTUP_WAIT_SEC)
         try:
-            self._run_ws_coro(self._ensure_ws_connected(), timeout=self.client.timeout)
+            self._run_ws_coro(
+                self._ensure_ws_connected(), timeout=self._context.timeout
+            )
         except TimeoutError:
             logger.error("TTS WebSocket 连接超时")
         except Exception as e:
             logger.error(f"TTS WebSocket 连接失败: {e}")
-
-    def start_tts_worker(self) -> threading.Thread:
-        tts_thread = threading.Thread(
-            target=self._tts_loop,
-            daemon=True,
-            name="tts-worker",
-        )
-        tts_thread.start()
-        return tts_thread
-
-    def request_stream(self, text: str, data_type: str):
-        return requests.post(
-            self.client._build_http_url("/api/tts"),
-            data={
-                "tts_text": text,
-                "data_type": data_type,
-                "sid": self.client.speaker_id,
-                "speed": self.client.speed,
-            },
-            timeout=self.client.timeout,
-            stream=data_type == "pcm",
-        )
 
     def close_runtime(self) -> None:
         if self._ws_loop is None:
@@ -79,20 +60,29 @@ class LocalTTSBackend:
             self._ws_loop = None
             self._ws_thread = None
 
-    def _tts_loop(self):
-        while not self.client._stop_event.is_set():
-            try:
-                text = self.client.text_queue.get(timeout=WORKER_POLL_TIMEOUT_SEC)
-            except Exception:
-                continue
+    def run_tts(self, text: str) -> None:
+        self._tts_request(text)
 
-            start_time = time.time()
-            self._tts_request(text)
-            elapsed_time = time.time() - start_time
-            logger.debug(f"完整音频传输耗时: {elapsed_time:.2f} 秒")
+    #############################
+
+    def request_stream(self, text: str, data_type: str):
+        return requests.post(
+            self._build_http_url("/api/tts"),
+            data={
+                "tts_text": text,
+                "data_type": data_type,
+                "sid": self._context.speaker_id,
+                "speed": self._context.speed,
+            },
+            timeout=self._context.timeout,
+            stream=data_type == "pcm",
+        )
+
+    def _build_http_url(self, path: str) -> str:
+        return f"http://{self._context.host}:{self._context.port}{path}"
 
     def _tts_request(self, text):
-        if self.client.use_websocket:
+        if self._context.use_websocket:
             self._tts_request_ws(text)
             return
 
@@ -102,12 +92,15 @@ class LocalTTSBackend:
         try:
             with self.request_stream(text, data_type="pcm") as resp:
                 resp.raise_for_status()
-                for chunk in resp.iter_content(chunk_size=self.client.chunk_size):
-                    if self.client._stop_event.is_set() or self.client._interrupt_event.is_set():
+                for chunk in resp.iter_content(chunk_size=self._context.chunk_size):
+                    if (
+                        self._context.stop_event.is_set()
+                        or self._context.interrupt_event.is_set()
+                    ):
                         return
                     if not chunk:
                         continue
-                    self.client.audio_queue.put(chunk)
+                    self._context.audio_queue.put(chunk)
         except Exception as e:
             logger.error(f"HTTP TTS 请求失败: {e}")
 
@@ -117,10 +110,10 @@ class LocalTTSBackend:
             self._run_ws_coro(self._tts_request_ws_async(text), timeout=10)
         except TimeoutError:
             logger.error("TTS WebSocket 请求超时")
-            self._run_ws_coro(self._close_ws_async(), timeout=self.client.timeout)
+            self._run_ws_coro(self._close_ws_async(), timeout=self._context.timeout)
         except Exception as e:
             logger.error(f"WebSocket TTS 请求失败: {e}")
-            self._run_ws_coro(self._close_ws_async(), timeout=self.client.timeout)
+            self._run_ws_coro(self._close_ws_async(), timeout=self._context.timeout)
 
     def _start_ws_runtime(self):
         if self._ws_thread is not None and self._ws_thread.is_alive():
@@ -171,14 +164,12 @@ class LocalTTSBackend:
         if self._ws is not None:
             return
 
-        url = (
-            f"ws://{self.client.host}:{self.client.port}{self.client.ws_path}"
-        )
+        url = f"ws://{self._context.host}:{self._context.port}{self._context.ws_path}"
         self._ws = await websockets.connect(
             url,
             max_size=None,
-            ping_interval=self.client.ws_ping_interval,
-            ping_timeout=self.client.ws_ping_timeout,
+            ping_interval=self._context.ws_ping_interval,
+            ping_timeout=self._context.ws_ping_timeout,
         )
         logger.info(f"TTS WebSocket 已连接: {url}")
 
@@ -197,8 +188,8 @@ class LocalTTSBackend:
     async def _tts_request_ws_async(self, text):
         payload = {
             "tts_text": text,
-            "sid": self.client.speaker_id,
-            "speed": self.client.speed,
+            "sid": self._context.speaker_id,
+            "speed": self._context.speed,
         }
 
         for attempt in range(2):
@@ -216,8 +207,8 @@ class LocalTTSBackend:
 
                 while True:
                     if (
-                        self.client._stop_event.is_set()
-                        or self.client._interrupt_event.is_set()
+                        self._context.stop_event.is_set()
+                        or self._context.interrupt_event.is_set()
                     ):
                         logger.info("TTS WebSocket 收到停止/打断信号")
                         return
@@ -225,7 +216,7 @@ class LocalTTSBackend:
                     message = await self._ws.recv()
 
                     if isinstance(message, bytes):
-                        self.client.audio_queue.put(message)
+                        self._context.audio_queue.put(message)
                         continue
 
                     try:

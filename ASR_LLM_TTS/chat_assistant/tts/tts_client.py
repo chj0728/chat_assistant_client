@@ -1,14 +1,15 @@
 import time
-from typing import Any, Optional  # , Self
+from typing import Optional  # , Self
 
 from logger import logger
 
-from .tts_local import LocalTTSBackend
-from .tts_remote import RemoteTTSBackend
-from .ttsbase import TTSBase
+from .backend_base import TTSBackend, TTSBackendContext
+from .tts_base import TTSClientBase
+from .tts_local import LocalTTSRuntime
+from .tts_remote import RemoteTTSRuntime
 
 
-class TTSClient(TTSBase):
+class TTSClient(TTSClientBase):
     def __init__(
         self,
         host,
@@ -63,19 +64,6 @@ class TTSClient(TTSBase):
 
         tts_server_type = config.get("tts_server_type", "tts_local")
 
-        # remote_host = config.get("host", "dashscope.aliyuncs.com")
-        # remote_port = config.get("port")
-        # remote_scheme = config.get("remote_scheme", "wss")
-        # remote_path = config.get("remote_path", "/api-ws/v1/realtime")
-        # remote_url = config.get("remote_url")
-        # if remote_url is None:
-        #     if remote_port:
-        #         remote_url = (
-        #             f"{remote_scheme}://{remote_host}:{remote_port}{remote_path}"
-        #         )
-        #     else:
-        #         remote_url = f"{remote_scheme}://{remote_host}{remote_path}"
-
         return {
             "host": config.get("host", "192.168.10.101"),
             "port": config.get("port", 50000),
@@ -127,7 +115,9 @@ class TTSClient(TTSBase):
         remote_url: Optional[str] = None,
         remote_mode: str = "commit",
     ) -> None:
+
         playback_dtype = "int16" if tts_server_type == "tts_remote" else "float32"
+
         self._apply_base_init_kwargs(
             host=host,
             port=port,
@@ -140,6 +130,7 @@ class TTSClient(TTSBase):
             playback_start_delay_sec=playback_start_delay_sec,
         )
 
+        ########## Local TTS 相关参数 ##########
         self.speaker_id = speaker_id
         self.speed = speed
         self.use_websocket = use_websocket
@@ -147,6 +138,7 @@ class TTSClient(TTSBase):
         self.ws_ping_interval = ws_ping_interval
         self.ws_ping_timeout = ws_ping_timeout
 
+        ########### Remote TTS 相关参数 ##########
         self.tts_server_type = tts_server_type
         self.voice = voice or voice_type or "Cherry"
         self.voice_type = self.voice
@@ -157,18 +149,60 @@ class TTSClient(TTSBase):
         )
         self.remote_mode = remote_mode
 
-        self._backend: Any = self._create_backend()
+        ########## Backend 上下文 ##########
+        backend_context = TTSBackendContext(
+            host=self.host,
+            port=self.port,
+            timeout=self.timeout,
+            sample_rate=self.sample_rate,
+            channels=self.channels,
+            chunk_size=self.chunk_size,
+            text_queue=self.text_queue,
+            audio_queue=self.audio_queue,
+            stop_event=self._stop_event,
+            interrupt_event=self._interrupt_event,
+            speaker_id=self.speaker_id,
+            speed=self.speed,
+            use_websocket=self.use_websocket,
+            ws_path=self.ws_path,
+            ws_ping_interval=self.ws_ping_interval,
+            ws_ping_timeout=self.ws_ping_timeout,
+            voice=self.voice,
+            api_key=self.api_key,
+            model=self.model,
+            remote_url=self.remote_url,
+            remote_mode=self.remote_mode,
+        )
+        self._backend = self._create_backend(backend_context)
 
     def _initialize_runtime_components(self) -> None:
+
         self.stream = self.__create_output_stream()
         self.stream.start()
+
         self.tts_thread = self.__start_tts_worker()
+
         self.__initialize_websocket_if_needed()
 
-    def _create_backend(self):
+    def _create_backend(self, context: TTSBackendContext) -> TTSBackend:
         if self.tts_server_type == "tts_remote":
-            return RemoteTTSBackend(self)
-        return LocalTTSBackend(self)
+            runtime = RemoteTTSRuntime(context)
+            return TTSBackend(
+                context=context,
+                runtime=runtime,
+                worker_thread_name="tts-remote-worker",
+                request_error_log_prefix="远端 TTS 请求失败",
+                transfer_elapsed_log_label="远端 TTS 音频传输耗时",
+            )
+
+        runtime = LocalTTSRuntime(context)
+        return TTSBackend(
+            context=context,
+            runtime=runtime,
+            worker_thread_name="tts-worker",
+            request_error_log_prefix="TTS 请求失败",
+            transfer_elapsed_log_label="完整音频传输耗时",
+        )
 
     def _initialize_backend_if_needed(self) -> None:
         self.__initialize_websocket_if_needed()
@@ -178,10 +212,7 @@ class TTSClient(TTSBase):
 
     def _close_backend_runtime(self) -> None:
         if self._backend is not None:
-            self._backend.close_runtime()
-
-    def _build_http_url(self, path: str) -> str:
-        return f"http://{self.host}:{self.port}{path}"
+            self._backend.close()
 
     @classmethod
     def from_config(cls, config: dict) -> "TTSClient":
@@ -193,37 +224,34 @@ class TTSClient(TTSBase):
         self._initialize_runtime_components()
 
     def generate_wav(self, text, filename) -> bool:
-        if self.tts_server_type == "tts_remote":
-            return self._backend.generate_wav(text, filename)
+        if self.tts_server_type == "tts_local":
+            try:
+                with self.__request_stream(text, data_type="wav") as resp:
+                    resp.raise_for_status()
 
-        try:
-            with self.__request_stream(text, data_type="wav") as resp:
-                resp.raise_for_status()
+                    if "audio" not in resp.headers.get("Content-Type", ""):
+                        logger.error("返回不是音频")
+                        logger.error(resp.text)
+                        return False
 
-                if "audio" not in resp.headers.get("Content-Type", ""):
-                    logger.error("返回不是音频")
-                    logger.error(resp.text)
-                    return False
-
-                with open(filename, "wb") as f:
-                    f.write(resp.content)
-            return True
-
-        except Exception as e:
-            logger.error(f"TTS 请求失败: {e}")
-            return False
+                    with open(filename, "wb") as f:
+                        f.write(resp.content)
+                return True
+            except Exception as e:
+                logger.error(f"TTS 请求失败: {e}")
+                return False
+        return self._backend.generate_wav(text, filename)
 
     def change_preset(self, preset):
         self.voice = preset
         self.voice_type = preset
-        if self.tts_server_type == "tts_remote":
-            self._backend.change_voice(preset)
+        self._backend.change_voice(preset)
 
     def __create_output_stream(self):
         return self._create_output_stream()
 
     def __start_tts_worker(self):
-        return self._backend.start_tts_worker()
+        return self._backend.start()
 
     def __initialize_websocket_if_needed(self) -> None:
         self._backend.initialize_if_needed()

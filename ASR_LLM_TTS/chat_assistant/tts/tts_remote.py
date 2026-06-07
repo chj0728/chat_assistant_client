@@ -1,13 +1,12 @@
 import base64
 import os
 import threading
-import time
 import wave
 from typing import Any
 
 from logger import logger
 
-from .ttsbase import WORKER_POLL_TIMEOUT_SEC
+from .backend_base import TTSBackendContext, TTSRuntime
 
 try:
     import dashscope
@@ -24,6 +23,7 @@ except ImportError:  # pragma: no cover - exercised only in minimal test envs
     class QwenTtsRealtimeCallback:  # type: ignore[no-redef]
         pass
 
+
 try:
     from dotenv import load_dotenv
 except ImportError:  # pragma: no cover - exercised only in minimal test envs
@@ -31,9 +31,9 @@ except ImportError:  # pragma: no cover - exercised only in minimal test envs
 
 
 class _RemoteCallback(QwenTtsRealtimeCallback):
-    def __init__(self, client) -> None:
+    def __init__(self, audio_queue) -> None:
         super().__init__()
-        self.client = client
+        self._audio_queue = audio_queue
         self.complete_event = threading.Event()
         self.session_finished_event = threading.Event()
         self._response_chunks: list[bytes] = []
@@ -72,7 +72,7 @@ class _RemoteCallback(QwenTtsRealtimeCallback):
                 with self._lock:
                     self._response_chunks.append(pcm_bytes)
                 if self._playback_enabled:
-                    self.client.audio_queue.put(pcm_bytes)
+                    self._audio_queue.put(pcm_bytes)
                 return
 
             if event_type == "response.done":
@@ -92,9 +92,9 @@ class _RemoteCallback(QwenTtsRealtimeCallback):
         return self.session_finished_event.wait(timeout=timeout_sec)
 
 
-class RemoteTTSBackend:
-    def __init__(self, client) -> None:
-        self.client = client
+class RemoteTTSRuntime(TTSRuntime):
+    def __init__(self, context: TTSBackendContext) -> None:
+        self._context = context
         self._runtime_lock = threading.Lock()
         self._qwen_tts = None
         self._callback = None
@@ -102,17 +102,9 @@ class RemoteTTSBackend:
         if load_dotenv is not None:
             load_dotenv()
 
+    ####### TTSRuntime 接口实现 ######
     def initialize_if_needed(self) -> None:
         self._ensure_runtime()
-
-    def start_tts_worker(self) -> threading.Thread:
-        tts_thread = threading.Thread(
-            target=self._tts_loop,
-            daemon=True,
-            name="tts-remote-worker",
-        )
-        tts_thread.start()
-        return tts_thread
 
     def close_runtime(self) -> None:
         with self._runtime_lock:
@@ -127,15 +119,46 @@ class RemoteTTSBackend:
                 self._qwen_tts = None
                 self._callback = None
 
+    def run_tts(self, text: str) -> None:
+        self.synthesize(text, playback_enabled=True)
+
+    ################################
+
+    def _ensure_runtime(self) -> None:
+        if self._qwen_tts is not None:
+            return
+
+        if dashscope is None or QwenTtsRealtime is None or AudioFormat is None:
+            raise RuntimeError("dashscope 未安装，无法启用远端 TTS")
+
+        api_key = self._context.api_key or os.getenv("DASHSCOPE_API_KEY")
+        if not api_key:
+            raise RuntimeError("未配置 DASHSCOPE_API_KEY，无法启用远端 TTS")
+
+        dashscope.api_key = api_key
+        self._callback = _RemoteCallback(self._context.audio_queue)
+        self._qwen_tts = QwenTtsRealtime(
+            model=self._context.model,
+            callback=self._callback,
+            url=self._context.remote_url,
+        )
+        self._qwen_tts.connect()
+        self._qwen_tts.update_session(
+            voice=self._context.voice,
+            response_format=AudioFormat.PCM_24000HZ_MONO_16BIT,
+            mode=self._context.remote_mode,
+        )
+
+    ####### 远端 TTS 运行时接口实现 ######
     def change_voice(self, voice: str) -> None:
-        self.client.voice = voice
+        self._context.voice = voice
         with self._runtime_lock:
             if self._qwen_tts is None:
                 return
             self._qwen_tts.update_session(
-                voice=self.client.voice,
+                voice=self._context.voice,
                 response_format=AudioFormat.PCM_24000HZ_MONO_16BIT,
-                mode=self.client.remote_mode,
+                mode=self._context.remote_mode,
             )
 
     def generate_wav(self, text: str, filename: str) -> bool:
@@ -144,9 +167,9 @@ class RemoteTTSBackend:
             if not pcm_bytes:
                 return False
             with wave.open(filename, "wb") as wf:
-                wf.setnchannels(self.client.channels)
+                wf.setnchannels(self._context.channels)
                 wf.setsampwidth(2)
-                wf.setframerate(self.client.sample_rate)
+                wf.setframerate(self._context.sample_rate)
                 wf.writeframes(pcm_bytes)
             return True
         except Exception as e:
@@ -154,6 +177,9 @@ class RemoteTTSBackend:
             return False
 
     def synthesize(self, text: str, *, playback_enabled: bool) -> bytes:
+        """执行 TTS 合成，返回合成的 PCM 音频数据。
+        如果 playback_enabled=True，则在合成过程中会将 PCM 数据放入音频队列以供播放；如果 playback_enabled=False，则仅返回完整的 PCM 数据，不进行播放。
+        """
         normalized_text = text.strip()
         if not normalized_text:
             return b""
@@ -167,47 +193,6 @@ class RemoteTTSBackend:
             self._qwen_tts.append_text(normalized_text)
             self._qwen_tts.commit()
 
-        if not self._callback.wait_for_response_done(timeout_sec=self.client.timeout):
+        if not self._callback.wait_for_response_done(timeout_sec=self._context.timeout):
             raise TimeoutError("远端 TTS 响应超时")
         return self._callback.get_response_pcm()
-
-    def _tts_loop(self):
-        while not self.client._stop_event.is_set():
-            try:
-                text = self.client.text_queue.get(timeout=WORKER_POLL_TIMEOUT_SEC)
-            except Exception:
-                continue
-
-            start_time = time.time()
-            try:
-                self.synthesize(text, playback_enabled=True)
-            except Exception as e:
-                logger.error(f"远端 TTS 请求失败: {e}")
-            finally:
-                elapsed_time = time.time() - start_time
-                logger.debug(f"远端 TTS 音频传输耗时: {elapsed_time:.2f} 秒")
-
-    def _ensure_runtime(self) -> None:
-        if self._qwen_tts is not None:
-            return
-
-        if dashscope is None or QwenTtsRealtime is None or AudioFormat is None:
-            raise RuntimeError("dashscope 未安装，无法启用远端 TTS")
-
-        api_key = self.client.api_key or os.getenv("DASHSCOPE_API_KEY")
-        if not api_key:
-            raise RuntimeError("未配置 DASHSCOPE_API_KEY，无法启用远端 TTS")
-
-        dashscope.api_key = api_key
-        self._callback = _RemoteCallback(self.client)
-        self._qwen_tts = QwenTtsRealtime(
-            model=self.client.model,
-            callback=self._callback,
-            url=self.client.remote_url,
-        )
-        self._qwen_tts.connect()
-        self._qwen_tts.update_session(
-            voice=self.client.voice,
-            response_format=AudioFormat.PCM_24000HZ_MONO_16BIT,
-            mode=self.client.remote_mode,
-        )
