@@ -1,3 +1,4 @@
+import asyncio
 from types import SimpleNamespace
 from typing import Any, cast
 
@@ -28,15 +29,15 @@ class DummyAgent:
     def __init__(self, *, invoke_result=None, stream_result=None):
         self.invoke_result = invoke_result
         self.stream_result = stream_result or []
-        self.invoke_calls = []
-        self.stream_calls = []
+        self.ainvoke_calls = []
+        self.astream_calls = []
 
-    def invoke(self, *args, **kwargs):
-        self.invoke_calls.append((args, kwargs))
+    async def ainvoke(self, *args, **kwargs):
+        self.ainvoke_calls.append((args, kwargs))
         return self.invoke_result
 
-    def stream(self, *args, **kwargs):
-        self.stream_calls.append((args, kwargs))
+    async def astream(self, *args, **kwargs):
+        self.astream_calls.append((args, kwargs))
         for item in self.stream_result:
             yield item
 
@@ -49,7 +50,13 @@ def build_agent_shell():
     agent.thread_id = llmagent_module.uuid7()
     agent.rag_enable = False
     agent.rag_client = None
+    agent.db_path = ":memory:"
+    agent.agent = None
     return agent
+
+
+async def collect_async_iter(async_iterable):
+    return [item async for item in async_iterable]
 
 
 def test_get_callback_handlers_returns_default_handlers():
@@ -85,6 +92,7 @@ def test_from_config_maps_llm_options_to_constructor():
             "top_k": 10,
             "max_completion_tokens": 512,
             "enable_thinking": True,
+            "timeout": 45,
             "extra_system_prompt": "extra",
             "rag_enable": True,
         }
@@ -100,9 +108,101 @@ def test_from_config_maps_llm_options_to_constructor():
         "top_k": 10,
         "max_completion_tokens": 512,
         "enable_thinking": True,
+        "timeout": 45,
         "extra_system_prompt": "extra",
         "rag_enable": True,
         "dynamic_middlewares": [middleware],
+    }
+
+
+def test_reset_from_config_reinitializes_instance_state():
+    """测试 reset_from_config 会关闭旧状态并按新配置重新初始化实例。"""
+
+    class ResettableStubAgent(llmagent_module.LLMAgent):
+        def __init__(self, **kwargs):
+            self.close_calls = 0
+            self.initialize_snapshots = []
+            super().__init__(**kwargs)
+
+        def close(self):
+            self.close_calls += 1
+
+        def _initialize_runtime_components(self):
+            self.initialize_snapshots.append(
+                {
+                    "host": self.host,
+                    "port": self.port,
+                    "temperature": self.temperature,
+                    "timeout": self.timeout,
+                    "enable_thinking": self.enable_thinking,
+                    "extra_system_prompt": self.extra_system_prompt,
+                    "rag_enable": self.rag_enable,
+                    "dynamic_middlewares": self.dynamic_middlewares,
+                    "thread_id": self.thread_id,
+                    "system_prompt": self.global_system_msg.content,
+                }
+            )
+
+    first_middleware = cast(AgentMiddleware, object())
+    second_middleware = cast(AgentMiddleware, object())
+    agent = ResettableStubAgent(
+        host="127.0.0.1",
+        port=8000,
+        dynamic_middlewares=[first_middleware],
+        extra_system_prompt="old",
+        timeout=15,
+    )
+    initial_thread_id = agent.thread_id
+
+    agent.reset_from_config(
+        {
+            "llm": {
+                "host": "192.168.1.20",
+                "port": 9001,
+                "temperature": 0.2,
+                "top_p": 0.7,
+                "top_k": 20,
+                "max_completion_tokens": 128,
+                "enable_thinking": True,
+                "timeout": 60,
+                "extra_system_prompt": "new prompt",
+                "rag_enable": True,
+            }
+        },
+        dynamic_middlewares=[second_middleware],
+    )
+
+    assert agent.close_calls == 1
+    assert len(agent.initialize_snapshots) == 2
+    assert agent.host == "192.168.1.20"
+    assert agent.port == 9001
+    assert agent.temperature == 0.2
+    assert agent.top_p == 0.7
+    assert agent.top_k == 20
+    assert agent.max_completion_tokens == 128
+    assert agent.enable_thinking is True
+    assert agent.timeout == 60
+    assert agent.extra_system_prompt == "new prompt"
+    assert agent.rag_enable is True
+    assert agent.dynamic_middlewares == [second_middleware]
+    assert agent.thread_id != initial_thread_id
+    assert (
+        agent.global_system_msg.content
+        == llmagent_module.build_global_system_prompt("new prompt")
+    )
+
+    latest_snapshot = agent.initialize_snapshots[-1]
+    assert latest_snapshot == {
+        "host": "192.168.1.20",
+        "port": 9001,
+        "temperature": 0.2,
+        "timeout": 60,
+        "enable_thinking": True,
+        "extra_system_prompt": "new prompt",
+        "rag_enable": True,
+        "dynamic_middlewares": [second_middleware],
+        "thread_id": agent.thread_id,
+        "system_prompt": llmagent_module.build_global_system_prompt("new prompt"),
     }
 
 
@@ -233,11 +333,11 @@ def test_chat_response_uses_agent_with_user_id_context():
     )
     agent.agent = cast(Any, stateful_agent)
 
-    result = agent.chat_response("你好", user_id="user-1")
+    result = asyncio.run(agent.chat_response("你好", user_id="user-1"))
 
     assert result == "有上下文回答"
-    assert len(stateful_agent.invoke_calls) == 1
-    invoke_args, invoke_kwargs = stateful_agent.invoke_calls[0]
+    assert len(stateful_agent.ainvoke_calls) == 1
+    invoke_args, invoke_kwargs = stateful_agent.ainvoke_calls[0]
     assert invoke_args == (
         {
             "messages": [
@@ -261,11 +361,11 @@ def test_chat_response_uses_default_thread_id_without_user_id():
     )
     agent.agent = cast(Any, stateful_agent)
 
-    result = agent.chat_response("你好")
+    result = asyncio.run(agent.chat_response("你好"))
 
     assert result == "快速回答"
-    assert len(stateful_agent.invoke_calls) == 1
-    invoke_args, invoke_kwargs = stateful_agent.invoke_calls[0]
+    assert len(stateful_agent.ainvoke_calls) == 1
+    invoke_args, invoke_kwargs = stateful_agent.ainvoke_calls[0]
     assert invoke_args == (
         {
             "messages": [
@@ -287,10 +387,10 @@ def test_chat_response_stream_flushes_by_max_chunk_length():
     stateful_agent = DummyAgent(stream_result=[AIMessageChunk(content="a" * 55)])
     agent.agent = cast(Any, stateful_agent)
 
-    result = list(agent.chat_response_stream("hello"))
+    result = asyncio.run(collect_async_iter(agent.chat_response_stream("hello")))
 
     assert result == [("a" * 50, 0), ("a" * 5, 1)]
-    stream_args, stream_kwargs = stateful_agent.stream_calls[0]
+    stream_args, stream_kwargs = stateful_agent.astream_calls[0]
     assert stream_args == (
         {
             "messages": [
@@ -315,11 +415,13 @@ def test_chat_response_stream_flushes_by_punctuation_with_user_id():
     )
     agent.agent = cast(Any, stateful_agent)
 
-    result = list(agent.chat_response_stream("你好", user_id="user-2"))
+    result = asyncio.run(
+        collect_async_iter(agent.chat_response_stream("你好", user_id="user-2"))
+    )
 
     assert result == [(sentence, 0)]
-    assert len(stateful_agent.stream_calls) == 1
-    stream_args, stream_kwargs = stateful_agent.stream_calls[0]
+    assert len(stateful_agent.astream_calls) == 1
+    stream_args, stream_kwargs = stateful_agent.astream_calls[0]
     assert stream_args == (
         {
             "messages": [
@@ -349,7 +451,7 @@ def test_chat_response_stream_keeps_intent_tag_unsplit():
     )
     agent.agent = cast(Any, tiny_agent)
 
-    result = list(agent.chat_response_stream("hello"))
+    result = asyncio.run(collect_async_iter(agent.chat_response_stream("hello")))
 
     assert result == [(plain_text, 0), (intent_text, 1)]
 

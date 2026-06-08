@@ -45,3 +45,6 @@ simplejson>=4.0
 python-dateutil>=2.8.2
 six>=1.16.0
 sortedcontainers>=2.4.0
+
+# 阿里云百炼官方的 DashScope SDK
+dashscope

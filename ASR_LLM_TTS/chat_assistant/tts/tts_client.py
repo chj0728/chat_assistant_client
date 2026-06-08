@@ -1,12 +1,29 @@
+import os
 import time
 from typing import Optional  # , Self
 
+from dotenv import load_dotenv
 from logger import logger
 
 from .backend_base import TTSBackend, TTSBackendContext
 from .tts_base import TTSClientBase
 from .tts_local import LocalTTSRuntime
 from .tts_remote import RemoteTTSRuntime
+
+load_dotenv()
+# --------------------- 阿里云 DashScope API Key 配置说明 ---------------------
+# 1. 获取 API Key：访问 https://help.aliyun.com/zh/model-studio/get-api-key 获取 API Key。
+# 2. 配置 API Key：有两种方式配置 API Key：
+#    a. 环境变量：将 API Key 设置为环境变量 DASHSCOPE_API_KEY，例如在 Linux/MacOS 终端执行 export DASHSCOPE_API_KEY=你的APIKey，或在 Windows 命令提示符执行 set DASHSCOPE_API_KEY=你的APIKey。
+#    b. 在 .env 文件中添加一行 DASHSCOPE_API_KEY=你的APIKey，并确保在代码中使用 load_dotenv() 加载环境变量。
+# --------------------- 阿里云 DashScope API Key 配置说明 ---------------------
+
+
+def GET_DASHSCOPE_API_KEY() -> Optional[str]:
+    """
+    获取 DashScope API Key 的函数，优先从环境变量中获取。
+    """
+    return os.environ.get("DASHSCOPE_API_KEY", "").strip()
 
 
 class TTSClient(TTSClientBase):
@@ -82,7 +99,7 @@ class TTSClient(TTSClientBase):
             "tts_server_type": tts_server_type,
             "voice": config.get("voice", config.get("voice_type", "Cherry")),
             "voice_type": config.get("voice_type", config.get("voice", "Cherry")),
-            "api_key": config.get("api_key"),
+            "api_key": config.get("api_key", GET_DASHSCOPE_API_KEY()),
             "model": config.get("model", "qwen3-tts-flash-realtime"),
             "remote_url": config.get(
                 "remote_url", "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
@@ -199,9 +216,9 @@ class TTSClient(TTSClientBase):
         return TTSBackend(
             context=context,
             runtime=runtime,
-            worker_thread_name="tts-worker",
-            request_error_log_prefix="TTS 请求失败",
-            transfer_elapsed_log_label="完整音频传输耗时",
+            worker_thread_name="tts-local-worker",
+            request_error_log_prefix="本地 TTS 请求失败",
+            transfer_elapsed_log_label="本地 TTS 音频传输耗时",
         )
 
     def _initialize_backend_if_needed(self) -> None:

@@ -2,7 +2,7 @@ import base64
 import os
 import threading
 import wave
-from typing import Any
+from typing import Any, cast
 
 from logger import logger
 
@@ -19,9 +19,7 @@ except ImportError:  # pragma: no cover - exercised only in minimal test envs
     dashscope = None
     AudioFormat = None
     QwenTtsRealtime = None
-
-    class QwenTtsRealtimeCallback:  # type: ignore[no-redef]
-        pass
+    QwenTtsRealtimeCallback = object
 
 
 try:
@@ -30,12 +28,16 @@ except ImportError:  # pragma: no cover - exercised only in minimal test envs
     load_dotenv = None
 
 
-class _RemoteCallback(QwenTtsRealtimeCallback):
+_REMOTE_CALLBACK_BASE = cast(Any, QwenTtsRealtimeCallback)
+
+
+class _RemoteCallback(_REMOTE_CALLBACK_BASE):
     def __init__(self, audio_queue) -> None:
         super().__init__()
         self._audio_queue = audio_queue
         self.complete_event = threading.Event()
         self.session_finished_event = threading.Event()
+        self.connection_closed_event = threading.Event()
         self._response_chunks: list[bytes] = []
         self._lock = threading.Lock()
         self._playback_enabled = True
@@ -45,6 +47,7 @@ class _RemoteCallback(QwenTtsRealtimeCallback):
             self._response_chunks = []
         self._playback_enabled = playback_enabled
         self.complete_event.clear()
+        self.connection_closed_event.clear()
 
     def get_response_pcm(self) -> bytes:
         with self._lock:
@@ -54,6 +57,7 @@ class _RemoteCallback(QwenTtsRealtimeCallback):
         logger.info("远端 TTS 连接已建立")
 
     def on_close(self, close_status_code, close_msg) -> None:
+        self.connection_closed_event.set()
         logger.info(
             "远端 TTS 连接已关闭，code=%s msg=%s",
             close_status_code,
@@ -91,6 +95,9 @@ class _RemoteCallback(QwenTtsRealtimeCallback):
     def wait_for_finished(self, timeout_sec: float) -> bool:
         return self.session_finished_event.wait(timeout=timeout_sec)
 
+    def is_connection_closed(self) -> bool:
+        return self.connection_closed_event.is_set()
+
 
 class RemoteTTSRuntime(TTSRuntime):
     def __init__(self, context: TTSBackendContext) -> None:
@@ -102,22 +109,29 @@ class RemoteTTSRuntime(TTSRuntime):
         if load_dotenv is not None:
             load_dotenv()
 
+    def _reset_runtime_locked(self) -> None:
+        qwen_tts = self._qwen_tts
+        self._qwen_tts = None
+        self._callback = None
+
+        if qwen_tts is None:
+            return
+
+        try:
+            qwen_tts.finish()
+        except Exception as e:
+            if "closed" in str(e).lower():
+                logger.info("远端 TTS 连接已关闭，跳过重复关闭")
+                return
+            logger.warning(f"关闭远端 TTS 会话失败: {e}")
+
     ####### TTSRuntime 接口实现 ######
     def initialize_if_needed(self) -> None:
         self._ensure_runtime()
 
     def close_runtime(self) -> None:
         with self._runtime_lock:
-            if self._qwen_tts is None:
-                return
-
-            try:
-                self._qwen_tts.finish()
-            except Exception as e:
-                logger.warning(f"关闭远端 TTS 会话失败: {e}")
-            finally:
-                self._qwen_tts = None
-                self._callback = None
+            self._reset_runtime_locked()
 
     def run_tts(self, text: str) -> None:
         self.synthesize(text, playback_enabled=True)
@@ -126,7 +140,12 @@ class RemoteTTSRuntime(TTSRuntime):
 
     def _ensure_runtime(self) -> None:
         if self._qwen_tts is not None:
-            return
+            callback = self._callback
+            if callback is not None and not callback.is_connection_closed():
+                return
+
+            logger.info("检测到远端 TTS 连接已关闭，准备重建运行时")
+            self._reset_runtime_locked()
 
         if dashscope is None or QwenTtsRealtime is None or AudioFormat is None:
             raise RuntimeError("dashscope 未安装，无法启用远端 TTS")
@@ -137,7 +156,9 @@ class RemoteTTSRuntime(TTSRuntime):
 
         dashscope.api_key = api_key
         self._callback = _RemoteCallback(self._context.audio_queue)
-        self._qwen_tts = QwenTtsRealtime(
+        qwen_tts_cls = cast(Any, QwenTtsRealtime)
+        audio_format = cast(Any, AudioFormat)
+        self._qwen_tts = qwen_tts_cls(
             model=self._context.model,
             callback=self._callback,
             url=self._context.remote_url,
@@ -145,7 +166,7 @@ class RemoteTTSRuntime(TTSRuntime):
         self._qwen_tts.connect()
         self._qwen_tts.update_session(
             voice=self._context.voice,
-            response_format=AudioFormat.PCM_24000HZ_MONO_16BIT,
+            response_format=audio_format.PCM_24000HZ_MONO_16BIT,
             mode=self._context.remote_mode,
         )
 
@@ -155,9 +176,10 @@ class RemoteTTSRuntime(TTSRuntime):
         with self._runtime_lock:
             if self._qwen_tts is None:
                 return
+            audio_format = cast(Any, AudioFormat)
             self._qwen_tts.update_session(
                 voice=self._context.voice,
-                response_format=AudioFormat.PCM_24000HZ_MONO_16BIT,
+                response_format=audio_format.PCM_24000HZ_MONO_16BIT,
                 mode=self._context.remote_mode,
             )
 
@@ -190,8 +212,21 @@ class RemoteTTSRuntime(TTSRuntime):
             assert self._qwen_tts is not None
 
             self._callback.reset_response(playback_enabled=playback_enabled)
-            self._qwen_tts.append_text(normalized_text)
-            self._qwen_tts.commit()
+            try:
+                self._qwen_tts.append_text(normalized_text)
+                self._qwen_tts.commit()
+            except Exception as e:
+                if "closed" not in str(e).lower():
+                    raise
+
+                logger.info("远端 TTS 连接已失效，正在重建后重试当前请求")
+                self._reset_runtime_locked()
+                self._ensure_runtime()
+                assert self._callback is not None
+                assert self._qwen_tts is not None
+                self._callback.reset_response(playback_enabled=playback_enabled)
+                self._qwen_tts.append_text(normalized_text)
+                self._qwen_tts.commit()
 
         if not self._callback.wait_for_response_done(timeout_sec=self._context.timeout):
             raise TimeoutError("远端 TTS 响应超时")

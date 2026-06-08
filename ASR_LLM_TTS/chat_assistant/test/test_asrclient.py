@@ -106,6 +106,94 @@ def test_clean_asr_text_removes_unk_and_extra_spaces():
     assert result == "你好世界"
 
 
+def test_reset_from_config_reinitializes_instance_state():
+    """测试 reset_from_config 会关闭旧状态并按新配置重建实例。"""
+
+    class ResettableStubClient(asrclient_module.ASRClient):
+        def __init__(self, **kwargs):
+            self.close_calls = 0
+            self.initialize_snapshots = []
+            super().__init__(**kwargs)
+
+        def close(self):
+            self.close_calls += 1
+
+        def _initialize_runtime_components(self):
+            self.initialize_snapshots.append(
+                {
+                    "host": self.host,
+                    "port": self.port,
+                    "timeout": self.timeout,
+                    "use_websocket": self.use_websocket,
+                    "ws_path": self.ws_path,
+                    "samples_per_message": self.samples_per_message,
+                    "seconds_per_message": self.seconds_per_message,
+                    "queue_size": self._asr_text_queue.maxsize,
+                    "mic_channels": self.mic_channels,
+                    "mic_samplerate": self.mic_samplerate,
+                    "mic_block_seconds": self.mic_block_seconds,
+                }
+            )
+
+    client = ResettableStubClient(
+        host="127.0.0.1",
+        port=6006,
+        timeout_sec=5.0,
+        use_websocket=False,
+        asr_queue_size=2,
+    )
+    original_queue = client._asr_text_queue
+
+    client.reset_from_config(
+        {
+            "host": "192.168.1.8",
+            "port": 7001,
+            "timeout_sec": 12.5,
+            "use_websocket": True,
+            "ws_path": "/custom/ws",
+            "ws_ping_interval": 3.0,
+            "ws_ping_timeout": 4.0,
+            "samples_per_message": 4096,
+            "seconds_per_message": 0.2,
+            "asr_queue_size": 5,
+            "mic_channels": 2,
+            "mic_samplerate": 22050,
+            "mic_block_seconds": 0.1,
+        }
+    )
+
+    assert client.close_calls == 1
+    assert len(client.initialize_snapshots) == 2
+    assert client.host == "192.168.1.8"
+    assert client.port == 7001
+    assert client.timeout == 12.5
+    assert client.use_websocket is True
+    assert client.ws_path == "/custom/ws"
+    assert client.ws_ping_interval == 3.0
+    assert client.ws_ping_timeout == 4.0
+    assert client.samples_per_message == 4096
+    assert client.seconds_per_message == 0.2
+    assert client.mic_channels == 2
+    assert client.mic_samplerate == 22050
+    assert client.mic_block_seconds == 0.1
+    assert client._asr_text_queue.maxsize == 5
+    assert client._asr_text_queue is not original_queue
+
+    assert client.initialize_snapshots[-1] == {
+        "host": "192.168.1.8",
+        "port": 7001,
+        "timeout": 12.5,
+        "use_websocket": True,
+        "ws_path": "/custom/ws",
+        "samples_per_message": 4096,
+        "seconds_per_message": 0.2,
+        "queue_size": 5,
+        "mic_channels": 2,
+        "mic_samplerate": 22050,
+        "mic_block_seconds": 0.1,
+    }
+
+
 def test_recognize_routes_to_http_when_websocket_disabled(monkeypatch):
     """测试 recognize 在未启用 WebSocket 时是否走 HTTP 识别分支。"""
     client = build_client_shell()
