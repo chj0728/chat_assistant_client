@@ -170,7 +170,7 @@ class TTSClient(TTSClientBase):
         backend_context = TTSBackendContext(
             host=self.host,
             port=self.port,
-            timeout=self.timeout,
+            timeout=self.timeout_sec,
             sample_rate=self.sample_rate,
             channels=self.channels,
             chunk_size=self.chunk_size,

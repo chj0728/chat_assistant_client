@@ -52,7 +52,7 @@ class TTSClientBase(AudioStreamOwner):
     ) -> None:
         self.host = host
         self.port = port
-        self.timeout = timeout_sec
+        self.timeout_sec = timeout_sec
         self.sample_rate = sample_rate
         self.channels = channels
         self.chunk_size = chunk_size
