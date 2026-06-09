@@ -89,8 +89,28 @@ class TTSRuntime(Protocol):
         """关闭运行时并释放资源。"""
         ...
 
-    def run_tts(self, text: str) -> None:
-        """运行 TTS 合成。"""
+    def tts_infer(self, text: str) -> None:
+        """执行 TTS 推理，将合成的音频数据块放入音频队列供播放线程使用。
+        Args:
+            text: 待合成文本。
+        """
+        ...
+
+    def generate_wav(self, text: str, filename: str) -> bool:
+        """生成 WAV 文件。
+        Args:
+            text: 待合成文本。
+            filename: 输出 WAV 文件名。
+        Returns:
+            bool: 是否生成成功。
+        """
+        ...
+
+    def change_voice(self, voice: str) -> None:
+        """更改语音设置，适用于支持多语音的 TTS 后端。
+        Args:
+            voice: 语音名称。
+        """
         ...
 
 
@@ -119,6 +139,25 @@ class TTSBackend(TTSBackendBase):
         self._request_error_log_prefix = request_error_log_prefix
         self._transfer_elapsed_log_label = transfer_elapsed_log_label
 
+    def _tts_loop(self) -> None:
+        """TTS 后端主循环，用于处理文本队列并调用运行时进行 TTS 合成。"""
+        while not self._context.stop_event.is_set():
+            try:
+                text = self._context.text_queue.get(timeout=WORKER_POLL_TIMEOUT_SEC)
+            except queue.Empty:
+                continue
+
+            start_time = time.time()
+            try:
+                self._runtime.tts_infer(text)
+            except Exception as e:
+                logger.error(f"{self._request_error_log_prefix}: {e}")
+            finally:
+                elapsed_time = time.time() - start_time
+                logger.debug(
+                    f"{self._transfer_elapsed_log_label}: {elapsed_time:.2f} 秒"
+                )
+
     ### TTSBackendBase 接口实现 ###
     def initialize_if_needed(self) -> None:
         self._runtime.initialize_if_needed()
@@ -141,9 +180,7 @@ class TTSBackend(TTSBackendBase):
     def change_voice(self, voice: str) -> None:
         """更改语音设置，适用于支持多语音的 TTS 后端。"""
         self._context.voice = voice
-        change_voice = getattr(self._runtime, "change_voice", None)
-        if callable(change_voice):
-            change_voice(voice)
+        self._runtime.change_voice(voice)
 
     def request_stream(self, text: str, data_type: str):
         """请求音频流，适用于支持音频流的 TTS 后端。"""
@@ -154,41 +191,4 @@ class TTSBackend(TTSBackendBase):
 
     def generate_wav(self, text: str, filename: str) -> bool:
         """生成 WAV 文件，适用于支持生成 WAV 的 TTS 后端。"""
-        generate_wav = getattr(self._runtime, "generate_wav", None)
-        if callable(generate_wav):
-            return generate_wav(text, filename)
-
-        try:
-            with self.request_stream(text, data_type="wav") as resp:
-                resp.raise_for_status()
-
-                if "audio" not in resp.headers.get("Content-Type", ""):
-                    logger.error("返回不是音频")
-                    logger.error(resp.text)
-                    return False
-
-                with open(filename, "wb") as f:
-                    f.write(resp.content)
-            return True
-        except Exception as e:
-            logger.error(f"TTS 请求失败: {e}")
-            return False
-
-    def _tts_loop(self) -> None:
-        """TTS 后端主循环，用于处理文本队列并调用运行时进行 TTS 合成。"""
-        while not self._context.stop_event.is_set():
-            try:
-                text = self._context.text_queue.get(timeout=WORKER_POLL_TIMEOUT_SEC)
-            except queue.Empty:
-                continue
-
-            start_time = time.time()
-            try:
-                self._runtime.run_tts(text)
-            except Exception as e:
-                logger.error(f"{self._request_error_log_prefix}: {e}")
-            finally:
-                elapsed_time = time.time() - start_time
-                logger.debug(
-                    f"{self._transfer_elapsed_log_label}: {elapsed_time:.2f} 秒"
-                )
+        return self._runtime.generate_wav(text, filename)

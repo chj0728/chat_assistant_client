@@ -106,10 +106,6 @@ class TTSClientBase(AudioStreamOwner):
         """启动 TTS 工作线程。"""
         raise NotImplementedError
 
-    def _close_backend_runtime(self) -> None:
-        """关闭 TTS 后端运行时。"""
-        return
-
     def _reset_playback_state(self) -> None:
         """重置播放状态，包括播放缓冲区和时间戳。"""
         with self._audio_lock:
@@ -137,7 +133,7 @@ class TTSClientBase(AudioStreamOwner):
             self.sound.stop()
             time.sleep(LOCAL_AUDIO_STOP_WAIT_SEC)
 
-    ######### TTS 客户端接口 #########
+    ######### TTSBase 对外功能接口实现 #########
     def speak(self, text, interrupt=True):
         """将文本加入 TTS 播放队列，等待 TTS 后端处理并通过音频流播放。"""
         self._interrupt_event.clear()
@@ -202,14 +198,3 @@ class TTSClientBase(AudioStreamOwner):
         if self.is_sounding:
             return True
         return self._playback_started_event.wait(timeout=timeout_sec)
-
-    def stop(self):
-        """停止 TTS 播放并清理资源。"""
-        self._stop_event.set()
-        self.interrupt()
-        self._close_backend_runtime()
-        if self.stream is not None:
-            self.stream.stop()
-            self.stream.close()
-        if self.tts_thread is not None:
-            self.tts_thread.join(timeout=3)

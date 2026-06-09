@@ -226,47 +226,6 @@ class RemoteTTSRuntime(TTSRuntime):
         with self.runtime_lock:
             self.reset_runtime()
 
-    ####### TTSRuntime 接口实现 ######
-    def initialize_if_needed(self) -> None:
-        self.ensure_runtime()
-
-    def close_runtime(self) -> None:
-        with self.runtime_lock:
-            self.session_to_finish()
-
-    def run_tts(self, text: str) -> None:
-        self.synthesize(text, playback_enabled=True)
-
-    ################################
-
-    ####### 远端 TTS 运行时接口实现 ######
-    def change_voice(self, voice: str) -> None:
-        self.context.voice = voice
-        with self.runtime_lock:
-            if self.qwen_tts is None:
-                return
-            audio_format = cast(Any, AudioFormat)
-            self.qwen_tts.update_session(
-                voice=self.context.voice,
-                response_format=audio_format.PCM_24000HZ_MONO_16BIT,
-                mode=self.context.remote_mode,
-            )
-
-    def generate_wav(self, text: str, filename: str) -> bool:
-        try:
-            pcm_bytes = self.synthesize(text, playback_enabled=False)
-            if not pcm_bytes:
-                return False
-            with wave.open(filename, "wb") as wf:
-                wf.setnchannels(self.context.channels)
-                wf.setsampwidth(2)
-                wf.setframerate(self.context.sample_rate)
-                wf.writeframes(pcm_bytes)
-            return True
-        except Exception as e:
-            logger.error(f"远端 TTS 生成 WAV 失败: {e}")
-            return False
-
     def synthesize(self, text: str, *, playback_enabled: bool) -> bytes:
         """执行 TTS 合成，返回合成的 PCM 音频数据。
         如果 playback_enabled=True，则在合成过程中会将 PCM 数据放入音频队列以供播放；如果 playback_enabled=False，则仅返回完整的 PCM 数据，不进行播放。
@@ -290,7 +249,7 @@ class RemoteTTSRuntime(TTSRuntime):
                     raise TimeoutError("远端 TTS 响应超时")
             except Exception as e:
                 if "closed" in str(e).lower():
-                    logger.warning("远端 TTS 连接在请求期间关闭，正在重建后重试")
+                    logger.warning("远端 TTS 连接在请求期间关闭，正在重连后重试...")
                     self.reset_runtime()
                     self.initialize_runtime()
                     assert self.callback is not None
@@ -306,3 +265,43 @@ class RemoteTTSRuntime(TTSRuntime):
                     raise
 
         return self.callback.get_response_pcm()
+
+    ####### TTSRuntime 接口实现 ######
+    def initialize_if_needed(self) -> None:
+        self.ensure_runtime()
+
+    def close_runtime(self) -> None:
+        with self.runtime_lock:
+            self.session_to_finish()
+
+    def tts_infer(self, text: str) -> None:
+        self.synthesize(text, playback_enabled=True)
+
+    def generate_wav(self, text: str, filename: str) -> bool:
+        try:
+            pcm_bytes = self.synthesize(text, playback_enabled=False)
+            if not pcm_bytes:
+                return False
+            with wave.open(filename, "wb") as wf:
+                wf.setnchannels(self.context.channels)
+                wf.setsampwidth(2)
+                wf.setframerate(self.context.sample_rate)
+                wf.writeframes(pcm_bytes)
+            return True
+        except Exception as e:
+            logger.error(f"远端 TTS 生成 WAV 失败: {e}")
+            return False
+
+    def change_voice(self, voice: str) -> None:
+        self.context.voice = voice
+        with self.runtime_lock:
+            if self.qwen_tts is None:
+                return
+            audio_format = cast(Any, AudioFormat)
+            self.qwen_tts.update_session(
+                voice=self.context.voice,
+                response_format=audio_format.PCM_24000HZ_MONO_16BIT,
+                mode=self.context.remote_mode,
+            )
+
+    ################################

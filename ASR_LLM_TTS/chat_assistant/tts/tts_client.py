@@ -199,7 +199,7 @@ class TTSClient(TTSClientBase):
 
         self.tts_thread = self.__start_tts_worker()
 
-        self.__initialize_websocket_if_needed()
+        self._backend.initialize_if_needed()
 
     def _create_backend(self, context: TTSBackendContext) -> TTSBackend:
         if self.tts_server_type == "tts_remote":
@@ -221,8 +221,11 @@ class TTSClient(TTSClientBase):
             transfer_elapsed_log_label="本地 TTS 音频传输耗时",
         )
 
-    def _initialize_backend_if_needed(self) -> None:
-        self.__initialize_websocket_if_needed()
+    def __create_output_stream(self):
+        return self._create_output_stream()
+
+    def __start_tts_worker(self):
+        return self._backend.start()
 
     def _start_tts_worker(self):
         return self.__start_tts_worker()
@@ -231,6 +234,7 @@ class TTSClient(TTSClientBase):
         if self._backend is not None:
             self._backend.close()
 
+    ########## TTSClient 对外功能接口实现 ##########
     @classmethod
     def from_config(cls, config: dict) -> "TTSClient":
         return cls(**cls._build_init_kwargs_from_config(config))
@@ -241,53 +245,27 @@ class TTSClient(TTSClientBase):
         self._initialize_runtime_components()
 
     def generate_wav(self, text, filename) -> bool:
-        if self.tts_server_type == "tts_local":
-            try:
-                with self.__request_stream(text, data_type="wav") as resp:
-                    resp.raise_for_status()
 
-                    if "audio" not in resp.headers.get("Content-Type", ""):
-                        logger.error("返回不是音频")
-                        logger.error(resp.text)
-                        return False
-
-                    with open(filename, "wb") as f:
-                        f.write(resp.content)
-                return True
-            except Exception as e:
-                logger.error(f"TTS 请求失败: {e}")
-                return False
         return self._backend.generate_wav(text, filename)
 
-    def change_preset(self, preset):
-        self.voice = preset
-        self.voice_type = preset
-        self._backend.change_voice(preset)
-
-    def __create_output_stream(self):
-        return self._create_output_stream()
-
-    def __start_tts_worker(self):
-        return self._backend.start()
-
-    def __initialize_websocket_if_needed(self) -> None:
-        self._backend.initialize_if_needed()
-
-    def __request_stream(self, text: str, data_type: str):
-        if self.tts_server_type != "tts_local":
-            raise RuntimeError("远端 TTS 不支持通过本地 HTTP 接口请求音频流")
-        return self._backend.request_stream(text, data_type)
-
-    def __close_ws_runtime(self):
-        self._close_backend_runtime()
+    def change_voice(self, voice: str) -> None:
+        self.voice = voice
+        self.voice_type = voice
+        self._backend.change_voice(voice)
 
     def stop(self):
         self._stop_event.set()
         self.interrupt()
-        self.__close_ws_runtime()
+
+        # 关闭 TTS 后端运行时，确保所有资源都被正确释放
+        self._close_backend_runtime()
+
+        # 关闭音频输出流
         if self.stream is not None:
             self.stream.stop()
             self.stream.close()
+
+        # 等待 TTS worker 线程结束
         if self.tts_thread is not None:
             self.tts_thread.join(timeout=3)
 
