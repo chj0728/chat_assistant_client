@@ -1,28 +1,26 @@
 import os
 import time
-from typing import Optional  # , Self
+from typing import Optional
 
 from dotenv import load_dotenv
 from logger import logger
 
-from .backend_base import TTSBackend, TTSBackendContext
-from .tts_base import TTSClientBase
-from .tts_local import LocalTTSRuntime
-from .tts_remote import RemoteTTSRuntime
+from .base import TTSClientBase
+from .contracts import TTSBackendContext
+from .runtimes.qwen import QwenTTSRuntime
+from .runtimes.sherpa import SherpaTTSRuntime
+from .worker import TTSBackend
 
 load_dotenv()
+
+
 # --------------------- 阿里云 DashScope API Key 配置说明 ---------------------
 # 1. 获取 API Key：访问 https://help.aliyun.com/zh/model-studio/get-api-key 获取 API Key。
 # 2. 配置 API Key：有两种方式配置 API Key：
 #    a. 环境变量：将 API Key 设置为环境变量 DASHSCOPE_API_KEY，例如在 Linux/MacOS 终端执行 export DASHSCOPE_API_KEY=你的APIKey，或在 Windows 命令提示符执行 set DASHSCOPE_API_KEY=你的APIKey。
 #    b. 在 .env 文件中添加一行 DASHSCOPE_API_KEY=你的APIKey，并确保在代码中使用 load_dotenv() 加载环境变量。
 # --------------------- 阿里云 DashScope API Key 配置说明 ---------------------
-
-
 def GET_DASHSCOPE_API_KEY() -> Optional[str]:
-    """
-    获取 DashScope API Key 的函数，优先从环境变量中获取。
-    """
     return os.environ.get("DASHSCOPE_API_KEY", "").strip()
 
 
@@ -78,9 +76,7 @@ class TTSClient(TTSClientBase):
 
     @staticmethod
     def _build_init_kwargs_from_config(config: dict) -> dict:
-
         tts_server_type = config.get("tts_server_type", "tts_local")
-
         return {
             "host": config.get("host", "192.168.10.101"),
             "port": config.get("port", 50000),
@@ -132,7 +128,6 @@ class TTSClient(TTSClientBase):
         remote_url: Optional[str] = None,
         remote_mode: str = "commit",
     ) -> None:
-
         playback_dtype = "int16" if tts_server_type == "tts_remote" else "float32"
 
         self._apply_base_init_kwargs(
@@ -146,8 +141,10 @@ class TTSClient(TTSClientBase):
             playback_dtype=playback_dtype,
             playback_start_delay_sec=playback_start_delay_sec,
         )
+        self.timeout = timeout_sec
+        self.tts_server_type = tts_server_type
 
-        ########## Local TTS 相关参数 ##########
+        ############## Sherpa TTS 配置项 ##############
         self.speaker_id = speaker_id
         self.speed = speed
         self.use_websocket = use_websocket
@@ -155,8 +152,7 @@ class TTSClient(TTSClientBase):
         self.ws_ping_interval = ws_ping_interval
         self.ws_ping_timeout = ws_ping_timeout
 
-        ########### Remote TTS 相关参数 ##########
-        self.tts_server_type = tts_server_type
+        ############# Qwen TTS 配置项 #############
         self.voice = voice or voice_type or "Cherry"
         self.voice_type = self.voice
         self.api_key = api_key
@@ -166,7 +162,7 @@ class TTSClient(TTSClientBase):
         )
         self.remote_mode = remote_mode
 
-        ########## Backend 上下文 ##########
+        ############### TTS 后端上下文 ###############
         backend_context = TTSBackendContext(
             host=self.host,
             port=self.port,
@@ -190,20 +186,18 @@ class TTSClient(TTSClientBase):
             remote_url=self.remote_url,
             remote_mode=self.remote_mode,
         )
-        self._backend = self._create_backend(backend_context)
+        self.tts_backend = self._create_backend(backend_context)
 
     def _initialize_runtime_components(self) -> None:
 
-        self.stream = self.__create_output_stream()
-        self.stream.start()
+        self.output_stream = self._create_output_stream()
+        self.output_stream.start()
 
-        self.tts_thread = self.__start_tts_worker()
-
-        self._backend.initialize_if_needed()
+        self.tts_backend.on_start()
 
     def _create_backend(self, context: TTSBackendContext) -> TTSBackend:
         if self.tts_server_type == "tts_remote":
-            runtime = RemoteTTSRuntime(context)
+            runtime = QwenTTSRuntime(context)
             return TTSBackend(
                 context=context,
                 runtime=runtime,
@@ -212,7 +206,7 @@ class TTSClient(TTSClientBase):
                 transfer_elapsed_log_label="远端 TTS 音频传输耗时",
             )
 
-        runtime = LocalTTSRuntime(context)
+        runtime = SherpaTTSRuntime(context)
         return TTSBackend(
             context=context,
             runtime=runtime,
@@ -221,20 +215,6 @@ class TTSClient(TTSClientBase):
             transfer_elapsed_log_label="本地 TTS 音频传输耗时",
         )
 
-    def __create_output_stream(self):
-        return self._create_output_stream()
-
-    def __start_tts_worker(self):
-        return self._backend.start()
-
-    def _start_tts_worker(self):
-        return self.__start_tts_worker()
-
-    def _close_backend_runtime(self) -> None:
-        if self._backend is not None:
-            self._backend.close()
-
-    ########## TTSClient 对外功能接口实现 ##########
     @classmethod
     def from_config(cls, config: dict) -> "TTSClient":
         return cls(**cls._build_init_kwargs_from_config(config))
@@ -245,33 +225,28 @@ class TTSClient(TTSClientBase):
         self._initialize_runtime_components()
 
     def generate_wav(self, text, filename) -> bool:
-
-        return self._backend.generate_wav(text, filename)
+        return self.tts_backend.generate_wav(text, filename)
 
     def change_voice(self, voice: str) -> None:
         self.voice = voice
         self.voice_type = voice
-        self._backend.change_voice(voice)
+        self.tts_backend.change_voice(voice)
 
     def stop(self):
+
         self._stop_event.set()
         self.interrupt()
 
-        # 关闭 TTS 后端运行时，确保所有资源都被正确释放
-        self._close_backend_runtime()
-
         # 关闭音频输出流
-        if self.stream is not None:
-            self.stream.stop()
-            self.stream.close()
+        if self.output_stream is not None:
+            self.output_stream.stop()
+            self.output_stream.close()
 
-        # 等待 TTS worker 线程结束
-        if self.tts_thread is not None:
-            self.tts_thread.join(timeout=3)
+        # 关闭 TTS 后端运行时，确保所有资源都被正确释放
+        self.tts_backend.on_stop()
 
 
 if __name__ == "__main__":
-
     from config import load_config, reload_config
 
     configs = load_config()
@@ -311,3 +286,6 @@ if __name__ == "__main__":
     logger.info("WebSocket 播放完成")
     time.sleep(2)
     logger.info("TTS 客户端测试完成")
+
+
+__all__ = ["GET_DASHSCOPE_API_KEY", "TTSClient"]
