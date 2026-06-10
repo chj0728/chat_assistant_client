@@ -235,6 +235,7 @@ class TTSClient(TTSClientBase):
     def stop(self):
 
         self._stop_event.set()
+
         self.interrupt()
 
         # 关闭音频输出流

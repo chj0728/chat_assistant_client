@@ -51,6 +51,7 @@ class AudioQueueOutputStream:
         return bool(getattr(self._stream, "active", False))
 
     def _audio_callback(self, outdata, frames, time_info, status) -> None:
+        """音频回调函数，用于处理音频数据的输出和播放状态的更新。"""
         del time_info
         owner = self._owner
         now = time.monotonic()
@@ -93,7 +94,9 @@ class AudioQueueOutputStream:
         if filled < frames:
             outdata[filled:].fill(0)
 
+        ####### 声音检测逻辑，延迟判断起播音频播放状态 #######
         if filled > 0:
+            # 先记录首帧时间；达到起播确认窗口后再判定为播放。
             if owner._audio_active_started_ts <= 0.0:
                 owner._audio_active_started_ts = now
             owner._last_audio_chunk_ts = now
@@ -103,6 +106,7 @@ class AudioQueueOutputStream:
             if owner.is_sounding:
                 owner._playback_started_event.set()
         else:
+            # 短暂挂起窗口用于吸收回调调度抖动，避免状态频繁抖动。
             keep_active = (
                 now - owner._last_audio_chunk_ts
             ) < owner._playback_hangover_sec
@@ -110,3 +114,22 @@ class AudioQueueOutputStream:
             if not keep_active:
                 owner._audio_active_started_ts = 0.0
                 owner._playback_started_event.clear()
+        ################################################
+
+    def _reset_playback_state(self) -> None:
+        """重置播放状态，清空播放缓冲区和相关时间戳，并更新播放状态标志和事件，确保在停止或中断播放时能够正确地清理播放状态并准备好下一次播放。"""
+        with self._owner._audio_lock:
+            self._owner._playback_buffer = np.empty(
+                (0, self._channels), dtype=self._dtype
+            )
+            self._owner._audio_active_started_ts = 0.0
+            self._owner._last_audio_chunk_ts = 0.0
+        self._owner.is_sounding = False
+        self._owner._playback_started_event.clear()
+
+    def interrupt(self) -> None:
+        """中断当前播放，设置中断事件并重置播放状态，确保在需要立即停止播放时能够正确地清理播放状态并通知相关组件。"""
+        self._owner._interrupt_event.set()
+        time.sleep(0.2)
+        self._reset_playback_state()
+        self._owner._interrupt_event.clear()
