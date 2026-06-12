@@ -1,3 +1,4 @@
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any, Mapping, Optional, Protocol, cast
@@ -134,6 +135,7 @@ class RosInterfaceOwner(Protocol):
     ros_interface_config: NodeRosConfig
     _publisher_handles: list[Any]
     _subscription_handles: list[Any]
+    _ros_interface_lock: threading.RLock
     audio_cb_group: Any
     interrupt_cb_group: Any
 
@@ -208,33 +210,38 @@ class RosInterfaceRegistryMixin:
 
     def _create_topic_interfaces(self: RosInterfaceOwner) -> None:
         node = cast(Node, self)
-        for spec in PUBLISHER_SPECS:
-            publisher = node.create_publisher(
-                spec.message_type,
-                getattr(self.ros_interface_config, spec.config_attr),
-                spec.qos_depth,
-            )
-            setattr(self, spec.attribute_name, publisher)
-            self._publisher_handles.append(publisher)
+        with self._ros_interface_lock:
+            for spec in PUBLISHER_SPECS:
+                publisher = node.create_publisher(
+                    spec.message_type,
+                    getattr(self.ros_interface_config, spec.config_attr),
+                    spec.qos_depth,
+                )
+                setattr(self, spec.attribute_name, publisher)
+                self._publisher_handles.append(publisher)
 
-        for spec in SUBSCRIPTION_SPECS:
-            subscription = node.create_subscription(
-                spec.message_type,
-                getattr(self.ros_interface_config, spec.config_attr),
-                getattr(self, spec.handler_name),
-                spec.qos_depth,
-            )
-            self._subscription_handles.append(subscription)
+            for spec in SUBSCRIPTION_SPECS:
+                subscription = node.create_subscription(
+                    spec.message_type,
+                    getattr(self.ros_interface_config, spec.config_attr),
+                    getattr(self, spec.handler_name),
+                    spec.qos_depth,
+                )
+                self._subscription_handles.append(subscription)
 
     def _destroy_topic_interfaces(self: RosInterfaceOwner) -> None:
         node = cast(Node, self)
-        for subscription in self._subscription_handles:
-            node.destroy_subscription(subscription)
-        self._subscription_handles.clear()
+        with self._ros_interface_lock:
+            for subscription in self._subscription_handles:
+                node.destroy_subscription(subscription)
+            self._subscription_handles.clear()
 
-        for publisher in self._publisher_handles:
-            node.destroy_publisher(publisher)
-        self._publisher_handles.clear()
+            for publisher in self._publisher_handles:
+                node.destroy_publisher(publisher)
+            self._publisher_handles.clear()
+
+            for spec in PUBLISHER_SPECS:
+                setattr(self, spec.attribute_name, None)
 
 
 class RosInterfaceRegistry(RosInterfaceRegistryMixin):
@@ -260,6 +267,7 @@ class RosInterfaceRegistry(RosInterfaceRegistryMixin):
         self.ros_interface_config = NodeRosConfig()
         self._publisher_handles = []
         self._subscription_handles = []
+        self._ros_interface_lock = threading.RLock()
         self.audio_cb_group = ReentrantCallbackGroup()
         self.interrupt_cb_group = ReentrantCallbackGroup()
 

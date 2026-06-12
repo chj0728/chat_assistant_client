@@ -75,6 +75,8 @@ class ChatAssistantNodeOwner(Protocol):
     last_user_face_true_time: float
     user_face_stale_timeout_sec: float
 
+    _ros_interface_lock: Any
+
     def reload_config_and_initialize(self) -> None:
         """重新加载配置文件并进行必要的初始化"""
         ...
@@ -109,6 +111,10 @@ class ChatAssistantNodeOwner(Protocol):
 
     def _publish_pending_resolved_user_name(self) -> None:
         """发布待发布的解析后的用户名"""
+        ...
+
+    def _publish_message(self, publisher_name: str, msg: Any) -> bool:
+        """通过指定的发布器发布消息，返回发布是否成功"""
         ...
 
 
@@ -478,7 +484,7 @@ class ChatAssistantStateHandlersMixin:
             asr_text = self.chat_assistant.asr_text_queue.get(timeout=0.05)
             msg = String()
             msg.data = asr_text
-            self.asr_publisher.publish(msg)
+            self._publish_message("asr_publisher", msg)
 
     def _publish_pending_llm_text(self: ChatAssistantNodeOwner) -> None:
         if self.chat_assistant.llm_text_queue.empty() is False:
@@ -486,7 +492,7 @@ class ChatAssistantStateHandlersMixin:
             msg = LLMResponse()
             msg.response_index = llm_response[0].get("index", 0)
             msg.response_text = llm_response[0].get("text", "")
-            self.llm_publisher.publish(msg)
+            self._publish_message("llm_publisher", msg)
 
     def _publish_pending_response(self: ChatAssistantNodeOwner) -> None:
         if self.chat_assistant.response_queue.empty() is False:
@@ -494,7 +500,8 @@ class ChatAssistantStateHandlersMixin:
             response_msg = Response()
             response_msg.asr_text = response_data.get("asr_text", "")
             response_msg.llm_text = response_data.get("llm_text", "")
-            self.response_publisher.publish(response_msg)
+            if not self._publish_message("response_publisher", response_msg):
+                return
             logger.info(
                 "发布 综合响应结果 到话题: ASR Text: [%s], LLM Text: [%s]",
                 response_msg.asr_text,
@@ -504,7 +511,7 @@ class ChatAssistantStateHandlersMixin:
     def _publish_tts_status(self: ChatAssistantNodeOwner) -> None:
         tts_msg = Bool()
         tts_msg.data = self.chat_assistant.check_tts_active()
-        self.tts_status_publisher.publish(tts_msg)
+        self._publish_message("tts_status_publisher", tts_msg)
 
     def _publish_pending_resolved_user_name(self: ChatAssistantNodeOwner) -> None:
         if self.chat_assistant.resolved_user_names_queue.empty() is False:
@@ -513,8 +520,20 @@ class ChatAssistantStateHandlersMixin:
             )
             msg = String()
             msg.data = resolved_user_name or ""
-            self.resolved_user_name_publisher.publish(msg)
+            if not self._publish_message("resolved_user_name_publisher", msg):
+                return
             logger.info(f"发布解析后的用户名: {resolved_user_name}")
+
+    def _publish_message(
+        self: ChatAssistantNodeOwner, publisher_name: str, msg: Any
+    ) -> bool:
+        """通过指定的发布器发布消息，返回发布是否成功"""
+        with self._ros_interface_lock:
+            publisher = getattr(self, publisher_name, None)
+            if publisher is None:
+                return False
+            publisher.publish(msg)
+            return True
 
 
 class ChatAssistantHandlers(
