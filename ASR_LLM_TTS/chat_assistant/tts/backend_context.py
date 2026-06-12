@@ -33,16 +33,16 @@ class TTSBackendContext:
                                     server_commit : 由服务端智能处理文本分段与合成时机，适合大段文本的连续合成场景。客户端只需持续追加文本，无需关注分段和提交。
     """
 
-    host: str
-    port: int
-    timeout: float
-    sample_rate: int
-    channels: int
-    chunk_size: int
-    text_queue: queue.Queue[str]
-    audio_queue: queue.Queue[bytes]
-    stop_event: threading.Event
-    interrupt_event: threading.Event
+    host: str = "0.0.0.0"
+    port: int = 0
+    timeout: float = 10.0
+    sample_rate: int = 16000
+    channels: int = 1
+    chunk_size: int = 1024
+    text_queue: queue.Queue[str] = queue.Queue()
+    audio_queue: queue.Queue[bytes] = queue.Queue()
+    stop_event: threading.Event = threading.Event()
+    interrupt_event: threading.Event = threading.Event()
     speaker_id: int = 0
     speed: float = 1.0
     use_websocket: bool = False

@@ -5,11 +5,11 @@ from typing import Optional
 from dotenv import load_dotenv
 from logger import logger
 
-from .base import TTSClientBase
-from .contracts import TTSBackendContext
+from .backend import TTSBackend
+from .backend_context import TTSBackendContext
+from .base import MyTTSClientBase, TTSClientBase
 from .runtimes.qwen import QwenTTSRuntime
 from .runtimes.sherpa import SherpaTTSRuntime
-from .worker import TTSBackend
 
 load_dotenv()
 
@@ -131,9 +131,6 @@ class TTSClient(TTSClientBase):
         playback_dtype = "int16" if tts_server_type == "tts_remote" else "float32"
 
         self._apply_base_init_kwargs(
-            host=host,
-            port=port,
-            timeout_sec=timeout_sec,
             sample_rate=sample_rate,
             channels=channels,
             chunk_size=chunk_size,
@@ -141,7 +138,10 @@ class TTSClient(TTSClientBase):
             playback_dtype=playback_dtype,
             playback_start_delay_sec=playback_start_delay_sec,
         )
-        self.timeout = timeout_sec
+
+        self.host = host
+        self.port = port
+        self.timeout_sec = timeout_sec
         self.tts_server_type = tts_server_type
 
         ############## Sherpa TTS 配置项 ##############
@@ -162,8 +162,17 @@ class TTSClient(TTSClientBase):
         )
         self.remote_mode = remote_mode
 
-        ############### TTS 后端上下文 ###############
-        backend_context = TTSBackendContext(
+    def _initialize_runtime_components(self) -> None:
+
+        self.output_stream = self._create_output_stream()
+        self.output_stream.start()
+
+        self.tts_backend = self._create_backend(self._create_backend_context())
+        self.tts_backend.on_start()
+
+    def _create_backend_context(self) -> TTSBackendContext:
+
+        return TTSBackendContext(
             host=self.host,
             port=self.port,
             timeout=self.timeout_sec,
@@ -186,14 +195,6 @@ class TTSClient(TTSClientBase):
             remote_url=self.remote_url,
             remote_mode=self.remote_mode,
         )
-        self.tts_backend = self._create_backend(backend_context)
-
-    def _initialize_runtime_components(self) -> None:
-
-        self.output_stream = self._create_output_stream()
-        self.output_stream.start()
-
-        self.tts_backend.on_start()
 
     def _create_backend(self, context: TTSBackendContext) -> TTSBackend:
         if self.tts_server_type == "tts_remote":
@@ -245,6 +246,28 @@ class TTSClient(TTSClientBase):
 
         # 关闭 TTS 后端运行时，确保所有资源都被正确释放
         self.tts_backend.on_stop()
+
+
+class MyTTSClient(MyTTSClientBase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @staticmethod
+    def build_init_kwargs_from_config(config: dict) -> dict:
+        # tts_kwargs = config.get("TTS", {})
+        return config
+
+    @classmethod
+    def from_config(cls, config: dict) -> "MyTTSClient":
+        init_kwargs = cls.build_init_kwargs_from_config(config)
+        return cls(**init_kwargs)
+
+    def reset_from_config(self, config: dict) -> None:
+
+        self.tts_backend.on_stop()
+
+        init_kwargs = self.build_init_kwargs_from_config(config)
+        self.__init__(**init_kwargs)
 
 
 if __name__ == "__main__":

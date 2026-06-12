@@ -15,7 +15,6 @@ from asr import ASRClient
 from config import get_vad_no_speech_threshold, load_config
 from llm import LLMAgent
 from logger import logger
-from tts import RealtimeTTSPlayer, TTSClient
 
 try:
     from voice.voice_recognizer import VoiceRecognizer
@@ -249,9 +248,16 @@ class ChatAssistant:
         # raise ValueError(f"未知的 TTS 服务器类型: {tts_server_type}")
 
         tts_cfg = self.configs.get("TTS", {})
-        tts_server_type = tts_cfg.get("tts_server_type", "tts_local")
-        logger.info(f"选择的 TTS 服务器类型: {tts_server_type}")
-        return TTSClient.from_config(config=tts_cfg)
+
+        # from tts import TTSClient
+
+        # tts_server_type = tts_cfg.get("tts_server_type", "tts_local")
+        # logger.info(f"选择的 TTS 服务器类型: {tts_server_type}")
+        # return TTSClient.from_config(config=tts_cfg)
+
+        from tts import MyTTSClient
+
+        return MyTTSClient.from_config(config=tts_cfg)
 
     def _initialize_audio_settings(self) -> None:
         audio_cfg = self.configs.get("Audio", {})
@@ -1137,14 +1143,12 @@ class ChatAssistant:
             return False
 
         elapsed_time = 0
-        if isinstance(self.tts_client, RealtimeTTSPlayer):
-            elapsed_time = time.time() - start_time
-        else:
-            elapsed_time = (
-                time.time()
-                - start_time
-                - self.tts_client.get_playback_start_delay_sec()
-            )
+        # if isinstance(self.tts_client, RealtimeTTSPlayer):
+        #     elapsed_time = time.time() - start_time
+        # else:
+        elapsed_time = (
+            time.time() - start_time - self.tts_client.get_playback_start_delay_sec()
+        )
         logger.info(f"TTS 首次合成并播放音频延迟: {elapsed_time:.2f} 秒")
         return True
 

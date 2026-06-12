@@ -6,7 +6,7 @@ from typing import Any, cast
 
 from logger import logger
 
-from ..contracts import TTSBackendContext
+from ..backend_context import TTSBackendContext
 from .protocol import TTSRuntimeProtocol
 
 try:
@@ -165,10 +165,11 @@ class QwenTTSRuntime(TTSRuntimeProtocol):
                 self.initialize_runtime()
                 return
 
-            if self.callback.is_connection_closed():
-                logger.warning("远端 TTS 连接已关闭，正在重新建立连接...")
-                self.reset_runtime()
-                self.initialize_runtime()
+            if self.callback is not None:
+                if self.callback.is_connection_closed():
+                    logger.warning("远端 TTS 连接已关闭，正在重新建立连接...")
+                    self.reset_runtime()
+                    self.initialize_runtime()
 
     def session_to_finish(self) -> None:
         with self.runtime_lock:

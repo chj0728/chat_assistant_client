@@ -8,7 +8,7 @@ from typing import Optional
 import requests
 from logger import logger
 
-from ..contracts import TTSBackendContext
+from ..backend_context import TTSBackendContext
 from .protocol import TTSRuntimeProtocol
 
 try:

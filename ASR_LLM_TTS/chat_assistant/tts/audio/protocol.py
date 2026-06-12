@@ -34,3 +34,45 @@ class OutputStreamProtocol(Protocol):
     _stop_event: threading.Event
     _interrupt_event: threading.Event
     _playback_started_event: threading.Event
+
+    def start(self) -> None:
+        """启动音频输出流，准备好接收和播放音频数据。"""
+        ...
+
+    def stop(self) -> None:
+        """停止音频输出流，清空播放状态和相关缓冲区，适用于正常停止播放的场景。"""
+        ...
+
+    def close(self) -> None:
+        """关闭音频输出流，释放相关资源，适用于彻底关闭播放功能的场景。"""
+        ...
+
+    def interrupt(self):
+        """中断当前播放，清空播放状态和相关缓冲区，适用于需要立即停止当前音频播放的场景（如用户取消、紧急停止等）。"""
+        ...
+
+
+class MyOutputStreamProtocol(Protocol):
+    def start(self) -> None:
+        """启动音频输出流，准备好接收和播放音频数据。"""
+        ...
+
+    def stop(self) -> None:
+        """停止音频输出流，清空播放状态和相关缓冲区，适用于正常停止播放的场景。"""
+        ...
+
+    def close(self) -> None:
+        """关闭音频输出流，释放相关资源，适用于彻底关闭播放功能的场景。"""
+        ...
+
+    def interrupt(self):
+        """中断当前播放，清空播放状态和相关缓冲区，适用于需要立即停止当前音频播放的场景（如用户取消、紧急停止等）。"""
+        ...
+
+    def wait_until_playback_starts(self, timeout_sec: float = 5.0) -> bool:
+        """ "等待直到播放开始，返回是否成功进入播放状态，适用于需要确认音频已经开始播放的场景。"""
+        ...
+
+    def is_sounding_flag(self) -> bool:
+        """返回当前音频是否正在播放的状态标志，适用于需要判断音频播放状态的场景。"""
+        ...
