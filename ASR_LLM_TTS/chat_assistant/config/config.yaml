@@ -91,7 +91,7 @@ TTS:
     host: "192.168.50.107" # 本地 TTS 服务器地址，通常是 Jetson Orin 设备的 IP 地址
     port: 50000
 
-    playback_gain: 4.0 # 本地播放音量增益。覆盖全局 playback_gain 设置
+    playback_gain: 2.0 # 本地播放音量增益。覆盖全局 playback_gain 设置
     chunk_size: 2048 # 每次读取的音频块大小（帧数）。覆盖全局 chunk_size 设置
     dtype: "float32" # 音频数据类型，通常是 int16 或 float32，根据 TTS 服务器的输出格式调整。覆盖全局 dtype 设置
     sample_rate: 16000 # 采样率（Hz），需要与 TTS 服务端的输出采样率一致，确保音频播放正常。覆盖全局 sample_rate 设置
@@ -107,7 +107,7 @@ TTS:
 
   tts_remote: 
     # ----------- tts_remote (阿里云百炼 TTS 服务) -----------
-    playback_gain: 1.0 # 本地播放音量增益。覆盖全局 playback_gain 设置
+    playback_gain: 2.0 # 本地播放音量增益。覆盖全局 playback_gain 设置
     dtype: "int16" # 音频数据类型，通常是 int16 或 float32，根据 TTS 服务器的输出格式调整。覆盖全局 dtype 设置
     sample_rate: 24000 # 需要与 TTS 服务器的输出采样率一致，确保音频播放正常，覆盖全局 sample_rate 设置
     
