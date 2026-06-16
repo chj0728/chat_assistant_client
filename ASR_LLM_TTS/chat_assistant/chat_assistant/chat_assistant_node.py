@@ -38,7 +38,7 @@ class ChatAssistantNode(
 def main(args=None):
     rclpy.init(args=args)
     chat_assistant_node = ChatAssistantNode()
-    chat_assistant_node.chat_assistant.start_recording()
+    chat_assistant_node.chat_assistant.start()
 
     executor = MultiThreadedExecutor(num_threads=4)
     executor.add_node(chat_assistant_node)
@@ -49,12 +49,12 @@ def main(args=None):
             executor.spin_once(timeout_sec=0.05)
 
     except (KeyboardInterrupt, ExternalShutdownException):
-        chat_assistant_node.chat_assistant.stop_recording()
+        chat_assistant_node.chat_assistant.stop()
         logger.info("Shutdown signal received, exiting main loop...")
 
     finally:
         if rclpy.ok():
-            chat_assistant_node.chat_assistant.stop_recording()
+            chat_assistant_node.chat_assistant.stop()
             chat_assistant_node.destroy_node()
             rclpy.shutdown()
 

@@ -1,14 +1,38 @@
 ##################### ASR 配置 ######################
 asr_enable: true # 是否启动激活 ASR 模块
-asr_server: ['asr_local'] # 可选值: "asr_local"（本地 jestson orin 设备提供的 ASR 服务） "asr_remote"（远程服务器提供的 ASR 服务 ）
-asr_local:
-  host: "192.168.10.101" # 本地 ASR 服务器地址，通常是 Jetson Orin 设备的 IP 地址
-  port: 6006 # 2002（FunASR 服务端 HTTP 模式）或 6006（sherpa_onnx_asr 服务端 HTTP/WebSocket 模式）
-  use_websocket: true # 是否使用 WebSocket ，确保服务端支持 WebSocket
-  timeout_sec: 3 # ASR 请求超时时间，单位秒，根据实际情况调整
-asr_remote:
-  host: "192.168.50.220" # 远程 ASR 服务器地址
-  port: 2002
+ASR:
+  asr_server_type: "asr_local" # 默认使用本地 ASR 服务器 ，如果需要切换到远程服务器，修改为 asr_remote
+
+  asr_local:
+    host: "192.168.10.101" # 本地 TTS 服务器地址，通常是 Jetson Orin 设备的 IP 地址
+    port: 6006 # 2002（FunASR 服务端 HTTP 模式）或 6006（sherpa_onnx_asr 服务端 HTTP/WebSocket 模式）
+
+    use_websocket: true # 是否使用 WebSocket 连接 ASR 服务器，确保服务器支持 WebSocket
+    ws_path: "/ws/api/asr" # WebSocket 连接路径，确保服务器的 WebSocket 服务监听在此路径
+    timeout_sec: 5 # ASR 请求超时时间，单位秒，根据实际情况调整
+    sample_rate: 16000 # 采样率（Hz），需要与 ASR 服务器的输入采样率一致，
+    channels: 1 # 单声道
+    # chunk_size: 4096 # 每次发送的音频块大小（字节），根据实际情况调整，过大可能导致延迟增加，过小可能增加通信开销
+    # dtype: "int16" # 音频数据类型，通常是 int16 或 float32，根据 ASR 服务器的输入格式调整
+
+  Audio:
+    enable: false # 是否启用音频采集模块
+    samplerate: 16000 # 8000 ，16000， 32000， 48000 # 采样率（Hz）每秒多少个采样点（帧）
+    channels: 1 # 单声道
+    chunk_duration_ms: 20  # 每次读取的音频块持续时间（毫秒）10,20,30
+    # chunk_size: 960  # int(rate * chunk_duration_ms / 1000) * 2 # 每次读取的音频块大小（帧数）
+    max_file_count: 20  # 最大保存音频文件数量，超过后循环覆盖
+
+  VAD:
+    output_dir: "output" # VAD 结果保存目录
+    mode : 2 # 0：最宽松，允许更多非语音通过  1：平衡模式 2：较严格，减少非语音通过  3：最严格，过滤更多非语音
+    no_speech_threshold: 0.6 # 静音持续多长时间后认为一句话结束 (秒)
+    # reactive_kws_threshold: 100  # 重置唤醒词检测 激活 LLM 时间间隔 (秒) 
+    decibel_threshold: -35 # 分贝阈值，低于此值认为是静音 (dB)
+    min_recording_duration: 0.4 # 最短有效录音时长 (秒)
+    max_recording_duration: 10 # 最大有效录音时长 (秒)
+    pause_duration: 4 # 距离上次语音保存多长时间后，允许再次保存音频 (秒)
+
 #####################################################
 
 ###################### LLM 配置 ######################
@@ -121,27 +145,6 @@ TTS:
     remote_mode: "commit" 
     remote_url: 'wss://dashscope.aliyuncs.com/api-ws/v1/realtime'
     # ---------------------------------------------------
-################################################
-
-################# 音频采集参数 #################
-Audio:
-  rate: 16000 # 8000 ，16000， 32000， 48000 # 采样率（Hz）每秒多少个采样点（帧）
-  channels: 1 # 单声道
-  chunk_duration_ms: 20  # 每次读取的音频块持续时间（毫秒）10,20,30
-  # chunk_size: 960  # int(rate * chunk_duration_ms / 1000) * 2 # 每次读取的音频块大小（帧数）
-  max_file_count: 20  # 最大保存音频文件数量，超过后循环覆盖
-################################################
-
-################# VAD 配置 ####################
-VAD:
-  output_dir: "output" # VAD 结果保存目录
-  mode : 2 # 0：最宽松，允许更多非语音通过  1：平衡模式 2：较严格，减少非语音通过  3：最严格，过滤更多非语音
-  no_speech_threshold: 0.6 # 静音持续多长时间后认为一句话结束 (秒)
-  # reactive_kws_threshold: 100  # 重置唤醒词检测 激活 LLM 时间间隔 (秒) 
-  decibel_threshold: -35 # 分贝阈值，低于此值认为是静音 (dB)
-  min_recording_duration: 0.4 # 最短有效录音时长 (秒)
-  max_recording_duration: 10 # 最大有效录音时长 (秒)
-  pause_duration: 4 # 距离上次语音保存多长时间后，允许再次保存音频 (秒)
 ################################################
 
 ################# 唤醒词检测配置 #################

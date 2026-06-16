@@ -210,7 +210,7 @@ class ChatAssistantServiceHandlersMixin:
 
         clear_config_cache()
         self.reload_config_and_initialize()
-        self.chat_assistant.reset(restart_recording=True)
+        self.chat_assistant.reset()
 
         response.success = True
         response.message = "配置文件已重新加载"

@@ -1,4 +1,5 @@
-from .asrclient import ASRClient as ASRClient
+# from .asrclient import ASRClient as ASRClient
+from .asr_client import ASRClient as ASRClient
 
 # from .asrclient_v1 import ASRClient as ASRClient
 

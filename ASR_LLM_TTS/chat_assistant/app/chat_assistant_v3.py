@@ -1,25 +1,17 @@
 import asyncio
+import queue
 import threading
 import time
-import wave
 from dataclasses import asdict
 from pathlib import Path
 from queue import Empty, Full, Queue
-from typing import AsyncIterator, Iterator
+from typing import AsyncIterator, Iterator, Optional
 
-import numpy as np
-import sounddevice as sd
-import webrtcvad
 import yaml
 from asr import ASRClient
-from config import get_vad_no_speech_threshold, load_config
+from config import load_config
 from llm import LLMAgent
 from logger import logger
-
-try:
-    from voice.voice_recognizer import VoiceRecognizer
-except ImportError:
-    VoiceRecognizer = None
 
 from app.assistant_support import (
     MAX_QUEUE_SIZE,
@@ -29,10 +21,6 @@ from app.assistant_support import (
     ComponentState,
     ResponseData,
 )
-
-# vr = VoiceRecognizer(low_thresh=0.60, high_thresh=0.67, max_prints_per_id=1)
-TAIL_SILENCE_MS = int(get_vad_no_speech_threshold() * 1000)
-logger.info(f"配置的 VAD 无语音阈值: {TAIL_SILENCE_MS} ms")
 
 
 class ChatAssistant:
@@ -63,16 +51,8 @@ class ChatAssistant:
         self.response_data = ResponseData()
         self.response_data.clear()
 
-        self.input_stream = None
-        self.recorder_thread = None
-        self.recording_active = False
-
-        if VoiceRecognizer is not None:
-            self.voice_recognizer = VoiceRecognizer(
-                low_thresh=0.60, high_thresh=0.67, max_prints_per_id=1
-            )
-        else:
-            self.voice_recognizer = None
+        self.worker_thread_active = False
+        self.worker_thread: Optional[threading.Thread] = None
 
         self.load_config_and_initialize()
 
@@ -129,82 +109,79 @@ class ChatAssistant:
         with self.state_lock:
             return self.state
 
-        # # 启动录音
-        # self.start_recording()
-
     # 析构函数
     def __del__(self):
         """
         析构函数，释放资源
         """
         logger.info("ChatAssistant 正在释放资源...")
-        self.stop_recording()
+        self.stop()
         self._shutdown_clients()
         logger.info("ChatAssistant 资源已释放.")
 
-    def start_recording(self):
-        """
-        开始录音
-        """
-        if self.recording_active:
-            logger.warning("录音线程已在运行，忽略重复启动请求")
+    def start(self):
+        """启动助手，进入主循环。"""
+
+        if self.worker_thread_active:
+            logger.warning("助手主线程已在运行，忽略重复启动请求")
             return
 
-        self.recording_active = True
-
-        # 启动音频录制线程
-        self.recorder_thread = threading.Thread(
-            target=self.__audio_recorder_thread, daemon=True
+        self.worker_thread_active = True
+        self.worker_thread = threading.Thread(
+            target=self.__worker_thread_entry, daemon=True
         )
-        self.recorder_thread.start()
-        # self.set_state(AssistantState.LISTENING)
+        self.worker_thread.start()
 
-    def stop_recording(self):
-        """
-        停止录音
-        """
+    def __worker_thread_entry(self):
+        """线程入口：在线程内运行异步主循环。"""
+        asyncio.run(self.__worker_thread_loop())
 
-        if self.input_stream:
-            self.input_stream.close()
-            self.input_stream = None
-            logger.info("音频输入流已关闭")
+    async def __worker_thread_loop(self):
+        """助手主线程循环，持续监听 ASR 和 LLM 文本队列，更新综合响应数据对象，并推送到响应队列。"""
+        while self.worker_thread_active:
 
-        if not self.recording_active:
-            logger.info("录音线程已停止")
-            return
-        self.recording_active = False
+            self.__update_status()
 
-        if self.recorder_thread and self.recorder_thread.is_alive():
-            self.recorder_thread.join()
-            logger.info("录音线程正在停止...")
-        self.recorder_thread = None
+            try:
+                asr_result, voice_id = self.asr_client.asr_voice_result_queue.get(
+                    timeout=0.1
+                )
+                logger.info(f"ASR 结果: [{asr_result}], Voice ID: [{voice_id}]")
+                if asr_result:
+                    await self.Inference(input_text=asr_result, voice_id=voice_id)
 
-        # self.set_state(AssistantState.IDLE)
+            except queue.Empty:
+                continue
+
+            await asyncio.sleep(0.01)
+
+    def stop(self):
+        """停止助手，释放资源。"""
+        self.worker_thread_active = False
+        if self.worker_thread and self.worker_thread.is_alive():
+            logger.info("正在停止助手主线程...")
+            self.worker_thread.join(timeout=5)
+            logger.info("助手主线程已停止")
+        self.worker_thread = None
+        self.worker_thread_active = False
 
     def load_config_and_initialize(self):
         self.configs = load_config(self.config_path) if self.config_path else {}
         logger.debug("当前配置:\n%s", yaml.dump(self.configs, allow_unicode=True))
 
         self._initialize_clients()
-        self._initialize_audio_settings()
-        self._initialize_vad_settings()
         self._initialize_kws_settings()
         self._initialize_runtime_state()
 
     def reset(self, restart_recording: bool | None = None) -> None:
         """重置助手状态并按当前配置重新初始化所有运行时资源。"""
-        was_recording = self.recording_active
 
-        self.stop_recording()
+        self.stop()
         self._shutdown_clients()
         self._reset_interaction_state()
         self.load_config_and_initialize()
 
-        should_restart_recording = (
-            was_recording if restart_recording is None else restart_recording
-        )
-        if should_restart_recording:
-            self.start_recording()
+        self.start()
 
     def _initialize_clients(self) -> None:
         self.asr_client = self._build_asr_client()
@@ -212,10 +189,8 @@ class ChatAssistant:
         self.tts_client = self._build_tts_client()
 
     def _build_asr_client(self) -> ASRClient:
-        asr_server_type = self.configs.get("asr_server", ["asr_local"])[0]
-        logger.info(f"选择的 ASR 服务器类型: {asr_server_type}")
-        asr_cfg = self.configs.get(asr_server_type, {})
 
+        asr_cfg = self.configs.get("ASR", {})
         return ASRClient.from_config(config=asr_cfg)
 
     def _build_llm_client(self) -> LLMAgent:
@@ -230,22 +205,6 @@ class ChatAssistant:
         )
 
     def _build_tts_client(self):
-        # tts_server_type = self.configs.get("tts_server_type", ["tts_local"])[0]
-        # logger.info(f"选择的 TTS 服务器类型: {tts_server_type}")
-        # tts_cfg = self.configs.get(tts_server_type, {})
-
-        # if tts_server_type == "tts_remote":
-        #     tts_client = RealtimeTTSPlayer(
-        #         host=tts_cfg.get("host", "192.168.50.220"),
-        #         port=tts_cfg.get("port", 50000),
-        #     )
-        #     tts_client.change_preset(tts_cfg.get("voice_type", "default"))
-        #     return tts_client
-
-        # if tts_server_type == "tts_local":
-        #     return TTSClient.from_config(config=tts_cfg)
-        # logger.error(f"未知的 TTS 服务器类型: {tts_server_type}")
-        # raise ValueError(f"未知的 TTS 服务器类型: {tts_server_type}")
 
         tts_cfg = self.configs.get("TTS", {})
 
@@ -258,41 +217,6 @@ class ChatAssistant:
         from tts import MyTTSClient
 
         return MyTTSClient.from_config(config=tts_cfg)
-
-    def _initialize_audio_settings(self) -> None:
-        audio_cfg = self.configs.get("Audio", {})
-
-        self.audio_rate = audio_cfg.get("rate", 16000)
-        self.audio_channels = audio_cfg.get("channels", 1)
-        self.chunk_duration_ms = audio_cfg.get("chunk_duration_ms", 30)
-        self.audio_file_count = 0
-        self.max_file_count = audio_cfg.get("max_file_count", 50)
-
-        self.chunk_frames = int(self.audio_rate * self.chunk_duration_ms / 1000)
-        self.chunk_bytes = self.chunk_frames * 2
-        valid_frame_bytes = {
-            int(self.audio_rate * ms / 1000) * 2 for ms in (10, 20, 30)
-        }
-        if self.chunk_bytes not in valid_frame_bytes:
-            logger.warning("chunk_duration_ms 设置不合适，已调整为 20 ms 对应的字节数")
-            self.chunk_duration_ms = 20
-            self.chunk_frames = int(self.audio_rate * self.chunk_duration_ms / 1000)
-            self.chunk_bytes = self.chunk_frames * 2
-
-    def _initialize_vad_settings(self) -> None:
-        vad_cfg = self.configs.get("VAD", {})
-
-        self.vad_mode = vad_cfg.get("mode", 3)
-        self.output_dir = (
-            Path(__file__).resolve().parent.parent / vad_cfg.get("output_dir", "output")
-        ).resolve()
-        self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.no_speech_threshold = vad_cfg.get("no_speech_threshold", 0.5)
-        self.decibel_threshold = vad_cfg.get("decibel_threshold", -40)
-        self.min_recording_duration = vad_cfg.get("min_recording_duration", 1.0)
-        self.max_recording_duration = vad_cfg.get("max_recording_duration", 10.0)
-        self.pause_duration = vad_cfg.get("pause_duration", 1.5)
-        self.vad = webrtcvad.Vad(self.vad_mode)
 
     def _initialize_kws_settings(self) -> None:
         kws_cfg = self.configs.get("KWS", {})
@@ -325,11 +249,7 @@ class ChatAssistant:
         self.last_failed_kws_time = 0
 
     def _initialize_runtime_state(self) -> None:
-        self.recording_active = False
-        self.segments_to_save = []
-        self.saved_intervals = []
-        self.last_active_time = time.time()
-        self.last_vad_end_time = time.time()
+
         self.last_llm_time = time.time()
         self.last_tts_time = time.time()
         self.last_interface_time = time.time()
@@ -346,105 +266,12 @@ class ChatAssistant:
             "enable_user_face_info", False
         )
 
-        self.energy_instability_check = self.configs.get(
-            "energy_instability_check", True
-        )
-        self.max_energy_frames = self.configs.get("energy_frames", 50)
-        self.energy_instability_threshold = self.configs.get(
-            "energy_instability_threshold", 2.0
-        )
-        self.energy_window = []
-
     def _initial_component_state(self, config_key: str) -> ComponentState:
         return (
             ComponentState.ACTIVE
             if self.configs.get(config_key, False)
             else ComponentState.IDLE
         )
-
-    def __compute_energy_instability(self):
-        """
-        计算能量不稳定性指标（标准差 / 均值）
-        """
-        if len(self.energy_window) < 5:
-            return 0.0
-        mean = np.mean(self.energy_window)
-        std = np.std(self.energy_window)
-        # logger.info(f"能量均值: {mean:.6f}, 标准差: {std:.6f}")
-        return std / (mean + 1e-6)
-
-    def __reset_segment_state(self):
-        """重置音频片段状态。"""
-        self.segments_to_save.clear()
-        self.energy_window.clear()
-
-    def __check_vad_activity(self, audio_bytes: bytes) -> bool:
-        """
-        audio_bytes: int16 PCM, mono
-        """
-        # frame_ms = 20  # webrtcvad 推荐
-        # bytes_per_sample = 2
-        # frame_size = int(self.audio_rate * frame_ms / 1000) * bytes_per_sample
-
-        if len(audio_bytes) < self.chunk_bytes:
-            return False
-
-        for i in range(0, len(audio_bytes) - self.chunk_bytes + 1, self.chunk_bytes):
-            frame = audio_bytes[i : i + self.chunk_bytes]
-            if self.vad.is_speech(frame, self.audio_rate):
-                return True
-
-        return False
-
-    def __calculate_decibel(self, audio_np: np.ndarray) -> float:
-        """计算音频分贝值，避免对零取对数。"""
-        if audio_np.size == 0:
-            return float("-inf")
-        rms = np.sqrt(np.mean(np.square(audio_np)))
-        return 20 * np.log10(max(rms, 1e-10))
-
-    def __float_to_pcm16(self, audio_np: np.ndarray) -> bytes:
-        """将 float32 音频转换为 PCM16 字节流。"""
-        # audio_clipped = np.clip(audio_np, -1.0, 1.0)
-        # return (audio_clipped * 32767).astype(np.int16).tobytes()
-
-        # audio_np: (N, 1) or (N,)
-        if audio_np.ndim == 2:
-            audio_np = audio_np[:, 0]  # ✅ 取 mono
-
-        audio_clipped = np.clip(audio_np, -1.0, 1.0)
-        return (audio_clipped * 32767).astype(np.int16).tobytes()
-
-    def __finalize_pending_segments(self, timestamp: float) -> None:
-        """在长时间静音后触发音频保存。"""
-
-        energy_instability = self.__compute_energy_instability()
-        # logger.info(f"能量不稳定性指标(标准差/均值): {energy_instability:.6f}")
-
-        # ====== 判定阈值 ======
-        if (
-            energy_instability > self.energy_instability_threshold
-            and self.energy_instability_check
-        ):
-            logger.info(f"当前指标(标准差/均值): {energy_instability:.6f}")
-            logger.info(f"阈值(标准差/均值): {self.energy_instability_threshold:.6f}")
-            logger.warning("疑似多人说话，音频能量不稳定，放弃保存音频")
-            self.__reset_segment_state()
-            return
-
-        # 有录音片段且距离上次 VAD 结束时间超过 pause_duration 则保存音频
-        if (
-            self.segments_to_save
-            and self.segments_to_save[-1][1]
-            > self.last_vad_end_time + self.pause_duration
-        ):
-            self.__save_audio_only()
-            self.last_active_time = timestamp
-        else:
-            logger.warning("缓冲时间内，跳过保存音频")
-
-        # 重置状态
-        self.__reset_segment_state()
 
     def __update_llm_text(self, llm_text, index=0):
         """更新 LLM 文本，并推送到队列。"""
@@ -487,230 +314,6 @@ class ChatAssistant:
             return asyncio.run(self.Inference(**kwargs))
 
         raise RuntimeError("不能在已运行的事件循环中同步调用 Inference")
-
-    ################## 保存音频的模块 ##################
-    def __save_audio_only(self):
-        """
-        将 PCM16 字节流片段 直接传给 ASR 识别，并保存为 WAV 文件。
-        """
-        if not self.segments_to_save:
-            return None
-
-        # # ===============================
-        # # TTS 播放中，跳过保存
-        # # ===============================
-        # if self.tts_client.is_active():
-        #     # print("TTS 播放中，跳过保存音频")
-        #     logger.warning("TTS 播放中，跳过保存音频")
-        #     self.segments_to_save.clear()
-        #     self.last_llm_time = time.time()
-        #     return None
-
-        # ===============================
-        # 缓冲时间判断
-        # ===============================
-        current_time = time.time()
-        if current_time - self.last_vad_end_time < self.pause_duration:
-            logger.warning("缓冲时间内，跳过保存音频")
-            self.segments_to_save.clear()
-            return None
-
-        # ===============================
-        # 2. 时间区间判断（防重复）
-        # ===============================
-        start_time = self.segments_to_save[0][1]
-        end_time = self.segments_to_save[-1][1]
-
-        # 检查是否与之前的片段重叠
-        if self.saved_intervals and self.saved_intervals[-1][1] >= start_time:
-            logger.warning("当前片段与之前片段重叠，跳过保存")
-            self.segments_to_save.clear()
-            return None
-
-        # 检查录音时长是否满足要求
-        recording_duration = end_time - start_time
-        # print(f"录音时长: {recording_duration:.2f} 秒")
-        logger.info(f"录音时长: {recording_duration:.2f} 秒")
-        if recording_duration < self.min_recording_duration:
-            logger.warning("录音时长过短，跳过保存")
-            self.segments_to_save.clear()
-            return None
-        if recording_duration > self.max_recording_duration:
-            logger.warning("录音时长过长，跳过保存")
-            self.segments_to_save.clear()
-            return None
-
-        # ===============================
-        # 1. 生成输出路径 ,循环保存最近 self.max_file_count 条音频
-        # ===============================
-        self.audio_file_count = (self.audio_file_count % self.max_file_count) + 1
-        audio_output_path = self.output_dir / f"audio_{self.audio_file_count}.wav"
-
-        # ===============================
-        # 3. 拼接音频
-        # ===============================
-        audio_frames = [seg[0] for seg in self.segments_to_save]
-
-        # 直接将 PCM16 字节流传给 ASR 识别
-        ## 如果交互有效，则保存音频文件
-        if self._run_inference_sync(audio_frames=audio_frames):
-            # if self.Inference(audio_frames=audio_frames):
-
-            # ===============================
-            # 4. 保存 WAV
-            # ===============================
-            with wave.open(str(audio_output_path), "wb") as wf:
-                wf.setnchannels(self.audio_channels)
-                wf.setsampwidth(2)  # int16
-                wf.setframerate(self.audio_rate)
-                wf.writeframes(b"".join(audio_frames))
-            logger.info(f"保存音频文件: {audio_output_path}")
-
-        # ===============================
-        # 5. 更新状态
-        # ===============================
-        self.saved_intervals.append((start_time, end_time))
-        self.last_vad_end_time = end_time
-        logger.info(f"更新 VAD 结束时间: {self.last_vad_end_time}")
-
-        self.segments_to_save.clear()
-
-        # 使用线程执行推理
-        # temp_audio_output_path = "/home/xuyao/chj/ws/ymbot/ASR_LLM_TTS/tts/intro.wav"
-        # threading.Thread(target=self.Inference, args=(audio_output_path,)).start()
-        # 直接调用函数
-        # self.Inference(audio_frames=audio_frames, audio_path=str(audio_output_path))
-
-        return audio_output_path
-
-    #################### 音频录制线程 ###################
-    def __audio_recorder_thread(self):
-
-        audio_buffer = []
-        frames_collected = 0
-        self.last_active_time = time.time()
-
-        # 每收集 ≥ 200ms（或 ≥ 一个 chunk_frames）的音频，就做一次分析
-        analysis_interval_frames = max(
-            1, max(self.chunk_frames, int(0.20 * self.audio_rate))
-        )
-
-        logger.info("音频录制已开始（sounddevice）")
-        logger.info(f"单次回调音频帧数: {self.chunk_frames}")
-        logger.info(f"单次回调音频时长: {self.chunk_frames / self.audio_rate:.3f} 秒")
-        logger.info(f"分析间隔音频帧数: {analysis_interval_frames}")
-        logger.info(
-            f"分析间隔时长: {analysis_interval_frames / self.audio_rate:.3f} 秒"
-        )
-
-        def reset_buffer():
-            nonlocal audio_buffer, frames_collected
-            audio_buffer.clear()
-            frames_collected = 0
-
-        def audio_callback(indata, frames, time_info, status):
-            nonlocal frames_collected
-
-            if not self.recording_active:
-                raise sd.CallbackStop()
-
-            now = time.time()
-
-            # if self.tts_client.is_active():
-            #     # tts 播放中，代表模型正在说话
-            #     # 更新 last_interface_time
-            #     self.last_interface_time = now
-
-            # indata: float32 [-1.0, 1.0]
-            audio_buffer.append(indata.copy())
-            frames_collected += frames
-
-            # 累积足够的音频进行分析
-            if frames_collected >= analysis_interval_frames:
-                # 合并音频块
-                audio_np = np.concatenate(audio_buffer, axis=0)
-                # 转为 PCM16 字节流
-                audio_bytes = self.__float_to_pcm16(audio_np)
-                # 重置缓冲区
-                reset_buffer()
-
-                # === NEW: 计算 RMS 能量 ===
-                rms = np.sqrt(np.mean(audio_np**2) + 1e-8)
-                # logger.info(f"RMS 能量: {rms:.6f}")
-                self.energy_window.append(rms)
-                if len(self.energy_window) > self.max_energy_frames:
-                    # logger.info("能量窗口已满，移除最早的能量值")
-                    self.energy_window.pop(0)
-
-                # 计算分贝
-                decibel = self.__calculate_decibel(audio_np)
-
-                ## 如果分贝低于阈值
-                if decibel < self.decibel_threshold:
-                    ### 静音时间超过 no_speech_threshold and 有待保存音频段 则保存音频段
-                    if (
-                        now - self.last_active_time > self.no_speech_threshold
-                        and self.segments_to_save
-                    ):
-                        logger.info("静音时间超过阈值，收集历史音频段")
-                        ### 保存末尾的音频段
-                        self.segments_to_save.append((audio_bytes, now))
-                        self.__finalize_pending_segments(now)
-
-                    ### 否则，继续等待, 保存静音段，防止断句不准确
-                    else:
-                        if self.segments_to_save:
-                            logger.info("静音时间未超过阈值，继续等待，保存静音段")
-                            self.segments_to_save.append((audio_bytes, now))
-
-                ## 分贝高于阈值，继续处理
-                else:
-                    ### 如果 检测 VAD 活动，则保存音频段
-                    if self.__check_vad_activity(audio_bytes):
-                        logger.info("检测到语音活动，分贝: {:.2f} dB".format(decibel))
-                        self.last_active_time = now
-                        self.segments_to_save.append((audio_bytes, now))
-
-                ## 如果处于录音段内（已有数据） and 录音时长超过最大值，则保存音频段
-                if self.segments_to_save and (
-                    self.segments_to_save[-1][1] - self.segments_to_save[0][1]
-                    > (self.max_recording_duration - 0.2)
-                ):
-                    logger.info(
-                        f"录音时长超过最大值{self.max_recording_duration}秒，保存音频段"
-                    )
-                    # self.segments_to_save.append((audio_bytes, now))
-                    self.__finalize_pending_segments(now)
-
-        # with self.input_stream =sd.InputStream(
-        #     samplerate=self.audio_rate,
-        #     channels=self.audio_channels,
-        #     dtype="float32",
-        #     blocksize=self.chunk_frames,
-        #     callback=audio_callback,
-        # ):
-        with sd.InputStream(
-            samplerate=self.audio_rate,
-            channels=self.audio_channels,
-            dtype="float32",
-            blocksize=self.chunk_frames,
-            callback=audio_callback,
-        ) as self.input_stream:
-            logger.info("音频输入流已打开，等待录音...")
-            while self.recording_active:
-
-                # 这里的循环主要是为了保持主线程活跃，以便音频回调函数能够持续接收数据并处理，同时也可以在这里监控状态或执行其他周期性任务
-                self.__update_status()
-
-                time.sleep(1)
-        # logger.info(
-        #     "sd.default.device info: {}".format(sd.query_devices(sd.default.device))
-        # )
-        # while self.recording_active:
-        #     time.sleep(1)
-
-        # print("音频录制已停止")
-        # logger.info("音频录制已停止")
 
     ############# 功能模块激活状态管理 #############
     def activate(self):
@@ -772,6 +375,10 @@ class ChatAssistant:
         self.current_user_id = (
             user_id.strip() if isinstance(user_id, str) and user_id.strip() else None
         )
+
+        # 将当前用户 ID 更新到 ASR Client，以支持个性化识别
+        self.asr_client.update_vision_id(self.current_user_id)
+
         logger.debug(f"当前用户 ID 已设置为: {self.current_user_id}")
 
     def set_current_user_face_status(self, face_status: bool | None):
@@ -874,8 +481,8 @@ class ChatAssistant:
             if audio_frames is not None:
                 asr_text = self.asr_client.recognize_frames(
                     audio_frames,
-                    sample_rate=self.audio_rate,
-                    channels=self.audio_channels,
+                    # sample_rate=self.audio_rate,
+                    # channels=self.audio_channels,
                 ).strip()
 
                 # # 帧识别失败时回退到文件识别，保证兼容旧流程。
@@ -906,7 +513,8 @@ class ChatAssistant:
             logger.warning("未提供 audio_frames，跳过 ASR 识别")
             return ""
 
-        return await asyncio.to_thread(self.asr_infer, audio_frames=audio_frames)
+        # return await asyncio.to_thread(self.asr_infer, audio_frames=audio_frames)
+        return await self.asr_client.async_recognize_frames(audio_frames=audio_frames)
 
     def llm_infer(
         self,
@@ -1277,6 +885,7 @@ class ChatAssistant:
         audio_path: str | None = None,
         input_text: str | None = None,
         user_id: str | None = None,
+        voice_id: str | None = None,
     ) -> bool:
         """
         负责调用 ASR、LLM、TTS 完成一次完整的交互
@@ -1285,6 +894,7 @@ class ChatAssistant:
             - audio_path: 可选的音频文件路径输入，用于 ASR 识别，当 audio_frames 为空时使用
             - input_text: 可选的文本输入，用于 ASR 识别，当 audio_frames 和 audio_path 都为空时使用
             - user_id: 可选的用户 ID，用于支持个性化对话，如果为 None 则使用当前默认用户 ID
+            - voice_id: 可选的语音 ID，用于支持个性化语音识别，如果为 None 则使用当前默认语音 ID
         """
 
         # # 测试异步的 asr, llm, tts 接口是否能正确协同工作
@@ -1306,8 +916,9 @@ class ChatAssistant:
             return False
 
         logger.info("\n\n开始一次完整的交互流程...")
-        voice_id = None
-        vision_id = user_id if user_id is not None else self.current_user_id
+
+        current_vision_id = user_id if user_id is not None else self.current_user_id
+        current_voice_id = voice_id if voice_id is not None else None
 
         # 响应数据，包括 asr_text 和 llm_text
         # self.response_json = {}
@@ -1323,27 +934,8 @@ class ChatAssistant:
 
         # -------- asr 识别 -----------
         if audio_frames is not None:
-            now = time.time()
-            self.asr_text, vr_results = await asyncio.gather(
-                self.async_asr_infer(audio_frames=audio_frames),
-                (
-                    self.voice_recognizer.recognize_async(
-                        self.asr_client.normalize_audio_frames(audio_frames),
-                        user_id=vision_id,
-                        tail_silence_ms=TAIL_SILENCE_MS,
-                    )
-                    if self.voice_recognizer is not None
-                    else asyncio.sleep(0)
-                ),
-            )
 
-            logger.info(f"VR 声纹识别结果: {vr_results}")
-            logger.info(f"ASR 异步识别耗时: {time.time() - now:.2f} 秒")
-
-            voice_id = vr_results[0] if vr_results else None
-
-            logger.info(f"本次交互视觉用户 ID: {vision_id}")
-            logger.info(f"本次交互语音用户 ID: {voice_id}")
+            self.asr_text = await self.async_asr_infer(audio_frames=audio_frames)
 
         elif audio_path:
             self.asr_text = self.asr_infer(audio_path=audio_path)
@@ -1353,6 +945,10 @@ class ChatAssistant:
             logger.warning("未提供音频路径或输入文本，跳过本次交互")
             self.last_interface_time = time.time()
             return False
+
+        logger.info(f"本次交互视觉用户 ID: {current_vision_id}")
+        logger.info(f"本次交互语音用户 ID: {current_voice_id}")
+
         # self.asr_text = "你好，小特"  # 测试代码，固定返回唤醒词
         # ## response_json 更新 asr_text
         # response_json["asr_text"] = self.asr_text
@@ -1423,7 +1019,7 @@ class ChatAssistant:
 
             ## 同步流式推理和播放
             for chunk, index in self.llm_stream_infer(
-                self.asr_text, vision_id=vision_id, voice_id=voice_id
+                self.asr_text, vision_id=current_vision_id, voice_id=current_voice_id
             ):
                 self.__push_queue(
                     self.llm_text_queue, [{"index": index, "text": chunk.strip()}]
@@ -1442,11 +1038,11 @@ class ChatAssistant:
             # -------- llm tts -----------
             ## llm异步推理 require python >=3.11
             # self.llm_text = await self.async_llm_infer(
-            #     self.asr_text, vision_id=vision_id, voice_id=voice_id
+            #     self.asr_text, vision_id=current_vision_id, voice_id=current_voice_id
             # )
             ## llm同步推理
             self.llm_text = self.llm_infer(
-                self.asr_text, vision_id=vision_id, voice_id=voice_id
+                self.asr_text, vision_id=current_vision_id, voice_id=current_voice_id
             )
 
             self.__update_llm_text(self.llm_text)
@@ -1483,12 +1079,14 @@ class ChatAssistant:
         audio_path: str | None = None,
         input_text: str | None = None,
         user_id: str | None = None,
+        voice_id: str | None = None,
     ) -> bool:
         return await self.inference(
             audio_frames=audio_frames,
             audio_path=audio_path,
             input_text=input_text,
             user_id=user_id,
+            voice_id=voice_id,
         )
 
 
@@ -1501,7 +1099,7 @@ if __name__ == "__main__":
 
     assistant = ChatAssistant(config_path=str(config_yaml_path))
 
-    assistant.start_recording()
+    assistant.start()
 
     # print("ChatAssistant 初始化完成")
     logger.info("ChatAssistant 初始化完成")
@@ -1513,5 +1111,5 @@ if __name__ == "__main__":
             time.sleep(1)
     except KeyboardInterrupt:
         logger.info("停止程序中...")
-        assistant.stop_recording()
+        assistant.stop()
         logger.info("程序已停止")
