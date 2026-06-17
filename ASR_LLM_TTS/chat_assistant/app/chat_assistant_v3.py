@@ -114,9 +114,10 @@ class ChatAssistant:
         """
         析构函数，释放资源
         """
-        logger.info("ChatAssistant 正在释放资源...")
-        self.stop()
-        self._shutdown_clients()
+        # logger.info("ChatAssistant 正在释放资源...")
+        # self.stop()
+        # # self._shutdown_clients()
+
         logger.info("ChatAssistant 资源已释放.")
 
     def start(self):
@@ -159,11 +160,15 @@ class ChatAssistant:
         """停止助手，释放资源。"""
         self.worker_thread_active = False
         if self.worker_thread and self.worker_thread.is_alive():
-            logger.info("正在停止助手主线程...")
             self.worker_thread.join(timeout=5)
-            logger.info("助手主线程已停止")
+            logger.info("语音助手主线程已停止")
         self.worker_thread = None
         self.worker_thread_active = False
+
+        # self._shutdown_clients()
+        self.asr_client.stop()
+        self.llm_client.stop()
+        self.tts_client.stop()
 
     def load_config_and_initialize(self):
         self.configs = load_config(self.config_path) if self.config_path else {}
@@ -177,7 +182,7 @@ class ChatAssistant:
         """重置助手状态并按当前配置重新初始化所有运行时资源。"""
 
         self.stop()
-        self._shutdown_clients()
+        # self._shutdown_clients()
         self._reset_interaction_state()
         self.load_config_and_initialize()
 

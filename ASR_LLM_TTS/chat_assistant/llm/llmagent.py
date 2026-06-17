@@ -688,6 +688,11 @@ class LLMAgent:
             self.health_check_thread.join(timeout=5)
             self.health_check_thread = None
 
+        logger.info("LLM Agent已停止")
+
+    def stop(self):
+        self.close()
+
     async def aclose(self):
         """异步关闭后台事件循环线程。"""
         await asyncio.to_thread(self.close)

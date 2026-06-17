@@ -12,14 +12,14 @@ try:
 except ImportError:  # pragma: no cover - exercised only in minimal test envs
     playsound = None
 
-from .audio import (
+from .backend import MyTTSBackend
+from .backend_context import TTSBackendContext
+from .runtimes.protocol import TTSRuntimeProtocol
+from .stream import (
     AudioQueueOutputStream,
     MyOutputStream,
     OutputStreamProtocol,
 )
-from .backend import MyTTSBackend
-from .backend_context import TTSBackendContext
-from .runtimes.protocol import TTSRuntimeProtocol
 
 INTERRUPT_GRACE_PERIOD_SEC = 0.2
 LOCAL_AUDIO_STOP_WAIT_SEC = 0.1
@@ -177,6 +177,8 @@ class MyTTSClientBase:
 
         self.on_init(**kwargs)
 
+        self.start()
+
     def on_init(self, **kwargs) -> None:
 
         self.tts_server_type = kwargs.get("tts_server_type", "tts_local")
@@ -230,6 +232,14 @@ class MyTTSClientBase:
 
         self.tts_backend.on_start()
 
+    def start(self) -> None:
+        """启动ASR客户端，初始化相关资源。"""
+        self.tts_backend.on_start()
+
+    def stop(self) -> None:
+        """停止ASR客户端，释放相关资源。"""
+        self.tts_backend.on_stop()
+
     def create_backend_context(self, **kwargs) -> TTSBackendContext:
 
         return TTSBackendContext(
@@ -272,11 +282,11 @@ class MyTTSClientBase:
     def create_tts_runtime(self) -> TTSRuntimeProtocol:
 
         if self.tts_server_type == "tts_remote":
-            from .runtimes.qwen import QwenTTSRuntime
+            from .runtimes import QwenTTSRuntime
 
             return QwenTTSRuntime(self.create_backend_context())
         else:
-            from .runtimes.sherpa import SherpaTTSRuntime
+            from .runtimes import SherpaTTSRuntime
 
             return SherpaTTSRuntime(self.create_backend_context())
 

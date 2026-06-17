@@ -6,8 +6,8 @@ from logger import logger
 
 from .asr_backend import ASRBackend
 from .asr_backend_context import ASRBackendContext
+from .runtimes import SherpaASRRuntime
 from .runtimes.protocol import ASRRuntimeProtocol
-from .runtimes.sherpa import SherpaASRRuntime
 from .stream.input import InputStream
 from .stream.protocol import InputStreamProtocol
 

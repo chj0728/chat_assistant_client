@@ -8,8 +8,7 @@ from logger import logger
 from .backend import TTSBackend
 from .backend_context import TTSBackendContext
 from .base import MyTTSClientBase, TTSClientBase
-from .runtimes.qwen import QwenTTSRuntime
-from .runtimes.sherpa import SherpaTTSRuntime
+from .runtimes import QwenTTSRuntime, SherpaTTSRuntime
 
 load_dotenv()
 
@@ -264,7 +263,7 @@ class MyTTSClient(MyTTSClientBase):
 
     def reset_from_config(self, config: dict) -> None:
 
-        self.tts_backend.on_stop()
+        self.stop()
 
         init_kwargs = self.build_init_kwargs_from_config(config)
         self.__init__(**init_kwargs)

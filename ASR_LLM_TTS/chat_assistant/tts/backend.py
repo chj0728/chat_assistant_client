@@ -5,9 +5,9 @@ from abc import ABC, abstractmethod
 
 from logger import logger
 
-from .audio.protocol import MyOutputStreamProtocol
 from .backend_context import TTSBackendContext
 from .runtimes.protocol import TTSRuntimeProtocol
+from .stream.protocol import MyOutputStreamProtocol
 
 WORKER_POLL_TIMEOUT_SEC = 0.1
 
@@ -173,6 +173,7 @@ class MyTTSBackend(TTSBackendBase):
 
         self.output_stream.stop()
         self.output_stream.close()
+        logger.info("TTS 后端已停止")
 
     ########################################
 
