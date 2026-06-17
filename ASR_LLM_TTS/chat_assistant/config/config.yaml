@@ -16,7 +16,7 @@ ASR:
     # dtype: "int16" # 音频数据类型，通常是 int16 或 float32，根据 ASR 服务器的输入格式调整
 
   Audio:
-    enable: false # 是否启用音频采集模块
+    enable: true # 是否启用音频采集模块
     samplerate: 16000 # 8000 ，16000， 32000， 48000 # 采样率（Hz）每秒多少个采样点（帧）
     channels: 1 # 单声道
     chunk_duration_ms: 20  # 每次读取的音频块持续时间（毫秒）10,20,30
@@ -42,6 +42,7 @@ llm:
   host: "192.168.50.125" # 局域网内 LLM 服务器地址
   port: 8000 # 局域网内 LLM 服务器端口
   enable_cloud: true # 是否启用云端 LLM 服务，启用后会使用云端 API 进行推理，确保.env 中的 EAS_TOKEN 和 EAS_ENDPOINT 已正确配置
+  enable_health_check: true # 是否启用 LLM 健康检查，启用后会定期检查 LLM 服务的健康状态
   timeout_sec: 10
   temperature: 0.6 # 生成文本的随机程度，范围0-1，值越大越随机
   # （max_tokens + max_completion_tokens(限制模型回复tokens) +RAG 检索结果 tokens) 需要在模型的上下文窗口限制内，例如 2048 或 4096，具体取决于所使用的 LLM 模型

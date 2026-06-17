@@ -61,6 +61,30 @@ from llm.custom_tools import get_custom_tools
 # ------------------------ 全局常量 ------------------------
 load_dotenv()
 
+# 查看日志专用
+"""
+from langchain_core.callbacks import BaseCallbackHandler
+class DebugMessageCallback(BaseCallbackHandler):
+
+    def on_chat_model_start(
+        self,
+        serialized,
+        messages,
+        **kwargs
+    ):
+        logger.info("\n========== FINAL MESSAGES ==========")
+
+        for batch_index, batch in enumerate(messages):
+            logger.info(f"\n--- Batch {batch_index} ---")
+
+            for msg in batch:
+                logger.info(f"{msg.type}:")
+                logger.info(msg.content)
+                logger.info("--------------------------------")
+
+        logger.info("====================================\n")
+"""
+
 
 def GET_API_TOKEN_FROM_ENV():
     """从环境变量获取 API_TOKEN，并进行基本验证。"""
@@ -72,7 +96,7 @@ def GET_API_ENDPOINT_FROM_ENV():
     return os.getenv("API_ENDPOINT", "").strip()
 
 
-DEFAULT_MODEL_ID = "Qwen/Qwen3"
+DEFAULT_MODEL_ID = "qwen3.7-max"
 DEFAULT_DB_PATH = (
     Path(__file__).resolve().parent.parent / "db" / "agent_conversations.db"
 )
@@ -120,6 +144,7 @@ class LLMAgent:
         extra_system_prompt: str | None = None,
         rag_enable=False,
         enable_cloud=False,
+        enable_health_check=True,
     ):
         """
         初始化 LLMAgent 实例。
@@ -152,6 +177,7 @@ class LLMAgent:
             extra_system_prompt=extra_system_prompt,
             rag_enable=rag_enable,
             enable_cloud=enable_cloud,
+            enable_health_check=enable_health_check,
         )
         self._initialize_runtime_components()
 
@@ -181,6 +207,7 @@ class LLMAgent:
             "rag_enable": llm_cfg.get("rag_enable", False),
             "dynamic_middlewares": dynamic_middlewares,
             "enable_cloud": llm_cfg.get("enable_cloud", False),
+            "enable_health_check": llm_cfg.get("enable_health_check", True),
         }
 
     def _apply_init_kwargs(
@@ -198,6 +225,7 @@ class LLMAgent:
         extra_system_prompt: str | None = None,
         rag_enable=False,
         enable_cloud=False,
+        enable_health_check=True,
     ) -> None:
         """将初始化参数写入实例状态。"""
 
@@ -215,6 +243,9 @@ class LLMAgent:
         self.extra_system_prompt = extra_system_prompt
         self.rag_enable = rag_enable
         self.enable_cloud = enable_cloud
+        self.enable_health_check = enable_health_check
+        self.health_check_active = False
+        self.health_check_thread = None
 
         self.dynamic_middlewares = dynamic_middlewares if dynamic_middlewares else []
         self.custom_middlewares = get_custom_middlewares()  # 获取自定义中间件列表
@@ -238,6 +269,9 @@ class LLMAgent:
         ## refer from: https://docs.langchain.com/oss/python/langchain/models#token-usage
         self.callback_handlers = get_callback_handlers()
 
+        # 查看日志专用
+        # self.callback_handlers.append(DebugMessageCallback())
+
         # 初始化 ChatOpenAI 模型实例，并拉取远端模型信息，失败时回退默认模型
         self.llm_model = self._init_chat_model()
         logger.info("LLM Chat Model 初始化完成")
@@ -250,7 +284,10 @@ class LLMAgent:
         self._init_rag_client()
 
         # 启动后台循环监听线程 ，GET self.base_url/health
-        self._start_health_check_loop()
+        if self.enable_health_check:
+            self.health_check_active = True
+            logger.info("启用 LLM 健康检查功能")
+            self._start_health_check_loop()
 
     @classmethod
     def from_config(
@@ -357,16 +394,29 @@ class LLMAgent:
             self.rag_client = None
             logger.warning("RAG 功能将不可用")
 
+    def _build_cloud_auth_headers(self) -> dict[str, str] | None:
+        """构造云端 API 请求的 Authorization 头。"""
+        if not self.enable_cloud:
+            return None
+        token = self.api_key.get_secret_value()
+        if not token:
+            return None
+        return {"Authorization": f"Bearer {token}"}
+
     def _load_model_metadata(self) -> None:
         """拉取远端模型信息，失败时回退默认模型。"""
-        try:
-            headers = None
-            if self.enable_cloud:
-                token = self.api_key.get_secret_value()
-                if token:
-                    headers = {"Authorization": f"Bearer {token}"}
+        if self.enable_cloud:
+            self.model_id = DEFAULT_MODEL_ID
+            self.model_root = None
+            logger.info(f"云端 LLM 使用默认模型ID: {self.model_id}")
+            return
 
-            response = requests.get(self.llm_url, timeout=self.timeout, headers=headers)
+        try:
+            response = requests.get(
+                self.llm_url,
+                timeout=self.timeout,
+                headers=self._build_cloud_auth_headers(),
+            )
             response.raise_for_status()
             data = response.json()
             model_list = data.get("data", []) if isinstance(data, dict) else []
@@ -409,6 +459,8 @@ class LLMAgent:
             api_key=self.api_key,
             base_url=self.base_url,
             max_retries=2,
+            # 查看日志专用
+            # callbacks=self.callback_handlers,
             # vLLM parameters
             ## refer from: https://docs.vllm.ai/en/v0.9.2/api/vllm/entrypoints/openai/protocol.html#vllm.entrypoints.openai.protocol.ChatCompletionRequest
             extra_body={
@@ -438,19 +490,17 @@ class LLMAgent:
 
     def _start_health_check_loop(self):
         """启动一个后台线程，定期检查 LLM 服务的健康状态。"""
+        health_check_url = (
+            self.llm_url if self.enable_cloud else self.endpoint + "/health"
+        )
 
         def health_check_loop():
+            headers = self._build_cloud_auth_headers()
 
-            headers = None
-            if self.enable_cloud:
-                token = self.api_key.get_secret_value()
-                if token:
-                    headers = {"Authorization": f"Bearer {token}"}
-
-            while True:
+            while self.health_check_active:
                 try:
                     response = requests.get(
-                        self.endpoint + "/health", headers=headers, timeout=self.timeout
+                        health_check_url, headers=headers, timeout=self.timeout
                     )
                     if response.status_code == 200:
                         logger.debug("LLM 服务健康检查成功")
@@ -462,9 +512,10 @@ class LLMAgent:
                     logger.error(f"LLM 服务健康检查异常: {e}")
                 time.sleep(5)  # 每5秒检查一次
 
-        threading.Thread(
+        self.health_check_thread = threading.Thread(
             target=health_check_loop, name="llm-health-check", daemon=True
-        ).start()
+        )
+        self.health_check_thread.start()
 
     ########################################################
 
@@ -631,6 +682,11 @@ class LLMAgent:
         background_loop.call_soon_threadsafe(background_loop.stop)
         background_thread.join(timeout=5)
         self._background_thread = None
+
+        self.health_check_active = False
+        if self.health_check_thread is not None:
+            self.health_check_thread.join(timeout=5)
+            self.health_check_thread = None
 
     async def aclose(self):
         """异步关闭后台事件循环线程。"""
@@ -898,27 +954,65 @@ class LLMAgent:
             user_text: 用户输入文本
             is_obtain_name: RAG 启用的情况下，获取用于解析名称的增强提示词。默认为 False。
         """
-        human_msg = self._build_human_message(user_text)
+        # 1. 构造 HumanMessage（根据 is_obtain_name 决定内容）
+        if is_obtain_name:
+            human_msg = self._build_human_message(
+                "（请按系统指令从【待分析文本】中抽取姓名）"
+            )
+        else:
+            human_msg = self._build_human_message(user_text)
 
-        custom_context = CustomContext(default_system_prompt=None)
+        # 2. 准备系统提示部分（包含可选的 RAG 增强提示词）
+        system_parts = []
 
+        # 2.1 全局系统提示（如果存在）
+        if self.global_system_msg:
+            system_parts.append(self.global_system_msg.content)
+
+        # 2.2 RAG 增强提示词（如果启用）
         if self.rag_enable and self.rag_client is not None:
-
-            # 在单次响应场景下直接调用 RAG 客户端获取增强提示词，并将其存储在上下文中，供 Agent 在生成回复时使用。
             res = self.rag_client.query(query=user_text, is_obtain_name=is_obtain_name)
-
             rag_prompt = res.get("prompt", "")
-            custom_context.rag_prompt = rag_prompt
+            if rag_prompt:
+                system_parts.append(rag_prompt)
             logger.debug(f"RAG 增强提示词: {rag_prompt}")
 
-        result = self.single_response_agent.invoke(
-            {"messages": [human_msg]},
-            context=custom_context,
-            config=self._build_runtime_config(),
-            stream_mode="values",
-        )
+        # 2.3 构建最终的系统消息（若有内容）
+        messages = []
+        if system_parts:
+            combined_system = "\n\n".join(system_parts)
+            messages.append(SystemMessage(content=combined_system))
+        messages.append(human_msg)
 
-        last_ai_content = self._get_last_ai_content(result)
+        # 3. 准备调用配置
+        invoke_config: RunnableConfig = {
+            "callbacks": self.callback_handlers,
+        }
+        if is_obtain_name:
+            # 姓名抽取要求确定性输出，降低随机性
+            # 方法：创建一个临时绑定低温参数的模型副本
+            llm_to_use = self.llm_model.bind(temperature=0.0, top_p=1.0)
+        else:
+            llm_to_use = self.llm_model
+
+        # 4. 直接调用 LLM
+        response = llm_to_use.invoke(messages, config=invoke_config)
+
+        # 5. 提取 AI 消息内容
+        last_ai_content = normalize_message_content(response.content)
+
+        # 6. 姓名清洗（若需要）
+        if is_obtain_name and last_ai_content is not None:
+            from RAG.prompt_builder import sanitize_extracted_name
+
+            sanitized = sanitize_extracted_name(last_ai_content)
+            if sanitized != last_ai_content:
+                logger.debug(
+                    "姓名抽取结果已清洗: raw=%r sanitized=%r",
+                    last_ai_content,
+                    sanitized,
+                )
+            return sanitized
         return last_ai_content
 
     def chat_response(
