@@ -229,7 +229,6 @@ class MyTTSClientBase:
         self.tts_backend = self.create_tts_backend()
 
         self.tts_backend.on_start()
-        logger.info("TTS 客户端初始化完成")
 
     def create_backend_context(self, **kwargs) -> TTSBackendContext:
 

@@ -1,0 +1,6 @@
+string input_text  # input string to be processed
+string user_id  # optional user ID for personalized processing
+string voice_id  # optional voice recognition ID for personalized processing
+---
+bool success          # indicate successful run of triggered service
+string message        # informational, e.g. for error messages

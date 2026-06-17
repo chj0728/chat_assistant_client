@@ -125,16 +125,22 @@ class ChatAssistantServiceHandlersMixin:
         """
         接收文本输入，调用 ASR、LLM、TTS 完成一次完整的交互服务
         """
-        input_text = request.input
+        input_text = request.input_text
+
         request_user_id = request.user_id if hasattr(request, "user_id") else None
         request_user_id = request_user_id.strip() if request_user_id else None
         user_id = request_user_id if request_user_id else self.get_latest_user_id()
 
+        voice_id = request.voice_id if hasattr(request, "voice_id") else None
+        voice_id = voice_id.strip() if voice_id else None
+
         logger.info(
-            f"收到聊天助手完整交互请求，输入文本: {input_text}，user_id: {user_id}"
+            f"收到聊天助手完整交互请求，输入文本: {input_text}，user_id: {user_id}，voice_id: {voice_id}"
         )
         asyncio.run(
-            self.chat_assistant.Inference(input_text=input_text, user_id=user_id)
+            self.chat_assistant.Inference(
+                input_text=input_text, user_id=user_id, voice_id=voice_id
+            )
         )
 
         response.success = True

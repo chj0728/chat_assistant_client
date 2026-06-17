@@ -4,7 +4,13 @@ from dataclasses import dataclass
 from typing import Any, Mapping, Optional, Protocol, cast
 
 from chat_assistant_interfaces.msg import LLMResponse, Response
-from chat_assistant_interfaces.srv import GenerateWav, GetString, RequestLLM, RequestTTS
+from chat_assistant_interfaces.srv import (
+    GenerateWav,
+    GetString,
+    RequestChat,
+    RequestLLM,
+    RequestTTS,
+)
 from config import load_config
 from logger import logger
 from rclpy.callback_groups import ReentrantCallbackGroup
@@ -153,7 +159,7 @@ SERVICE_SPECS = (
     ServiceSpec(GetString, "asr_infer", "handle_asr_infer"),
     ServiceSpec(RequestLLM, "llm_infer", "handle_llm_infer"),
     ServiceSpec(RequestTTS, "tts_infer", "handle_tts_infer"),
-    ServiceSpec(GetString, "chat_assistant_infer", "handle_chat_assistant_infer"),
+    ServiceSpec(RequestChat, "chat_assistant_infer", "handle_chat_assistant_infer"),
     ServiceSpec(
         GetString,
         "play_audio_file",

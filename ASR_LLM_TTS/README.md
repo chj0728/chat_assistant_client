@@ -366,27 +366,28 @@ chat_assistant_interfaces.srv.GenerateWav_Response(success=True, message='WAV �
 ### 接收文本输入，调用 ASR、LLM、TTS 完成一次完整的交互服务
 
 - 服务名称：`/chat_assistant_infer`
-- 服务类型：`chat_assistant_interfaces/srv/GetString`
+- 服务类型：`chat_assistant_interfaces/srv/RequestChat`
 - 请求参数
-  - `string input`：输入文本
+  - `string input_text`：输入文本
   - `string user_id`：用户ID（可选，提供后LLM会使用上下文记忆）
+  - `string voice_id`：语音ID（可选，提供后LLM可以根据不同的语音ID进行个性化处理）
   - 返回参数
     - `bool success`：表示服务调用是否成功
     - `string message`：生成结果文本 or 错误信息  
 - 请求示例
 
 ```bash
-ros2 service call /chat_assistant_infer chat_assistant_interfaces/srv/GetString "{input: '你好小特',user_id: ''}"
+ros2 service call /chat_assistant_infer chat_assistant_interfaces/srv/RequestChat "{input_text: '你好小特', user_id: '', voice_id: ''}"
 ```
 
 - 响应示例
 
 ``` bash
 waiting for service to become available...
-requester: making request: chat_assistant_interfaces.srv.GetString_Request(input='你好小特')
+requester: making request: chat_assistant_interfaces.srv.RequestChat_Request(input_text='你好小特', user_id='', voice_id='')
 
 response:
-chat_assistant_interfaces.srv.GetString_Response(success=True, message='聊天助手完整交互已完成')
+chat_assistant_interfaces.srv.RequestChat_Response(success=True, message='聊天助手完整交互已完成')
 ```
 
 ### 删除用户上下文服务（传入用户ID，删除该用户的上下文记忆）

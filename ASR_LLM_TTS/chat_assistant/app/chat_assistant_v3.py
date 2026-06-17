@@ -919,6 +919,8 @@ class ChatAssistant:
 
         current_vision_id = user_id if user_id is not None else self.current_user_id
         current_voice_id = voice_id if voice_id is not None else None
+        logger.info(f"本次交互视觉用户 ID: {current_vision_id}")
+        logger.info(f"本次交互语音用户 ID: {current_voice_id}")
 
         # 响应数据，包括 asr_text 和 llm_text
         # self.response_json = {}
@@ -931,7 +933,6 @@ class ChatAssistant:
 
             logger.warning("ASR 模块未激活，跳过本次交互")
             return False
-
         # -------- asr 识别 -----------
         if audio_frames is not None:
 
@@ -945,9 +946,6 @@ class ChatAssistant:
             logger.warning("未提供音频路径或输入文本，跳过本次交互")
             self.last_interface_time = time.time()
             return False
-
-        logger.info(f"本次交互视觉用户 ID: {current_vision_id}")
-        logger.info(f"本次交互语音用户 ID: {current_voice_id}")
 
         # self.asr_text = "你好，小特"  # 测试代码，固定返回唤醒词
         # ## response_json 更新 asr_text
@@ -1070,7 +1068,7 @@ class ChatAssistant:
             logger.info(f"解析得到名称: {resolve_name}")
         ###############################################################
 
-        logger.info("本次交互完成，等待下一次录音")
+        logger.info("本次交互完成")
         return True
 
     async def Inference(
