@@ -70,6 +70,7 @@ class SherpaASRRuntime(ASRRuntimeProtocol):
             except Exception as e:
                 logger.error(f"ASR WebSocket 连接异常: {e}")
         ###################################################################
+        logger.info("ASR Runtime 已启动")
 
     def stop(self) -> None:
         if self.use_websocket and self._ws_loop is not None:
@@ -86,6 +87,7 @@ class SherpaASRRuntime(ASRRuntimeProtocol):
                     self._ws_thread.join(timeout=3)
                 self._ws_loop = None
                 self._ws_thread = None
+        logger.info("ASR Runtime 已停止")
 
     def asr_infer_wav_path(self, wav_path: str) -> str:
         if self.use_websocket:

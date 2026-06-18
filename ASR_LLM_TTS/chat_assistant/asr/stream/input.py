@@ -89,19 +89,20 @@ class InputStream(InputStreamProtocol):
 
         self.recording_active = True
         self.recorder_thread.start()
+        logger.info("音频输入流线程已启动")
 
     def stop(self) -> None:
         """停止音频输入流，释放相关资源。"""
 
         if not self.recording_active:
-            logger.info("录音线程已停止")
+            logger.info("音频输入流线程已停止")
             return
 
         self.recording_active = False
 
         if self.recorder_thread and self.recorder_thread.is_alive():
             self.recorder_thread.join()
-            logger.info("录音线程正在停止...")
+            logger.info("音频输入流线程已停止")
 
     def close(self) -> None:
         """关闭音频输入流，彻底释放相关资源。"""
