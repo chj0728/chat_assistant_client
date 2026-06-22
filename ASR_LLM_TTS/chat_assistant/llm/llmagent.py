@@ -142,7 +142,7 @@ class LLMAgent:
         enable_thinking=False,
         timeout=30,
         extra_system_prompt: str | None = None,
-        rag_enable=False,
+        enable_rag=False,
         enable_cloud=False,
         enable_health_check=True,
     ):
@@ -160,7 +160,7 @@ class LLMAgent:
             enable_thinking (bool): 是否启用思考过程。默认值为 False。
             timeout (int): 请求超时时间（秒）。默认值为 30 秒。
             extra_system_prompt (str | None): 额外的系统提示信息。用于初始化agent时构建的全局系统提示词。默认值为 None。
-            rag_enable (bool): 是否启用 RAG 功能。默认值为 False。启用后会在 调用LLM回复前先进行检索增强。
+            enable_rag (bool): 是否启用 RAG 功能。默认值为 False。启用后会在 调用LLM回复前先进行检索增强。
             enable_cloud (bool): 是否启用云端 LLM 服务，启用后会使用云端 API 进行推理，确保.env 中的 EAS_TOKEN 和 EAS_ENDPOINT 已正确配置。默认值为 False。
         """
 
@@ -175,7 +175,7 @@ class LLMAgent:
             enable_thinking=enable_thinking,
             timeout=timeout,
             extra_system_prompt=extra_system_prompt,
-            rag_enable=rag_enable,
+            enable_rag=enable_rag,
             enable_cloud=enable_cloud,
             enable_health_check=enable_health_check,
         )
@@ -204,7 +204,7 @@ class LLMAgent:
             "enable_thinking": llm_cfg.get("enable_thinking", False),
             "timeout": llm_cfg.get("timeout_sec", 30),
             "extra_system_prompt": llm_cfg.get("extra_system_prompt", ""),
-            "rag_enable": llm_cfg.get("rag_enable", False),
+            "enable_rag": llm_cfg.get("enable_rag", False),
             "dynamic_middlewares": dynamic_middlewares,
             "enable_cloud": llm_cfg.get("enable_cloud", False),
             "enable_health_check": llm_cfg.get("enable_health_check", True),
@@ -223,7 +223,7 @@ class LLMAgent:
         enable_thinking=False,
         timeout=30,
         extra_system_prompt: str | None = None,
-        rag_enable=False,
+        enable_rag=False,
         enable_cloud=False,
         enable_health_check=True,
     ) -> None:
@@ -241,7 +241,7 @@ class LLMAgent:
         self.max_completion_tokens = max_completion_tokens
         self.enable_thinking = enable_thinking
         self.extra_system_prompt = extra_system_prompt
-        self.rag_enable = rag_enable
+        self.enable_rag = enable_rag
         self.enable_cloud = enable_cloud
         self.enable_health_check = enable_health_check
         self.health_check_active = False
@@ -380,7 +380,7 @@ class LLMAgent:
 
     def _init_rag_client(self):
         """初始化 RAG 客户端实例。"""
-        if not self.rag_enable:
+        if not self.enable_rag:
             logger.info("RAG 功能未启用")
             self.rag_client = None
             return
@@ -756,7 +756,7 @@ class LLMAgent:
         self, user_text: str, vision_id: str | None = None, voice_id: str | None = None
     ) -> list:
         """构造输入用户输入消息列表"""
-        # if self.rag_enable and self.rag_client is not None:
+        # if self.enable_rag and self.rag_client is not None:
         #     return [
         #         self._build_system_message(
         #             self.rag_client.query(
@@ -782,7 +782,7 @@ class LLMAgent:
         is_active_ask: bool = False,
     ) -> str:
         """构造 RAG 增强提示词。"""
-        if self.rag_enable and self.rag_client is not None:
+        if self.enable_rag and self.rag_client is not None:
 
             res = self.rag_client.query(
                 query=user_text,
@@ -978,7 +978,7 @@ class LLMAgent:
             system_parts.append(self.global_system_msg.content)
 
         # 2.2 RAG 增强提示词（如果启用）
-        if self.rag_enable and self.rag_client is not None:
+        if self.enable_rag and self.rag_client is not None:
             res = self.rag_client.query(query=user_text, is_obtain_name=is_obtain_name)
             rag_prompt = res.get("prompt", "")
             if rag_prompt:

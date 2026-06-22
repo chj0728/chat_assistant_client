@@ -41,8 +41,7 @@ llm_stream_infer_enable: true # 是否启用 LLM 流式推理，开启后可以�
 llm:
   host: "192.168.50.125" # 局域网内 LLM 服务器地址
   port: 8000 # 局域网内 LLM 服务器端口
-  enable_cloud: true # 是否启用云端 LLM 服务，启用后会使用云端 API 进行推理，确保.env 中的 EAS_TOKEN 和 EAS_ENDPOINT 已正确配置
-  enable_health_check: true # 是否启用 LLM 健康检查，启用后会定期检查 LLM 服务的健康状态
+
   timeout_sec: 10
   temperature: 0.6 # 生成文本的随机程度，范围0-1，值越大越随机
   # （max_tokens + max_completion_tokens(限制模型回复tokens) +RAG 检索结果 tokens) 需要在模型的上下文窗口限制内，例如 2048 或 4096，具体取决于所使用的 LLM 模型
@@ -50,8 +49,10 @@ llm:
   max_messages: 15 # 历史消息的最大条数，配合 max_tokens 控制上下文长度，根据实际情况调整
   max_completion_tokens: 100 # 只限制 生成内容（completion） 的 token 数量，不是输入（prompt）+输出（completion）的总token数，根据实际情况调整
 
+  enable_cloud: true # 是否启用云端 LLM 服务，启用后会使用云端 API 进行推理，确保.env 中的 EAS_TOKEN 和 EAS_ENDPOINT 已正确配置
+  enable_health_check: true # 是否启用 LLM 健康检查，启用后会定期检查 LLM 服务的健康状态
   enable_thinking: false # 是否启用思考过程
-  rag_enable: true # 是否启用 RAG 功能，启用后会在 LLM 回复前先进行检索增强
+  enable_rag: true # 是否启用 RAG 功能，启用后会在 LLM 回复前先进行检索增强
   default_system_prompt: |
     你需要简洁且有礼貌地回答用户的问题，请保持回答简短且有条理。
     正文中请正常使用中文标点符号来表达停顿和语义边界，便于流式切分和语音合成。
@@ -113,7 +114,7 @@ TTS:
 
   tts_local:
     # ----------- tts_local (sherpa_onnx_tts 本地 TTS 服务) -----------
-    host: "192.168.50.107" # 本地 TTS 服务器地址，通常是 Jetson Orin 设备的 IP 地址
+    host: "192.168.10.101" # 本地 TTS 服务器地址，通常是 Jetson Orin 设备的 IP 地址
     port: 50000
 
     playback_gain: 2.0 # 本地播放音量增益。覆盖全局 playback_gain 设置
