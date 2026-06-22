@@ -38,6 +38,7 @@ class ChatAssistant:
         self.asr_text = ""
         self.llm_text = ""
         self.current_user_id = None
+        self.current_user_name = None
         self.current_user_face_status = False
 
         self.asr_text_queue = Queue(maxsize=MAX_QUEUE_SIZE)
@@ -61,6 +62,7 @@ class ChatAssistant:
         self.asr_text = ""
         self.llm_text = ""
         self.current_user_id = None
+        self.current_user_name = None
         self.current_user_face_status = False
         self.asr_text_queue = Queue(maxsize=MAX_QUEUE_SIZE)
         self.llm_text_queue = Queue(maxsize=MAX_QUEUE_SIZE)
@@ -386,9 +388,29 @@ class ChatAssistant:
 
         logger.debug(f"当前用户 ID 已设置为: {self.current_user_id}")
 
+    def set_current_user_info(self, user_id: str | None, user_name: str | None):
+        """
+        设置当前用户信息，包括 ID 和 Name
+        """
+        self.current_user_id = (
+            user_id.strip() if isinstance(user_id, str) and user_id.strip() else None
+        )
+        self.current_user_name = (
+            user_name.strip()
+            if isinstance(user_name, str) and user_name.strip()
+            else None
+        )
+
+        # 将当前用户ID更新到 ASR Client，以支持声纹识别
+        self.asr_client.update_vision_id(self.current_user_id)
+
+        logger.debug(
+            f"当前用户信息已设置 - ID: {self.current_user_id}, Name: {self.current_user_name}"
+        )
+
     def set_current_user_face_status(self, face_status: bool | None):
         """
-        设置当前 用户 人脸识别状态
+        设置当前用户人脸识别状态
         """
         self.current_user_face_status = face_status
         logger.debug(f"当前用户在场状态已设置为: {self.current_user_face_status}")
@@ -526,6 +548,7 @@ class ChatAssistant:
         input_text: str,
         vision_id: str | None = None,
         voice_id: str | None = None,
+        rag_id: str | None = None,
         is_active_ask: bool = False,
     ) -> str:
         """
@@ -534,6 +557,8 @@ class ChatAssistant:
             input_text (str): 输入文本
             vision_id (str | None): 可选的视觉 ID，用于记忆相同用户的对话上下文，如果为 None 直接与LLM 进行对话
             voice_id (str | None): 可选的语音 ID
+            rag_id (str | None): 可选的 RAG ID
+            is_active_ask (bool): 是否为主动提问，默认为 False
         Returns:
             str: LLM 生成的文本响应，失败时返回空字符串
         """
@@ -542,13 +567,15 @@ class ChatAssistant:
             vision_id if vision_id is not None else self.current_user_id
         )
         effective_voice_id = voice_id if voice_id is not None else None
+        effective_rag_id = rag_id if rag_id is not None else None
         llm_text = ""
         time_now = time.time()
         try:
             llm_text = self.llm_client.chat_response(
-                input_text,
-                effective_vision_id,
-                effective_voice_id,
+                user_text=input_text,
+                vision_id=effective_vision_id,
+                voice_id=effective_voice_id,
+                rag_id=effective_rag_id,
                 is_active_ask=is_active_ask,
             )
             if not llm_text:
@@ -568,7 +595,11 @@ class ChatAssistant:
             return ""
 
     def llm_stream_infer(
-        self, input_text: str, vision_id: str | None = None, voice_id: str | None = None
+        self,
+        input_text: str,
+        vision_id: str | None = None,
+        voice_id: str | None = None,
+        rag_id: str | None = None,
     ) -> Iterator[tuple[str, int]]:
         """
         接收输入文本（可选携带用户 ID），调用 LLM 完成流式推理，逐步返回生成的文本响应片段和对应的索引
@@ -576,6 +607,7 @@ class ChatAssistant:
             input_text (str): 输入文本
             vision_id (str | None): 可选的视觉 ID，用于记忆相同用户的对话上下文，如果为 None 直接与LLM 进行对话
             voice_id (str | None): 可选的语音 ID
+            rag_id (str | None): 可选的 RAG ID
         Returns:
             Iterator[tuple[str, int]]: 生成器，逐步返回LLM 生成的文本响应片段和对应的索引，失败时返回空字符串和当前索引
         """
@@ -584,6 +616,7 @@ class ChatAssistant:
             vision_id if vision_id is not None else self.current_user_id
         )
         effective_voice_id = voice_id if voice_id is not None else None
+        effective_rag_id = rag_id if rag_id is not None else None
         time_now = time.time()
         llm_response_chunks = []
         index = 0
@@ -592,7 +625,10 @@ class ChatAssistant:
                 llm_response_chunk,
                 index,
             ) in self.llm_client.chat_response_stream(
-                input_text, effective_vision_id, effective_voice_id
+                user_text=input_text,
+                vision_id=effective_vision_id,
+                voice_id=effective_voice_id,
+                rag_id=effective_rag_id,
             ):
                 logger.info(
                     f"LLM 流式推理输出 [{index}]: [{llm_response_chunk}], 耗时: {(time.time() - time_now) * 1000:.2f} ms"
@@ -922,10 +958,22 @@ class ChatAssistant:
 
         logger.info("\n\n开始一次完整的交互流程...")
 
-        current_vision_id = user_id if user_id is not None else self.current_user_id
+        current_user_id = user_id if user_id is not None else self.current_user_id
+        current_user_name = (
+            self.current_user_name if self.current_user_name is not None else None
+        )
+        current_rag_id = (
+            current_user_name if current_user_name is not None else current_user_id
+        )
         current_voice_id = voice_id if voice_id is not None else None
-        logger.info(f"本次交互视觉用户 ID: {current_vision_id}")
-        logger.info(f"本次交互语音用户 ID: {current_voice_id}")
+        logger.info(
+            f"本次交互用户 ID: {current_user_id}, 用户 Name: {current_user_name}, Voice_ID: {current_voice_id}, RAG_ID: {current_rag_id}"
+        )
+
+        # current_vision_id = user_id if user_id is not None else self.current_user_id
+        # current_voice_id = voice_id if voice_id is not None else None
+        # logger.info(f"本次交互视觉用户 ID: {current_vision_id}")
+        # logger.info(f"本次交互语音用户 ID: {current_voice_id}")
 
         # 响应数据，包括 asr_text 和 llm_text
         # self.response_json = {}
@@ -1022,7 +1070,10 @@ class ChatAssistant:
 
             ## 同步流式推理和播放
             for chunk, index in self.llm_stream_infer(
-                self.asr_text, vision_id=current_vision_id, voice_id=current_voice_id
+                self.asr_text,
+                vision_id=current_user_id,
+                voice_id=current_voice_id,
+                rag_id=current_rag_id,
             ):
                 self.__push_queue(
                     self.llm_text_queue, [{"index": index, "text": chunk.strip()}]
@@ -1045,7 +1096,10 @@ class ChatAssistant:
             # )
             ## llm同步推理
             self.llm_text = self.llm_infer(
-                self.asr_text, vision_id=current_vision_id, voice_id=current_voice_id
+                self.asr_text,
+                vision_id=current_user_id,
+                voice_id=current_voice_id,
+                rag_id=current_rag_id,
             )
 
             self.__update_llm_text(self.llm_text)

@@ -66,7 +66,8 @@ class ChatAssistantNodeOwner(Protocol):
     tts_status_publisher: Publisher
     resolved_user_name_publisher: Publisher
 
-    current_user_id: Any
+    current_user_id: String | None
+    current_user_name: String | None
     last_user_id_msg_time: Any
     user_id_stale_timeout_sec: float
 
@@ -389,14 +390,22 @@ class ChatAssistantServiceHandlersMixin:
 class ChatAssistantTopicHandlersMixin:
     """定义 ChatAssistantNode 的话题处理函数，处理来自 ROS 订阅的话题消息并调用聊天助手核心对象的方法完成相应的功能。"""
 
-    def handle_user_id(self: ChatAssistantNodeOwner, msg):
+    def handle_user_info(self: ChatAssistantNodeOwner, msg):
         """
-        处理订阅到的用户 vision_id 消息，更新当前用户 ID，并记录消息接收时间以便后续判断数据是否过期
+        处理订阅到的用户消息，更新当前用户 ID 和 Name，并记录消息接收时间以便后续判断数据是否过期
         """
         self.last_user_id_msg_time = time.time()
-        self.current_user_id = msg.data.strip() if msg.data else None
-        logger.debug(f"收到用户vision_id消息: {self.current_user_id}")
-        self.chat_assistant.set_current_user_id(self.current_user_id)
+        self.current_user_id = msg.person_uuid.strip() if msg.person_uuid else None
+        self.current_user_name = msg.person_name.strip() if msg.person_name else None
+        logger.debug(
+            f"收到用户ID: {self.current_user_id}, 用户名: {self.current_user_name}"
+        )
+
+        # self.chat_assistant.set_current_user_id(self.current_user_id)
+
+        self.chat_assistant.set_current_user_info(
+            self.current_user_id, self.current_user_name
+        )
 
     def handle_user_face(self: ChatAssistantNodeOwner, msg):
         """
@@ -459,10 +468,11 @@ class ChatAssistantStateHandlersMixin:
 
         if (time.time() - self.last_user_id_msg_time) > self.user_id_stale_timeout_sec:
             if self.current_user_id is not None:
-                logger.debug("用户ID订阅数据超时，回退为 None")
+                logger.debug("用户信息订阅超时，回退为 None")
             self.current_user_id = None
+            self.current_user_name = None
             self.last_user_id_msg_time = None
-            self.chat_assistant.set_current_user_id(None)
+            self.chat_assistant.set_current_user_info(None, None)
             return None
 
         return self.current_user_id

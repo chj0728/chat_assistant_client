@@ -3,7 +3,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Mapping, Optional, Protocol, cast
 
-from chat_assistant_interfaces.msg import LLMResponse, Response
+from chat_assistant_interfaces.msg import LLMResponse, Response, UserInfo
 from chat_assistant_interfaces.srv import (
     GenerateWav,
     GetString,
@@ -192,7 +192,7 @@ PUBLISHER_SPECS = (
 
 
 SUBSCRIPTION_SPECS = (
-    SubscriptionSpec(String, "user_id_subscribe_topic", "handle_user_id", 1),
+    SubscriptionSpec(UserInfo, "user_id_subscribe_topic", "handle_user_info", 1),
     SubscriptionSpec(Bool, "user_face_subscribe_topic", "handle_user_face", 1),
 )
 
@@ -262,6 +262,7 @@ class RosInterfaceRegistry(RosInterfaceRegistryMixin):
         self.resolved_user_name_publisher: Any = None
 
         self.current_user_id = None
+        self.current_user_name = None
         self.last_user_id_msg_time = None
         self.user_id_stale_timeout_sec = 1.0
 

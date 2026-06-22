@@ -22,6 +22,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/RequestChat.srv"
   "msg/Response.msg"
   "msg/LLMResponse.msg"
+  "msg/UserInfo.msg"
   DEPENDENCIES geometry_msgs
 )
 

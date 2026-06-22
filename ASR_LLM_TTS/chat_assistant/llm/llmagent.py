@@ -777,7 +777,7 @@ class LLMAgent:
     def _build_rag_prompt(
         self,
         user_text: str,
-        vision_id: str | None = None,
+        rag_id: str | None = None,
         voice_id: str | None = None,
         is_active_ask: bool = False,
     ) -> str:
@@ -786,7 +786,7 @@ class LLMAgent:
 
             res = self.rag_client.query(
                 query=user_text,
-                vision_user_id=vision_id,
+                vision_user_id=rag_id,
                 voice_user_id=voice_id,
                 is_active_ask=is_active_ask,
             )
@@ -805,13 +805,14 @@ class LLMAgent:
         user_text: str,
         vision_id: str | None = None,
         voice_id: str | None = None,
+        rag_id: str | None = None,
         is_active_ask: bool = False,
     ) -> CustomContext:
         """构建运行时上下文。"""
 
         rag_prompt = self._build_rag_prompt(
             user_text,
-            vision_id=vision_id,
+            rag_id=rag_id,
             voice_id=voice_id,
             is_active_ask=is_active_ask,
         )
@@ -826,19 +827,21 @@ class LLMAgent:
         user_text: str,
         vision_id: str | None = None,
         voice_id: str | None = None,
+        rag_id: str | None = None,
         is_active_ask: bool = False,
     ) -> tuple[list, CustomContext, RunnableConfig]:
         """统一构造消息、上下文和运行时配置。"""
 
         messages = self._build_input_messages(
-            user_text, vision_id=vision_id, voice_id=voice_id
+            user_text=user_text, vision_id=vision_id, voice_id=voice_id
         )
         logger.debug(f"构建输入消息-------------->: {[m for m in messages]}")
 
         custom_context = self._build_runtime_context(
-            user_text,
+            user_text=user_text,
             vision_id=vision_id,
             voice_id=voice_id,
+            rag_id=rag_id,
             is_active_ask=is_active_ask,
         )
         logger.debug(f"构建运行时上下文-------------->: {custom_context}")
@@ -1025,6 +1028,7 @@ class LLMAgent:
         user_text: str,
         vision_id: str | None = None,
         voice_id: str | None = None,
+        rag_id: str | None = None,
         is_active_ask: bool = False,
     ) -> str | None:
         """
@@ -1034,6 +1038,7 @@ class LLMAgent:
             user_text,
             vision_id=vision_id,
             voice_id=voice_id,
+            rag_id=rag_id,
             is_active_ask=is_active_ask,
         )
         result = (self._get_agent() if vision_id else self.tiny_agent).invoke(
@@ -1047,14 +1052,18 @@ class LLMAgent:
         return last_ai_content
 
     def chat_response_stream(
-        self, user_text: str, vision_id: str | None = None, voice_id: str | None = None
+        self,
+        user_text: str,
+        vision_id: str | None = None,
+        voice_id: str | None = None,
+        rag_id: str | None = None,
     ) -> Generator[tuple[str, int], Any, None]:
         """
         发送用户输入，获取 RAG 增强提示词，并以同步流式方式返回LLM生成的分段内容。
         """
         index = 0
         messages, context, runtime_config = self._prepare_request(
-            user_text, vision_id=vision_id, voice_id=voice_id
+            user_text, vision_id=vision_id, voice_id=voice_id, rag_id=rag_id
         )
         buffer = ""
         stream_agent = self._select_stream_agent(vision_id)
