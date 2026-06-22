@@ -1,4 +1,5 @@
 import logging
+import logging.config
 import logging.handlers
 import os
 import re
@@ -21,16 +22,6 @@ if not os.path.exists(logs_dir):
 if not os.path.exists(user_dialog_logs_dir):
     os.makedirs(user_dialog_logs_dir, exist_ok=True)
 
-# 设置根日志级别为DEBUG
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-# 创建日志格式（文件和控制台共用）
-formatter = logging.Formatter(
-    # "%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
-    "[%(asctime)s][%(levelname)s][%(filename)s:%(lineno)d]: %(message)s"
-)
-
 # 定义宏，在日志消息中使用不同的颜色来区分不同级别的日志（需要支持 ANSI 转义序列的终端）
 LOG_COLORS = {
     logging.DEBUG: "\033[36m",  # 青色
@@ -48,41 +39,82 @@ class ColoredFormatter(logging.Formatter):
         return f"{log_color}{message}\033[0m"  # 添加颜色并重置
 
 
-# 控制台处理器
-console_handler = logging.StreamHandler()  # 默认输出到sys.stderr（控制台）
-console_handler.setLevel(
-    logging.DEBUG if DEBUG_MODE else logging.INFO
-)  # 控制台输出DEBUG或INFO及以上级别日志
-console_handler.setFormatter(ColoredFormatter(formatter._fmt))
-
-# timed_handler：每小时生成一个新的日志文件，保留48小时的日志文件
-timed_handler = logging.handlers.TimedRotatingFileHandler(
-    filename=logs_dir + "/asr_llm_tts",
-    when="H",  # 滚动间隔：Y=年，M=月，D=日，H=时，m=分，s=秒
-    interval=1,  # 间隔倍数（如when="H"，interval=6则每6小时滚动）
-    backupCount=48,  # 保留的旧日志文件个数
-    encoding="utf-8",
-    atTime=dt_time(0, 0, 0),  # 滚动时间点（每天零点）
+DEFAULT_LOG_FORMAT = (
+    "[%(asctime)s][%(levelname)s][%(filename)s:%(lineno)d]: %(message)s"
 )
-# 设置日志文件后缀格式为年-月-日_时-分
-# timed_handler.suffix = "%Y-%m-%d_%H-%M-%S"  # 精确到秒
-# timed_handler.suffix = "%Y-%m-%d_%H-%M"  #  精确到分钟即可
-timed_handler.suffix = "%Y-%m-%d_%H"  #  精确到小时即可
 
-# 配置Formatter：日志格式包含时间、模块名、级别、内容
-timed_handler.setFormatter(formatter)
-timed_handler.setLevel(logging.INFO)  # 文件输出INFO及以上级别日志
 
-# 为根日志添加处理器
-logger.addHandler(timed_handler)
-logger.addHandler(console_handler)
+USER_DIALOG_LOG_FORMAT = (
+    # # default format
+    # "[%(asctime)s] \n用户姓名: %(user_name)s\nASR: %(asr_text)s\nLLM: %(llm_text)s"
+    # # xml standard format
+    # "<log><time>%(asctime)s</time><user_name>%(user_name)s</user_name><asr_text>%(asr_text)s</asr_text><llm_text>%(llm_text)s</llm_text></log>"
+    # json standard format
+    '{"time": "%(asctime)s", "user_name": "%(user_name)s", "asr_text": "%(asr_text)s", "llm_text": "%(llm_text)s"}'
+    # json.dumps(
+    #     {
+    #         "time": "%(asctime)s",
+    #         "user_name": "%(user_name)s",
+    #         "asr_text": "%(asr_text)s",
+    #         "llm_text": "%(llm_text)s",
+    #     },
+    #     ensure_ascii=False,
+    #     sort_keys=True,
+    #     indent=4,
+    #     separators=(",", ": "),
+    # )
+)
+
+LOGGING_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "default": {
+            "format": DEFAULT_LOG_FORMAT,
+        },
+        "colored": {
+            "()": ColoredFormatter,
+            "format": DEFAULT_LOG_FORMAT,
+        },
+        "user_dialog": {
+            "format": USER_DIALOG_LOG_FORMAT,
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "level": "DEBUG" if DEBUG_MODE else "INFO",
+            "formatter": "colored",
+        },
+        "timed_file": {
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "level": "INFO",
+            "formatter": "default",
+            "filename": os.path.join(logs_dir, "asr_llm_tts"),
+            "when": "H",
+            "interval": 1,
+            "backupCount": 48,
+            "encoding": "utf-8",
+            "atTime": dt_time(0, 0, 0),
+        },
+    },
+    "loggers": {
+        __name__: {
+            "level": "DEBUG",
+            "handlers": ["timed_file", "console"],
+            "propagate": False,
+        },
+    },
+}
+
+
+logging.config.dictConfig(LOGGING_CONFIG)
+logger = logging.getLogger(__name__)
 
 
 _dialog_logger_lock = threading.Lock()
 _dialog_logger_cache = {}
-_dialog_formatter = logging.Formatter(
-    "[%(asctime)s] 用户姓名: %(user_name)s | ASR结果: %(asr_text)s | LLM回复: %(llm_text)s"
-)
+_dialog_formatter = logging.Formatter(USER_DIALOG_LOG_FORMAT)
 
 
 def _safe_path_name(value: str | None, default: str) -> str:
@@ -119,7 +151,7 @@ def get_user_dialog_logger(user_id: str | None) -> logging.Logger:
 
         if not dialog_logger.handlers:
             dialog_handler = logging.handlers.TimedRotatingFileHandler(
-                filename=os.path.join(user_log_dir, "dialog"),
+                filename=os.path.join(user_log_dir, "dialog.jsonl"),
                 when="H",
                 interval=1,
                 backupCount=48,
