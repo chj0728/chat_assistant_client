@@ -1,6 +1,4 @@
-from .client import MyTTSClient as MyTTSClient
-from .client import TTSClient as TTSClient
+# from .client import MyTTSClient as MyTTSClient
+from .tts_client import TTSClient as TTSClient
 
-# from .ttsplay import RealtimeTTSPlayer as RealtimeTTSPlayer
-
-__all__ = ["TTSClient", "MyTTSClient"]
+__all__ = ["TTSClient"]

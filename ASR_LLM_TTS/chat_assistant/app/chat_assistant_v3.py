@@ -221,9 +221,9 @@ class ChatAssistant:
         # logger.info(f"选择的 TTS 服务器类型: {tts_server_type}")
         # return TTSClient.from_config(config=tts_cfg)
 
-        from tts import MyTTSClient
+        from tts import TTSClient
 
-        return MyTTSClient.from_config(config=tts_cfg)
+        return TTSClient.from_config(config=tts_cfg)
 
     def _initialize_kws_settings(self) -> None:
         kws_cfg = self.configs.get("KWS", {})

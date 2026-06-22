@@ -2,9 +2,7 @@ import queue
 import threading
 import time
 import wave
-from typing import Any
 
-import numpy as np
 from logger import logger
 
 try:
@@ -16,161 +14,14 @@ from .backend import MyTTSBackend
 from .backend_context import TTSBackendContext
 from .runtimes.protocol import TTSRuntimeProtocol
 from .stream import (
-    AudioQueueOutputStream,
     MyOutputStream,
-    OutputStreamProtocol,
 )
 
 INTERRUPT_GRACE_PERIOD_SEC = 0.2
 LOCAL_AUDIO_STOP_WAIT_SEC = 0.1
 
 
-class TTSClientBase(OutputStreamProtocol):
-    """TTS 基类，同时声明了 TTS 客户端的核心接口和基础功能实现，具体的 TTS 客户端实现可以继承该基类并重写必要的方法以适配不同的 TTS 服务和协议。"""
-
-    audio_queue: queue.Queue[bytes]
-    is_sounding: bool
-    _audio_active_started_ts: float
-    _audio_lock: threading.Lock
-    _last_audio_chunk_ts: float
-    _playback_start_delay_sec: float
-    _playback_hangover_sec: float
-    _playback_buffer: np.ndarray
-    _stop_event: threading.Event
-    _interrupt_event: threading.Event
-    _playback_started_event: threading.Event
-
-    sound: Any
-    output_stream: AudioQueueOutputStream
-    tts_thread: threading.Thread | None
-
-    def _apply_base_init_kwargs(
-        self,
-        *,
-        sample_rate: int,
-        channels: int,
-        chunk_size: int,
-        buffer_size: int,
-        playback_dtype: str,
-        playback_start_delay_sec: float,
-    ) -> None:
-        self.sample_rate = sample_rate
-        self.channels = channels
-        self.chunk_size = chunk_size
-        self.buffer_size = buffer_size
-        self.playback_dtype = playback_dtype
-
-        self.text_queue: queue.Queue[str] = queue.Queue()
-
-        ############# OutputStreamProtocol 相关属性 #############
-        self.audio_queue: queue.Queue[bytes] = queue.Queue()
-        self.is_sounding = False
-        self._audio_active_started_ts = 0.0
-        self._audio_lock = threading.Lock()
-        self._last_audio_chunk_ts = 0.0
-        self._playback_start_delay_sec = playback_start_delay_sec
-        self._playback_hangover_sec = 0.0
-        self._playback_buffer = np.empty(
-            (0, self.channels), dtype=np.dtype(playback_dtype)
-        )
-        self._stop_event = threading.Event()
-        self._interrupt_event = threading.Event()
-        self._playback_started_event = threading.Event()
-        ########################################################
-
-        self.sound = None
-        self.output_stream: AudioQueueOutputStream
-        self.tts_thread = None
-
-    def _create_output_stream(self):
-        return AudioQueueOutputStream(
-            self,
-            sample_rate=self.sample_rate,
-            channels=self.channels,
-            buffer_size=self.buffer_size,
-            dtype=self.playback_dtype,
-        )
-
-    def _initialize_runtime_components(self) -> None:
-        raise NotImplementedError
-
-    def _start_tts_worker(self):
-        raise NotImplementedError
-
-    @staticmethod
-    def _drain_queue(target_queue: queue.Queue) -> None:
-        """清空指定的队列，丢弃其中的所有元素，确保队列在中断或停止播放时被正确清理。"""
-        while not target_queue.empty():
-            try:
-                target_queue.get_nowait()
-            except queue.Empty:
-                break
-
-    def _stop_local_audio_playback(self) -> None:
-        """停止当前正在播放的本地音频，如果有的话，并等待一段时间以确保音频播放已经完全停止，避免与后续的 TTS 音频播放产生冲突或叠加。"""
-        if self.sound is not None and self.sound.is_alive():
-            logger.info("正在停止当前播放的音频...")
-            self.sound.stop()
-            time.sleep(LOCAL_AUDIO_STOP_WAIT_SEC)
-
-    def speak(self, text, interrupt=True):
-        """请求 TTS 播放指定的文本内容，如果 interrupt 参数为 True，则在请求播放前会先中断当前的播放状态，确保新的文本能够立即被播放而不会与之前的播放内容产生冲突或叠加。"""
-        self._interrupt_event.clear()
-        normalized_text = text.strip()
-
-        if interrupt and normalized_text:
-            self.interrupt()
-
-        if not normalized_text:
-            return
-
-        self.text_queue.put(normalized_text)
-
-    def is_active(self):
-        return self.is_sounding or (self.sound is not None and self.sound.is_alive())
-
-    def play_audio(self, file_path, block=False):
-        try:
-            if playsound is None:
-                raise RuntimeError("playsound3 未安装，无法播放本地音频")
-
-            self._stop_local_audio_playback()
-            self.sound = playsound(file_path, block=block)
-        except Exception as e:
-            logger.error(f"播放{file_path}失败: {e}")
-
-    def play_audio_from_pcm(self, pcm_bytes):
-        with wave.open("temp.wav", "wb") as wf:
-            wf.setnchannels(1)
-            wf.setsampwidth(2)
-            wf.setframerate(self.sample_rate)
-            wf.writeframes(pcm_bytes)
-        self.play_audio("temp.wav")
-
-    def interrupt(self):
-
-        self._stop_local_audio_playback()
-
-        if not self.text_queue.empty() or not self.audio_queue.empty():
-            logger.info("正在清空播放队列...")
-        self._drain_queue(self.text_queue)
-        self._drain_queue(self.audio_queue)
-
-        self.output_stream.interrupt()
-
-    def change_preset(self, preset):
-        self.voice = preset
-
-    def get_playback_start_delay_sec(self):
-        return self._playback_start_delay_sec
-
-    def wait_until_playback_starts(self, timeout_sec: float = 5.0) -> bool:
-        if self.is_sounding:
-            return True
-        return self._playback_started_event.wait(timeout=timeout_sec)
-
-
-class MyTTSClientBase:
+class TTSClientBase:
     def __init__(self, **kwargs) -> None:
 
         self.sound = None
@@ -384,3 +235,60 @@ class MyTTSClientBase:
     def wait_until_playback_starts(self, timeout_sec: float = 5.0) -> bool:
         """等待output_stream进入播放状态，返回是否成功进入播放状态，适用于需要确认音频已经开始播放的场景。"""
         return self.tts_backend.wait_until_playback_starts(timeout_sec=timeout_sec)
+
+
+class TTSClient(TTSClientBase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @staticmethod
+    def build_init_kwargs_from_config(config: dict) -> dict:
+        # tts_kwargs = config.get("TTS", {})
+        return config
+
+    @classmethod
+    def from_config(cls, config: dict) -> "TTSClient":
+        init_kwargs = cls.build_init_kwargs_from_config(config)
+        return cls(**init_kwargs)
+
+    def reset_from_config(self, config: dict) -> None:
+
+        self.stop()
+
+        init_kwargs = self.build_init_kwargs_from_config(config)
+        self.__init__(**init_kwargs)
+
+
+if __name__ == "__main__":
+    from config import load_config, reload_config
+
+    configs = load_config()
+
+    tts_cfg = dict(configs.get("TTS", {}))
+    tts_client = TTSClient.from_config(tts_cfg)
+
+    tts_client.speak("你好，这是一段测试语音。")
+    time.sleep(1)
+    while tts_client.is_active():
+        time.sleep(1)
+    logger.info("播放完成")
+
+    tts_client.generate_wav(
+        "你好，这是一段测试语音保存的语音合成示例。",
+        "./wavs/example.wav",
+    )
+    logger.info("WAV 文件生成完成")
+
+    time.sleep(3)
+
+    configs = reload_config()
+    tts_cfg = dict(configs.get("TTS", {}))
+    tts_client.reset_from_config(tts_cfg)
+
+    tts_client.speak("你好，这是一段通过 WebSocket 接收的测试语音。")
+    time.sleep(2)
+    while tts_client.is_active():
+        time.sleep(1)
+    logger.info("WebSocket 播放完成")
+    time.sleep(2)
+    logger.info("TTS 客户端测试完成")
