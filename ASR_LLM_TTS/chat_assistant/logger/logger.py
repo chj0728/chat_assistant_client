@@ -1,6 +1,8 @@
 import logging
 import logging.handlers
 import os
+import re
+import threading
 import time
 from datetime import time as dt_time
 
@@ -11,10 +13,13 @@ DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
 current_dir = os.path.dirname(os.path.abspath(__file__))
 # logs 目录路径
 logs_dir = os.path.join(current_dir, "..", "logs")
+user_dialog_logs_dir = os.path.join(logs_dir, "user_dialogs")
 
 # logs_dir = "logs"
 if not os.path.exists(logs_dir):
     os.makedirs(logs_dir, exist_ok=True)
+if not os.path.exists(user_dialog_logs_dir):
+    os.makedirs(user_dialog_logs_dir, exist_ok=True)
 
 # 设置根日志级别为DEBUG
 logger = logging.getLogger(__name__)
@@ -71,6 +76,83 @@ timed_handler.setLevel(logging.INFO)  # 文件输出INFO及以上级别日志
 # 为根日志添加处理器
 logger.addHandler(timed_handler)
 logger.addHandler(console_handler)
+
+
+_dialog_logger_lock = threading.Lock()
+_dialog_logger_cache = {}
+_dialog_formatter = logging.Formatter(
+    "[%(asctime)s] 用户姓名: %(user_name)s | ASR结果: %(asr_text)s | LLM回复: %(llm_text)s"
+)
+
+
+def _safe_path_name(value: str | None, default: str) -> str:
+    if not value:
+        return default
+
+    safe_value = re.sub(r"[^0-9A-Za-z_.\-\u4e00-\u9fff]+", "_", str(value).strip())
+    safe_value = safe_value.strip("._-")
+    return safe_value or default
+
+
+def _normalize_dialog_text(value: str | None) -> str:
+    if value is None:
+        return ""
+    return " ".join(str(value).split())
+
+
+def get_user_dialog_logger(user_id: str | None) -> logging.Logger:
+    """
+    按用户 ID 获取专用对话 logger，并动态创建对应日志目录。
+    """
+    safe_user_id = _safe_path_name(user_id, "unknown_user")
+
+    with _dialog_logger_lock:
+        if safe_user_id in _dialog_logger_cache:
+            return _dialog_logger_cache[safe_user_id]
+
+        user_log_dir = os.path.join(user_dialog_logs_dir, safe_user_id)
+        os.makedirs(user_log_dir, exist_ok=True)
+
+        dialog_logger = logging.getLogger(f"user_dialog.{safe_user_id}")
+        dialog_logger.setLevel(logging.INFO)
+        dialog_logger.propagate = False
+
+        if not dialog_logger.handlers:
+            dialog_handler = logging.handlers.TimedRotatingFileHandler(
+                filename=os.path.join(user_log_dir, "dialog"),
+                when="H",
+                interval=1,
+                backupCount=48,
+                encoding="utf-8",
+                atTime=dt_time(0, 0, 0),
+            )
+            dialog_handler.suffix = "%Y-%m-%d_%H"
+            dialog_handler.setFormatter(_dialog_formatter)
+            dialog_handler.setLevel(logging.INFO)
+            dialog_logger.addHandler(dialog_handler)
+
+        _dialog_logger_cache[safe_user_id] = dialog_logger
+        return dialog_logger
+
+
+def log_user_dialog(
+    user_id: str | None,
+    user_name: str | None,
+    asr_text: str | None,
+    llm_text: str | None,
+) -> None:
+    """
+    记录单轮用户对话，只保存时间、用户姓名、ASR 结果和 LLM 回复。
+    """
+    dialog_logger = get_user_dialog_logger(user_id)
+    dialog_logger.info(
+        "",
+        extra={
+            "user_name": _normalize_dialog_text(user_name) or "未知用户",
+            "asr_text": _normalize_dialog_text(asr_text),
+            "llm_text": _normalize_dialog_text(llm_text),
+        },
+    )
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ import yaml
 from asr import ASRClient
 from config import load_config
 from llm import LLMAgent
-from logger import logger
+from logger import log_user_dialog, logger
 
 from app.assistant_support import (
     MAX_QUEUE_SIZE,
@@ -917,6 +917,26 @@ class ChatAssistant:
             logger.error(f"删除用户 ID {user_id} 的对话上下文失败: {e}")
             return False
 
+    def _log_user_dialog(
+        self,
+        user_id: str | None,
+        user_name: str | None,
+        asr_text: str | None,
+        llm_text: str | None,
+    ) -> None:
+        """
+        保存单轮用户对话记录，失败时不影响主交互流程。
+        """
+        try:
+            log_user_dialog(
+                user_id=user_id,
+                user_name=user_name,
+                asr_text=asr_text,
+                llm_text=llm_text,
+            )
+        except Exception as e:
+            logger.error(f"保存用户对话记录失败: {e}")
+
     ##########################################################
 
     ####################### 核心交互流程 #######################
@@ -1104,6 +1124,14 @@ class ChatAssistant:
 
             self.__update_llm_text(self.llm_text)
 
+        self._log_user_dialog(
+            user_id=current_user_id,
+            user_name=current_user_name,
+            asr_text=self.asr_text,
+            llm_text=self.llm_text,
+        )
+
+        if not self.llm_stream_infer_enable:
             ## -------- tts 播放 -----------
             if not self.check_tts_status():
                 return False
