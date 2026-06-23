@@ -212,10 +212,11 @@ class QwenTTSRuntime(TTSRuntimeProtocol):
 
         return self.callback.get_response_pcm()
 
-    def initialize_if_needed(self) -> None:
+    ###################### 实现 TTSRuntimeProtocol 接口方法 ######################
+    def start(self) -> None:
         self.ensure_runtime()
 
-    def close_runtime(self) -> None:
+    def stop(self) -> None:
         with self.runtime_lock:
             self.session_to_finish()
 
@@ -248,3 +249,5 @@ class QwenTTSRuntime(TTSRuntimeProtocol):
                 response_format=audio_format.PCM_24000HZ_MONO_16BIT,
                 mode=self.context.remote_mode,
             )
+
+    ##############################################################################

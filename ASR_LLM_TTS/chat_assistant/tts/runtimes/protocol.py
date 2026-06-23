@@ -4,11 +4,11 @@ from typing import Protocol
 class TTSRuntimeProtocol(Protocol):
     """TTS 后端运行时 Protocol，定义了后端运行时需要实现的接口方法。"""
 
-    def initialize_if_needed(self) -> None:
-        """按需初始化运行时资源。"""
+    def start(self) -> None:
+        """启动运行时资源。"""
         ...
 
-    def close_runtime(self) -> None:
+    def stop(self) -> None:
         """关闭运行时资源。"""
         ...
 

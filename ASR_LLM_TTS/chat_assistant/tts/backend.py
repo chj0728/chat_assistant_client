@@ -15,11 +15,6 @@ WORKER_POLL_TIMEOUT_SEC = 0.1
 class TTSBackendBase(ABC):
     """TTS 后端生命周期接口，只保留对外可见的基本控制入口。"""
 
-    # @abstractmethod
-    # def initialize_if_needed(self) -> None:
-    #     """按需初始化运行时资源。"""
-    #     pass
-
     @abstractmethod
     def on_start(self) -> None:
         """初始化运行时资源。"""
@@ -87,14 +82,14 @@ class TTSBackend(TTSBackendBase):
         )
         self.worker_loop_thread.start()
 
-        self._runtime.initialize_if_needed()
+        self._runtime.start()
 
     def on_stop(self) -> None:
 
         if self.worker_loop_thread is not None:
             self.worker_loop_thread.join(timeout=3.0)
 
-        self._runtime.close_runtime()
+        self._runtime.stop()
 
     def change_voice(self, voice: str) -> None:
         self._context.voice = voice
@@ -158,7 +153,7 @@ class MyTTSBackend(TTSBackendBase):
         )
         self.worker_loop_thread.start()
 
-        self.tts_runtime.initialize_if_needed()
+        self.tts_runtime.start()
 
         self.output_stream.start()
 
@@ -169,7 +164,7 @@ class MyTTSBackend(TTSBackendBase):
             self.worker_loop_thread.join(timeout=3.0)
         self.tts_backend_context.stop_event.clear()
 
-        self.tts_runtime.close_runtime()
+        self.tts_runtime.stop()
 
         self.output_stream.stop()
         self.output_stream.close()

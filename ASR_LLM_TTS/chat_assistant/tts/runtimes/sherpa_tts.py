@@ -207,8 +207,9 @@ class SherpaTTSRuntime(TTSRuntimeProtocol):
                 self._ws = None
                 if attempt == 1:
                     raise
-
-    def initialize_if_needed(self) -> None:
+    
+    ######################## 实现 TTSRuntimeProtocol 接口方法 ########################
+    def start(self) -> None:
         if not self._context.use_websocket:
             return
 
@@ -223,7 +224,7 @@ class SherpaTTSRuntime(TTSRuntimeProtocol):
         except Exception as e:
             logger.error(f"TTS WebSocket 连接失败: {e}")
 
-    def close_runtime(self) -> None:
+    def stop(self) -> None:
         if self._ws_loop is None:
             return
 
@@ -261,3 +262,4 @@ class SherpaTTSRuntime(TTSRuntimeProtocol):
 
     def change_voice(self, voice: str) -> None:
         logger.warning("当前 TTS 后端不支持动态更改语音设置")
+    ##############################################################################

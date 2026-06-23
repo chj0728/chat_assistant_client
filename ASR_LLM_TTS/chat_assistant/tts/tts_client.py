@@ -81,8 +81,6 @@ class TTSClientBase:
         self.tts_runtime = self.create_tts_runtime()
         self.tts_backend = self.create_tts_backend()
 
-        self.tts_backend.on_start()
-
     def start(self) -> None:
         """启动ASR客户端，初始化相关资源。"""
         self.tts_backend.on_start()
