@@ -143,6 +143,7 @@ class QwenTTSRuntime(TTSRuntimeProtocol):
         dashscope.api_key = api_key
 
     def init_qwen_tts(self) -> None:
+
         self.callback = RemoteCallback(self.context.audio_queue)
         self.qwen_tts = QwenTtsRealtime(
             model=self.context.model,
@@ -185,14 +186,18 @@ class QwenTTSRuntime(TTSRuntimeProtocol):
             assert self.callback is not None
             assert self.qwen_tts is not None
 
+            # 清除可能的残留音频数据，避免下次请求时被误用
             self.callback.reset_response(playback_enabled=playback_enabled)
+
             try:
                 self.qwen_tts.append_text(normalized_text)
                 self.qwen_tts.commit()
                 if not self.callback.wait_for_response_done(
                     timeout_sec=self.context.timeout
                 ):
+
                     raise TimeoutError("远端 TTS 响应超时")
+
             except Exception as e:
                 if "closed" in str(e).lower():
                     logger.warning("远端 TTS 连接在请求期间关闭，正在重连后重试...")
@@ -206,9 +211,10 @@ class QwenTTSRuntime(TTSRuntimeProtocol):
                     if not self.callback.wait_for_response_done(
                         timeout_sec=self.context.timeout
                     ):
+
                         raise TimeoutError("远端 TTS 重试后响应超时")
                 else:
-                    raise
+                    raise RuntimeError(f"{e}")
 
         return self.callback.get_response_pcm()
 

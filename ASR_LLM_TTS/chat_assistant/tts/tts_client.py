@@ -31,6 +31,7 @@ class TTSClientBase:
         self.start()
 
     def on_init(self, **kwargs) -> None:
+        self._init_kwargs = kwargs
 
         self.tts_server_type = kwargs.get("tts_server_type", "tts_local")
         self.timeout_sec = kwargs.get("timeout_sec", 10.0)
@@ -76,6 +77,7 @@ class TTSClientBase:
 
         self.stop_event = threading.Event()
         self.interrupt_event = threading.Event()
+        self.output_stream_started = False
 
         self.output_stream = self.create_output_stream()
         self.tts_runtime = self.create_tts_runtime()
@@ -84,20 +86,34 @@ class TTSClientBase:
     def start(self) -> None:
         """启动ASR客户端，初始化相关资源。"""
         self.tts_backend.on_start()
+        self.output_stream_started = True
 
     def stop(self) -> None:
         """停止ASR客户端，释放相关资源。"""
         self.tts_backend.on_stop()
+        self.output_stream_started = False
 
-    def create_backend_context(self, **kwargs) -> TTSBackendContext:
+    def get_playback_config_value(self, server_type: str, key: str, default):
+        return self._init_kwargs.get(server_type, {}).get(
+            key, self._init_kwargs.get(key, default)
+        )
+
+    def create_backend_context(
+        self, server_type: str | None = None
+    ) -> TTSBackendContext:
+        active_server_type = server_type or self.tts_server_type
 
         return TTSBackendContext(
             host=self.host,
             port=self.port,
             timeout=self.timeout_sec,
-            sample_rate=self.sample_rate,
-            channels=self.channels,
-            chunk_size=self.chunk_size,
+            sample_rate=self.get_playback_config_value(
+                active_server_type, "sample_rate", 16000
+            ),
+            channels=self.get_playback_config_value(active_server_type, "channels", 1),
+            chunk_size=self.get_playback_config_value(
+                active_server_type, "chunk_size", 1024
+            ),
             text_queue=self.text_queue,
             audio_queue=self.audio_queue,
             stop_event=self.stop_event,
@@ -115,29 +131,80 @@ class TTSClientBase:
             remote_mode=self.remote_mode,
         )
 
-    def create_output_stream(self) -> MyOutputStream:
+    def create_output_stream(self, server_type: str | None = None) -> MyOutputStream:
+        active_server_type = server_type or self.tts_server_type
+        sample_rate = self.get_playback_config_value(
+            active_server_type, "sample_rate", 16000
+        )
+        channels = self.get_playback_config_value(active_server_type, "channels", 1)
+        dtype = self.get_playback_config_value(active_server_type, "dtype", "int16")
+        buffer_size = self.get_playback_config_value(
+            active_server_type, "buffer_size", 4096
+        )
+        playback_gain = self.get_playback_config_value(
+            active_server_type, "playback_gain", 1.0
+        )
 
         return MyOutputStream(
-            context=self.create_backend_context(),
-            sample_rate=self.sample_rate,
-            channels=self.channels,
-            buffer_size=self.buffer_size,
-            dtype=self.dtype,
+            context=self.create_backend_context(active_server_type),
+            sample_rate=sample_rate,
+            channels=channels,
+            buffer_size=buffer_size,
+            dtype=dtype,
             playback_start_delay_sec=self.playback_start_delay_sec,
             playback_hangover_sec=self.playback_hangover_sec,
-            playback_gain=self.playback_gain,
+            playback_gain=playback_gain,
         )
 
     def create_tts_runtime(self) -> TTSRuntimeProtocol:
 
         if self.tts_server_type == "tts_remote":
-            from .runtimes import QwenTTSRuntime
+            from .runtimes.fallback import FallbackTTSRuntime
 
-            return QwenTTSRuntime(self.create_backend_context())
+            return FallbackTTSRuntime(
+                context=self.create_backend_context(),
+                primary_factory=lambda: self.create_qwen_tts_runtime(),
+                fallback_factory=lambda: self.create_sherpa_tts_runtime(),
+                fallback_switch_callback=lambda: self.switch_output_stream(
+                    "tts_local"
+                ),
+                primary_name="远端 Qwen TTS",
+                fallback_name="本地 Sherpa TTS",
+            )
         else:
-            from .runtimes import SherpaTTSRuntime
+            return self.create_sherpa_tts_runtime()
 
-            return SherpaTTSRuntime(self.create_backend_context())
+    def create_qwen_tts_runtime(self) -> TTSRuntimeProtocol:
+        from .runtimes.qwen_tts import QwenTTSRuntime
+
+        return QwenTTSRuntime(self.create_backend_context("tts_remote"))
+
+    def create_sherpa_tts_runtime(self) -> TTSRuntimeProtocol:
+        from .runtimes.sherpa_tts import SherpaTTSRuntime
+
+        return SherpaTTSRuntime(self.create_backend_context("tts_local"))
+
+    def switch_output_stream(self, server_type: str) -> None:
+        logger.info("正在切换 TTS 输出流格式: %s", server_type)
+        old_output_stream = self.output_stream
+
+        try:
+            old_output_stream.stop()
+        except Exception as e:
+            logger.warning("停止旧 TTS 输出流失败: %s", e)
+
+        try:
+            old_output_stream.close()
+        except Exception as e:
+            logger.warning("关闭旧 TTS 输出流失败: %s", e)
+
+        self.output_stream = self.create_output_stream(server_type)
+
+        if hasattr(self, "tts_backend"):
+            self.tts_backend.output_stream = self.output_stream
+
+        if self.output_stream_started:
+            self.output_stream.start()
 
     def create_tts_backend(self) -> MyTTSBackend:
 

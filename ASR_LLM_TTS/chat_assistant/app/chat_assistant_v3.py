@@ -787,9 +787,16 @@ class ChatAssistant:
         """
         计算 TTS 合成并播放音频的延迟时间
         """
-        if not self.tts_client.wait_until_playback_starts(timeout_sec=10.0):
-            logger.error("TTS 播放超时 或者 TTS 播放音频太短")
-            return False
+
+        # if not self.tts_client.wait_until_playback_starts(timeout_sec=5.0):
+        #     logger.error("TTS 播放超时 或者 TTS 播放音频太短")
+        #     return False
+
+        while not self.tts_client.is_active():
+            if time.time() - start_time > 10.0:
+                logger.warning("TTS 播放超时 或者 TTS 播放音频太短")
+                return False
+            time.sleep(0.05)
 
         elapsed_time = 0
         # if isinstance(self.tts_client, RealtimeTTSPlayer):

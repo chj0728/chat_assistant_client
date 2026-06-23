@@ -99,8 +99,8 @@ llm:
 ###################### TTS 配置 ######################
 tts_enable: false # 是否启动激活 TTS 模块
 TTS:
-  tts_server_type: "tts_local" # 默认使用本地 TTS 服务器 ，如果需要切换到远程服务器，修改为 tts_remote
-  timeout_sec: 10 # TTS 请求超时时间，单位秒，根据实际情况调整
+  tts_server_type: "tts_remote" # 默认使用本地 TTS 服务器 ，如果需要切换到远程服务器，修改为 tts_remote
+  timeout_sec: 5 # TTS 请求超时时间，单位秒，根据实际情况调整
   playback_start_delay_sec: 0.5 # 起播确认延迟时间，单位秒，根据实际情况调整，影响 tts_active_topic 发布时机
   playback_hangover_sec: 0.1 # 播放挂起时间，单位秒，根据实际情况调整，避免因回调调度抖动导致的状态频繁切换
   playback_gain: 1.0 # 本地播放音量增益；仅放大客户端播放音量，不修改服务端合成结果。过大可能削波失真，建议从 1.2-1.8 逐步调
@@ -117,7 +117,7 @@ TTS:
     host: "192.168.10.101" # 本地 TTS 服务器地址，通常是 Jetson Orin 设备的 IP 地址
     port: 50000
 
-    playback_gain: 2.0 # 本地播放音量增益。覆盖全局 playback_gain 设置
+    playback_gain: 4.0 # 本地播放音量增益。覆盖全局 playback_gain 设置
     chunk_size: 2048 # 每次读取的音频块大小（帧数）。覆盖全局 chunk_size 设置
     dtype: "float32" # 音频数据类型，通常是 int16 或 float32，根据 TTS 服务器的输出格式调整。覆盖全局 dtype 设置
     sample_rate: 16000 # 采样率（Hz），需要与 TTS 服务端的输出采样率一致，确保音频播放正常。覆盖全局 sample_rate 设置
@@ -133,7 +133,7 @@ TTS:
 
   tts_remote: 
     # ----------- tts_remote (阿里云百炼 TTS 服务) -----------
-    playback_gain: 2.0 # 本地播放音量增益。覆盖全局 playback_gain 设置
+    playback_gain: 3.0 # 本地播放音量增益。覆盖全局 playback_gain 设置
     dtype: "int16" # 音频数据类型，通常是 int16 或 float32，根据 TTS 服务器的输出格式调整。覆盖全局 dtype 设置
     sample_rate: 24000 # 需要与 TTS 服务器的输出采样率一致，确保音频播放正常，覆盖全局 sample_rate 设置
     
