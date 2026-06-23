@@ -11,7 +11,7 @@ except ImportError:  # pragma: no cover - exercised only in minimal test envs
     sd = None
 
 from ..backend_context import TTSBackendContext
-from .protocol import MyOutputStreamProtocol, OutputStreamProtocol
+from .protocol import MyOutputStreamProtocol
 
 
 def _apply_playback_gain(pcm: np.ndarray, gain: float) -> np.ndarray:
@@ -33,132 +33,6 @@ def _apply_playback_gain(pcm: np.ndarray, gain: float) -> np.ndarray:
         ).astype(pcm.dtype, copy=False)
 
     return pcm
-
-
-class AudioQueueOutputStream:
-    def __init__(
-        self,
-        owner: OutputStreamProtocol,
-        *,
-        sample_rate: int,
-        channels: int,
-        buffer_size: int,
-        dtype: str,
-        playback_gain: float = 1.0,
-    ) -> None:
-        if sd is None:
-            raise RuntimeError("sounddevice 未安装，无法创建音频输出流")
-
-        self._owner = owner
-        self._channels = channels
-        self._dtype = np.dtype(dtype)
-        self._playback_gain = max(playback_gain, 0.0)
-        self._stream = sd.OutputStream(
-            samplerate=sample_rate,
-            channels=channels,
-            dtype=dtype,
-            blocksize=buffer_size,
-            latency="low",
-            callback=self._audio_callback,
-        )
-
-    def start(self) -> None:
-        self._stream.start()
-
-    def stop(self) -> None:
-        self._stream.stop()
-
-    def close(self) -> None:
-        self._stream.close()
-
-    @property
-    def active(self) -> bool:
-        return bool(getattr(self._stream, "active", False))
-
-    def _audio_callback(self, outdata, frames, time_info, status) -> None:
-        """音频回调函数，用于处理音频数据的输出和播放状态的更新。"""
-        del time_info
-        owner = self._owner
-        now = time.monotonic()
-
-        if status:
-            logger.debug(f"音频回调状态: {status}")
-
-        if owner._stop_event.is_set() or owner._interrupt_event.is_set():
-            outdata.fill(0)
-            owner.is_sounding = False
-            owner._audio_active_started_ts = 0.0
-            owner._last_audio_chunk_ts = 0.0
-            owner._playback_started_event.clear()
-            return
-
-        filled = 0
-        with owner._audio_lock:
-            while filled < frames:
-                if owner._playback_buffer.shape[0] == 0:
-                    try:
-                        chunk = owner.audio_queue.get_nowait()
-                    except queue.Empty:
-                        break
-
-                    pcm = np.frombuffer(chunk, dtype=self._dtype)
-                    pcm = _apply_playback_gain(pcm, self._playback_gain)
-                    if pcm.size == 0:
-                        continue
-                    if pcm.size % self._channels != 0:
-                        logger.warning("丢弃未对齐的音频块")
-                        continue
-                    owner._playback_buffer = np.ascontiguousarray(
-                        pcm.reshape(-1, self._channels)
-                    )
-
-                take = min(frames - filled, owner._playback_buffer.shape[0])
-                outdata[filled : filled + take] = owner._playback_buffer[:take]
-                owner._playback_buffer = owner._playback_buffer[take:]
-                filled += take
-
-        if filled < frames:
-            outdata[filled:].fill(0)
-
-        ####### 声音检测逻辑，延迟判断起播音频播放状态 #######
-        if filled > 0:
-            # 先记录首帧时间；达到起播确认窗口后再判定为播放。
-            if owner._audio_active_started_ts <= 0.0:
-                owner._audio_active_started_ts = now
-            owner._last_audio_chunk_ts = now
-            owner.is_sounding = (
-                now - owner._audio_active_started_ts
-            ) >= owner._playback_start_delay_sec
-            if owner.is_sounding:
-                owner._playback_started_event.set()
-        else:
-            # 短暂挂起窗口用于吸收回调调度抖动，避免状态频繁抖动。
-            keep_active = (
-                now - owner._last_audio_chunk_ts
-            ) < owner._playback_hangover_sec
-            owner.is_sounding = keep_active
-            if not keep_active:
-                owner._audio_active_started_ts = 0.0
-                owner._playback_started_event.clear()
-        ################################################
-
-    def _reset_playback_state(self) -> None:
-        """重置播放状态，清空播放缓冲区和相关时间戳，并更新播放状态标志和事件，确保在停止或中断播放时能够正确地清理播放状态并准备好下一次播放。"""
-        with self._owner._audio_lock:
-            self._owner._playback_buffer = np.empty(
-                (0, self._channels), dtype=self._dtype
-            )
-            self._owner._audio_active_started_ts = 0.0
-            self._owner._last_audio_chunk_ts = 0.0
-        self._owner.is_sounding = False
-        self._owner._playback_started_event.clear()
-
-    def interrupt(self) -> None:
-        """中断当前播放，设置中断事件并重置播放状态，确保在需要立即停止播放时能够正确地清理播放状态并通知相关组件。"""
-        self._owner._interrupt_event.set()
-        time.sleep(0.2)
-        self._reset_playback_state()
-        self._owner._interrupt_event.clear()
 
 
 class MyOutputStream(MyOutputStreamProtocol):
@@ -266,7 +140,7 @@ class MyOutputStream(MyOutputStreamProtocol):
             keep_active = (now - self.last_audio_chunk_ts) < self.playback_hangover_sec
             self.is_sounding = keep_active
             if not keep_active:
-                self._audio_active_started_ts = 0.0
+                self.audio_active_started_ts = 0.0
                 self.playback_started_event.clear()
         ################################################
 
