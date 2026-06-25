@@ -1,5 +1,8 @@
 import asyncio
+import json
+import os
 import queue
+import socket
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -19,6 +22,16 @@ except ImportError:
 from config import get_vad_no_speech_threshold
 
 TAIL_SILENCE_MS = int(get_vad_no_speech_threshold() * 1000)
+
+# 外部 ASR 文本推送服务：每行一个 UTF-8 JSON，例如 {"text": "..."}\n
+EXTERNAL_ASR_TEXT_HOST = os.environ.get("EXTERNAL_ASR_TEXT_HOST", "192.168.10.101")
+EXTERNAL_ASR_TEXT_PORT = int(os.environ.get("EXTERNAL_ASR_TEXT_PORT", "9103"))
+EXTERNAL_ASR_RECONNECT_SECONDS = float(
+    os.environ.get("EXTERNAL_ASR_RECONNECT_SECONDS", "1.0")
+)
+EXTERNAL_ASR_SOCKET_TIMEOUT_SECONDS = float(
+    os.environ.get("EXTERNAL_ASR_SOCKET_TIMEOUT_SECONDS", "1.0")
+)
 
 
 class ASRBackendBase(ABC):
@@ -46,18 +59,42 @@ class ASRBackend(ASRBackendBase):
         asr_backend_context: ASRBackendContext,
         asr_runtime: ASRRuntimeProtocol,
         asr_input_stream: InputStreamProtocol,
+        **kwargs,
     ) -> None:
+        self.kwargs = kwargs
+
         self.asr_backend_context = asr_backend_context
         self.asr_runtime = asr_runtime
         self.asr_input_stream = asr_input_stream
         self.asr_worker_thread: Optional[threading.Thread] = None
 
+        #################### 外部 ASR 文本服务订阅相关配置 ####################
+        self.enable_external_asr: bool = kwargs.get("enable_external_asr", False)
+        self.external_asr_text_worker_thread: Optional[threading.Thread] = None
+        self._external_asr_socket: Optional[socket.socket] = None
+        self._external_asr_socket_lock = threading.Lock()
+        self.EXTERNAL_ASR_TEXT_HOST = kwargs.get(
+            "EXTERNAL_ASR_TEXT_HOST", EXTERNAL_ASR_TEXT_HOST
+        )
+        self.EXTERNAL_ASR_TEXT_PORT = kwargs.get(
+            "EXTERNAL_ASR_TEXT_PORT", EXTERNAL_ASR_TEXT_PORT
+        )
+        self.EXTERNAL_ASR_RECONNECT_SECONDS = kwargs.get(
+            "EXTERNAL_ASR_RECONNECT_SECONDS", EXTERNAL_ASR_RECONNECT_SECONDS
+        )
+        self.EXTERNAL_ASR_SOCKET_TIMEOUT_SECONDS = kwargs.get(
+            "EXTERNAL_ASR_SOCKET_TIMEOUT_SECONDS", EXTERNAL_ASR_SOCKET_TIMEOUT_SECONDS
+        )
+        ###################################################################
+
+        ########################## 声纹识别器初始化 #########################
         if VoiceRecognizer is not None:
             self.voice_recognizer = VoiceRecognizer(
                 low_thresh=0.60, high_thresh=0.67, max_prints_per_id=1
             )
         else:
             self.voice_recognizer = None
+        ##################################################################
 
     def asr_worker_loop(self) -> None:
         """ASR 后端工作线程主循环，持续监听音频输入队列，触发 ASR 推理请求。"""
@@ -83,12 +120,124 @@ class ASRBackend(ASRBackendBase):
                     (asr_text, voice_id)
                 )
             except Exception as e:
-                logger.error(f"[vision_id: {self.asr_backend_context.vision_id}] [ASR + Voice] 推理失败: {e}")
+                logger.error(
+                    f"[vision_id: {self.asr_backend_context.vision_id}] [ASR + Voice] 推理失败: {e}"
+                )
             finally:
                 elapsed_time = time.time() - start_time
                 logger.info(
                     f"[vision_id: {self.asr_backend_context.vision_id}] [ASR + Voice] 推理耗时: {elapsed_time:.3f} 秒"
                 )
+
+    def external_asr_text_worker_loop(self) -> None:
+        """订阅外部 ASR 文本服务，将每条 text 写入统一的 ASR 结果队列。"""
+        reconnect_delay = self.EXTERNAL_ASR_RECONNECT_SECONDS
+
+        while not self.asr_backend_context.stop_event.is_set():
+            sock: Optional[socket.socket] = None
+            try:
+                logger.info(
+                    f"[External ASR] 正在连接 "
+                    f"{self.EXTERNAL_ASR_TEXT_HOST}:{self.EXTERNAL_ASR_TEXT_PORT}"
+                )
+                sock = socket.create_connection(
+                    (self.EXTERNAL_ASR_TEXT_HOST, self.EXTERNAL_ASR_TEXT_PORT),
+                    timeout=self.EXTERNAL_ASR_SOCKET_TIMEOUT_SECONDS,
+                )
+                sock.settimeout(self.EXTERNAL_ASR_SOCKET_TIMEOUT_SECONDS)
+
+                with self._external_asr_socket_lock:
+                    self._external_asr_socket = sock
+
+                reconnect_delay = self.EXTERNAL_ASR_RECONNECT_SECONDS
+                recv_buffer = b""
+                logger.info(
+                    f"[External ASR] 已连接 "
+                    f"{self.EXTERNAL_ASR_TEXT_HOST}:{self.EXTERNAL_ASR_TEXT_PORT}"
+                )
+
+                while not self.asr_backend_context.stop_event.is_set():
+                    try:
+                        data = sock.recv(4096)
+                    except socket.timeout:
+                        continue
+
+                    if not data:
+                        raise ConnectionError("服务端已断开连接")
+
+                    recv_buffer += data
+                    while b"\n" in recv_buffer:
+                        raw_line, recv_buffer = recv_buffer.split(b"\n", 1)
+                        raw_line = raw_line.strip()
+                        if not raw_line:
+                            continue
+
+                        try:
+                            payload = json.loads(raw_line.decode("utf-8"))
+                        except (UnicodeDecodeError, json.JSONDecodeError) as e:
+                            logger.warning(f"[External ASR] 忽略非法 JSON 行: {e}")
+                            continue
+
+                        text = (
+                            payload.get("text") if isinstance(payload, dict) else None
+                        )
+                        if not isinstance(text, str):
+                            logger.warning(
+                                f"[External ASR] 忽略缺少 text 字段的消息: {payload!r}"
+                            )
+                            continue
+
+                        text = text.strip()
+                        if not text:
+                            continue
+
+                        # 复用既有队列格式：(asr_text, voice_id)。
+                        # 外部服务未提供声纹结果，故 voice_id 为 None。
+                        self.asr_backend_context.asr_voice_result_queue.put(
+                            (text, None)
+                        )
+                        logger.info(f"[External ASR] 收到文本: {text}")
+
+            except OSError as e:
+                if not self.asr_backend_context.stop_event.is_set():
+                    logger.warning(
+                        f"[External ASR] 连接/读取失败: {e}；"
+                        f"{reconnect_delay:.1f} 秒后重连"
+                    )
+                    self.asr_backend_context.stop_event.wait(reconnect_delay)
+                    reconnect_delay = min(reconnect_delay * 2.0, 10.0)
+            except Exception as e:
+                if not self.asr_backend_context.stop_event.is_set():
+                    logger.exception(f"[External ASR] 工作线程异常: {e}")
+                    self.asr_backend_context.stop_event.wait(reconnect_delay)
+                    reconnect_delay = min(reconnect_delay * 2.0, 10.0)
+            finally:
+                if sock is not None:
+                    with self._external_asr_socket_lock:
+                        if self._external_asr_socket is sock:
+                            self._external_asr_socket = None
+                    try:
+                        sock.close()
+                    except OSError:
+                        pass
+
+        logger.info("[External ASR] worker 线程已退出")
+
+    def _close_external_asr_socket(self) -> None:
+        """主动关闭 socket，解除 recv 阻塞，让 stop() 不必等待超时。"""
+        with self._external_asr_socket_lock:
+            sock = self._external_asr_socket
+            self._external_asr_socket = None
+
+        if sock is not None:
+            try:
+                sock.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            try:
+                sock.close()
+            except OSError:
+                pass
 
     def start(self) -> None:
         """初始化 ASR 后端资源，启动 ASR worker 线程和音频输入流。"""
@@ -100,6 +249,16 @@ class ASRBackend(ASRBackendBase):
             target=self.asr_worker_loop, daemon=True, name="asr-worker"
         )
         self.asr_worker_thread.start()
+
+        if self.enable_external_asr:
+            self.external_asr_text_worker_thread = threading.Thread(
+                target=self.external_asr_text_worker_loop,
+                daemon=True,
+                name="external-asr-text-worker",
+            )
+            self.external_asr_text_worker_thread.start()
+            logger.info("[External ASR] worker 线程已启动")
+
         logger.info("ASR 后端已启动")
 
     def stop(self) -> None:
@@ -107,9 +266,19 @@ class ASRBackend(ASRBackendBase):
 
         self.asr_backend_context.stop_event.set()
 
+        self._close_external_asr_socket()
+
         if self.asr_worker_thread and self.asr_worker_thread.is_alive():
             self.asr_worker_thread.join()
             logger.info("ASR worker 线程已停止")
+
+        if (
+            self.enable_external_asr
+            and self.external_asr_text_worker_thread
+            and self.external_asr_text_worker_thread.is_alive()
+        ):
+            self.external_asr_text_worker_thread.join()
+            logger.info("[External ASR] worker 线程已停止")
 
         self.asr_input_stream.stop()
         self.asr_runtime.stop()

@@ -84,6 +84,7 @@ class ASRClientBase:
             asr_backend_context=self.create_backend_context(),
             asr_runtime=self.create_asr_runtime(**kwargs),
             asr_input_stream=self.create_input_stream(**kwargs),
+            **kwargs,
         )
 
     def recognize(self, wav_path: str) -> str:
