@@ -46,6 +46,7 @@ class MyOutputStream(MyOutputStreamProtocol):
         playback_start_delay_sec: float = 0.0,
         playback_hangover_sec: float = 0.0,
         playback_gain: float = 1.0,
+        device: int | str | None = None,
     ) -> None:
 
         self.context = context
@@ -71,6 +72,40 @@ class MyOutputStream(MyOutputStreamProtocol):
         self.interrupt_event = threading.Event()
         self.playback_started_event = threading.Event()
 
+        # ---------- 查询并列出所有可用音频输出设备 ----------
+        devices = sd.query_devices()
+        output_devices = [
+            (idx, info)
+            for idx, info in enumerate(devices)
+            if info["max_output_channels"] > 0
+        ]
+        logger.info(f"共发现 {len(output_devices)} 个音频输出设备:")
+        for idx, info in output_devices:
+            logger.info(
+                f"  [{idx}] {info['name']} "
+                f"(max_output_channels={info['max_output_channels']}, "
+                f"default_samplerate={info['default_samplerate']}, "
+                f"hostapi={sd.query_hostapis(info['hostapi'])['name']})"
+            )
+
+        # 确定最终使用的设备
+        if device is None:
+            # 未指定设备时使用系统默认输出设备
+            effective_device = sd.default.device[1]  # 1 = output
+            if effective_device is not None and effective_device < len(devices):
+                logger.info(
+                    f"使用系统默认输出设备: [{effective_device}] {devices[effective_device]['name']}"
+                )
+            else:
+                logger.info("使用 sounddevice 自动选择的默认设备")
+        else:
+            effective_device = device
+            if isinstance(device, int) and device < len(devices):
+                logger.info(f"使用指定输出设备: [{device}] {devices[device]['name']}")
+            else:
+                logger.info(f"使用指定输出设备: {device}")
+        # ----------------------------------------------------
+
         self.output_stream = sd.OutputStream(
             samplerate=self.sample_rate,
             channels=self.channels,
@@ -78,6 +113,7 @@ class MyOutputStream(MyOutputStreamProtocol):
             blocksize=self.buffer_size,
             latency="low",
             callback=self._audio_callback,
+            device=effective_device,
         )
 
     def _audio_callback(self, outdata, frames, time_info, status) -> None:

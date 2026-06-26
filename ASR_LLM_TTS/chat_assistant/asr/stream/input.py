@@ -13,8 +13,14 @@ from .protocol import InputStreamProtocol
 
 
 class InputStream(InputStreamProtocol):
-    def __init__(self, asr_backend_context: ASRBackendContext, **kwargs) -> None:
+    def __init__(
+        self,
+        asr_backend_context: ASRBackendContext,
+        device: int | str | None = None,
+        **kwargs,
+    ) -> None:
         self.asr_backend_context = asr_backend_context
+        self.device = device
 
         self.recording_active = False
         self.segments_to_save = []
@@ -280,12 +286,48 @@ class InputStream(InputStreamProtocol):
                     # self.segments_to_save.append((audio_bytes, now))
                     self.__finalize_pending_segments(now)
 
+        # ---------- 查询并列出所有可用音频输入设备 ----------
+        devices = sd.query_devices()
+        input_devices = [
+            (idx, info)
+            for idx, info in enumerate(devices)
+            if info["max_input_channels"] > 0
+        ]
+        logger.info(f"共发现 {len(input_devices)} 个音频输入设备:")
+        for idx, info in input_devices:
+            logger.info(
+                f"  [{idx}] {info['name']} "
+                f"(max_input_channels={info['max_input_channels']}, "
+                f"default_samplerate={info['default_samplerate']}, "
+                f"hostapi={sd.query_hostapis(info['hostapi'])['name']})"
+            )
+
+        # 确定最终使用的设备
+        if self.device is None:
+            effective_device = sd.default.device[0]  # 0 = input
+            if effective_device is not None and effective_device < len(devices):
+                logger.info(
+                    f"使用系统默认输入设备: [{effective_device}] {devices[effective_device]['name']}"
+                )
+            else:
+                logger.info("使用 sounddevice 自动选择的默认设备")
+        else:
+            effective_device = self.device
+            if isinstance(self.device, int) and self.device < len(devices):
+                logger.info(
+                    f"使用指定输入设备: [{self.device}] {devices[self.device]['name']}"
+                )
+            else:
+                logger.info(f"使用指定输入设备: {self.device}")
+        # ----------------------------------------------------
+
         with sd.InputStream(
             samplerate=self.samplerate,
             channels=self.channels,
             dtype="float32",
             blocksize=self.chunk_frames,
             callback=audio_callback,
+            device=effective_device,
         ):
             logger.info("音频输入流已打开，等待录音...")
             while self.recording_active:

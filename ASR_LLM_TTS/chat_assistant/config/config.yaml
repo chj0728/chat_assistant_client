@@ -16,7 +16,7 @@ ASR:
     # dtype: "int16" # 音频数据类型，通常是 int16 或 float32，根据 ASR 服务器的输入格式调整
 
   Audio:
-    enable: false # 是否启用音频采集模块
+    enable: true # 是否启用音频采集模块
     samplerate: 16000 # 8000 ，16000， 32000， 48000 # 采样率（Hz）每秒多少个采样点（帧）
     channels: 1 # 单声道
     chunk_duration_ms: 20  # 每次读取的音频块持续时间（毫秒）10,20,30
@@ -33,7 +33,7 @@ ASR:
     max_recording_duration: 10 # 最大有效录音时长 (秒)
     pause_duration: 4 # 距离上次语音保存多长时间后，允许再次保存音频 (秒)
 
-  enable_external_asr: true # 是否启用外部 ASR 文本服务订阅功能，启用后会连接外部 ASR 文本服务获取识别结果
+  enable_external_asr: true # 是否启用外部 ASR 文本服务订阅功能，启用后会连接外部 ASR 文本服务获取识别结果，会强制关闭音频采集模块
   EXTERNAL_ASR_TEXT_HOST: "192.168.10.101"
   EXTERNAL_ASR_TEXT_PORT: 9103
   EXTERNAL_ASR_RECONNECT_SECONDS: 10
@@ -176,7 +176,7 @@ ros_cfg:
   user_id_subscribe_topic: "user_id" # 用户ID订阅话题
   user_id_stale_timeout_sec: 5 # 用户ID过期时间，超过此时间未更新则认为用户离开，回退为 None (秒)
 
-  enable_user_face_info: false # 是否启用用户人脸信息订阅功能，启用后会订阅 user_face_subscribe_topic 话题获取用户人脸状态
+  enable_user_face_info: true # 是否启用用户人脸信息订阅功能，启用后会订阅 user_face_subscribe_topic 话题获取用户人脸状态
   user_face_subscribe_topic: "is_faced" # 用户人脸信息订阅话题 (bool:True 表示检测到人脸，False 表示未检测到人脸)
   user_face_stale_timeout_sec: 5 # 用户人脸信息过期时间，超过此时间未更新则认为用户离开，回退为 None (秒)
 ##############################################

@@ -243,7 +243,9 @@ class ASRBackend(ASRBackendBase):
         """初始化 ASR 后端资源，启动 ASR worker 线程和音频输入流。"""
 
         self.asr_runtime.start()
-        self.asr_input_stream.start()
+
+        if not self.enable_external_asr:
+            self.asr_input_stream.start()
 
         self.asr_worker_thread = threading.Thread(
             target=self.asr_worker_loop, daemon=True, name="asr-worker"

@@ -165,9 +165,7 @@ class TTSClientBase:
                 context=self.create_backend_context(),
                 primary_factory=lambda: self.create_qwen_tts_runtime(),
                 fallback_factory=lambda: self.create_sherpa_tts_runtime(),
-                fallback_switch_callback=lambda: self.switch_output_stream(
-                    "tts_local"
-                ),
+                fallback_switch_callback=lambda: self.switch_output_stream("tts_local"),
                 primary_name="远端 Qwen TTS",
                 fallback_name="本地 Sherpa TTS",
             )
