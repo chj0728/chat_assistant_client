@@ -31,50 +31,19 @@ class TTSClientBase:
         self.start()
 
     def on_init(self, **kwargs) -> None:
+
         self._init_kwargs = kwargs
 
         self.tts_server_type = kwargs.get("tts_server_type", "tts_local")
         self.timeout_sec = kwargs.get("timeout_sec", 10.0)
-        self.playback_start_delay_sec = kwargs.get("playback_start_delay_sec", 0.0)
-        self.playback_hangover_sec = kwargs.get("playback_hangover_sec", 0.0)
-        self.playback_gain = kwargs.get(self.tts_server_type, {}).get(
-            "playback_gain", kwargs.get("playback_gain", 1.0)
-        )
 
+        self.playback_start_delay_sec = kwargs.get("playback_start_delay_sec", 0.0)
         self.sample_rate = kwargs.get(self.tts_server_type, {}).get(
             "sample_rate", kwargs.get("sample_rate", 16000)
         )
-        self.channels = kwargs.get(self.tts_server_type, {}).get(
-            "channels", kwargs.get("channels", 1)
-        )
-        self.dtype = kwargs.get(self.tts_server_type, {}).get(
-            "dtype", kwargs.get("dtype", "int16")
-        )
-        self.buffer_size = kwargs.get(self.tts_server_type, {}).get(
-            "buffer_size", kwargs.get("buffer_size", 4096)
-        )
-
-        self.chunk_size = kwargs.get(self.tts_server_type, {}).get(
-            "chunk_size", kwargs.get("chunk_size", 1024)
-        )
-
-        self.host = kwargs.get("tts_local", {}).get("host", "0.0.0.0")
-        self.port = kwargs.get("tts_local", {}).get("port", 0)
-        self.speaker_id = kwargs.get("tts_local", {}).get("speaker_id", 0)
-        self.speed = kwargs.get("tts_local", {}).get("speed", 1.0)
-        self.use_websocket = kwargs.get("tts_local", {}).get("use_websocket", False)
-        self.ws_path = kwargs.get("tts_local", {}).get("ws_path", "/ws/api/tts")
-
-        self.voice_type = kwargs.get("tts_remote", {}).get("voice_type", "Ethan")
-        self.model = kwargs.get("tts_remote", {}).get(
-            "model", "qwen3-tts-flash-realtime"
-        )
-        self.remote_mode = kwargs.get("tts_remote", {}).get("remote_mode", "commit")
-        self.remote_url = kwargs.get("tts_remote", {}).get("remote_url", None)
 
         self.text_queue: queue.Queue[str] = queue.Queue()
         self.audio_queue: queue.Queue[bytes] = queue.Queue()
-
         self.stop_event = threading.Event()
         self.interrupt_event = threading.Event()
         self.output_stream_started = False
@@ -101,34 +70,14 @@ class TTSClientBase:
     def create_backend_context(
         self, server_type: str | None = None
     ) -> TTSBackendContext:
-        active_server_type = server_type or self.tts_server_type
+        # active_server_type = server_type or self.tts_server_type
 
         return TTSBackendContext(
-            host=self.host,
-            port=self.port,
             timeout=self.timeout_sec,
-            sample_rate=self.get_playback_config_value(
-                active_server_type, "sample_rate", 16000
-            ),
-            channels=self.get_playback_config_value(active_server_type, "channels", 1),
-            chunk_size=self.get_playback_config_value(
-                active_server_type, "chunk_size", 1024
-            ),
             text_queue=self.text_queue,
             audio_queue=self.audio_queue,
             stop_event=self.stop_event,
             interrupt_event=self.interrupt_event,
-            speaker_id=self.speaker_id,
-            speed=self.speed,
-            use_websocket=self.use_websocket,
-            ws_path=self.ws_path,
-            # ws_ping_interval=self.ws_ping_interval,
-            # ws_ping_timeout=self.ws_ping_timeout,
-            voice=self.voice_type,
-            # api_key=self.api_key,
-            model=self.model,
-            remote_url=self.remote_url,
-            remote_mode=self.remote_mode,
         )
 
     def create_output_stream(self, server_type: str | None = None) -> MyOutputStream:
@@ -141,46 +90,63 @@ class TTSClientBase:
         buffer_size = self.get_playback_config_value(
             active_server_type, "buffer_size", 4096
         )
+
+        playback_start_delay_sec = self.get_playback_config_value(
+            active_server_type, "playback_start_delay_sec", 0.0
+        )
+        playback_hangover_sec = self.get_playback_config_value(
+            active_server_type, "playback_hangover_sec", 0.0
+        )
         playback_gain = self.get_playback_config_value(
             active_server_type, "playback_gain", 1.0
         )
 
         return MyOutputStream(
-            context=self.create_backend_context(active_server_type),
+            context=self.create_backend_context(),
             sample_rate=sample_rate,
             channels=channels,
             buffer_size=buffer_size,
             dtype=dtype,
-            playback_start_delay_sec=self.playback_start_delay_sec,
-            playback_hangover_sec=self.playback_hangover_sec,
+            playback_start_delay_sec=playback_start_delay_sec,
+            playback_hangover_sec=playback_hangover_sec,
             playback_gain=playback_gain,
         )
 
     def create_tts_runtime(self) -> TTSRuntimeProtocol:
 
-        if self.tts_server_type == "tts_remote":
+        if self.tts_server_type == "qwen3_tts":
             from .runtimes.fallback import FallbackTTSRuntime
 
             return FallbackTTSRuntime(
                 context=self.create_backend_context(),
                 primary_factory=lambda: self.create_qwen_tts_runtime(),
                 fallback_factory=lambda: self.create_sherpa_tts_runtime(),
-                fallback_switch_callback=lambda: self.switch_output_stream("tts_local"),
+                fallback_switch_callback=lambda: self.switch_output_stream(
+                    "sherpa_onnx_tts"
+                ),
                 primary_name="远端 Qwen TTS",
                 fallback_name="本地 Sherpa TTS",
             )
-        else:
+        elif self.tts_server_type == "sherpa_onnx_tts":
             return self.create_sherpa_tts_runtime()
+
+        else:
+            raise ValueError(f"未知的 TTS 服务器类型: {self.tts_server_type}")
 
     def create_qwen_tts_runtime(self) -> TTSRuntimeProtocol:
         from .runtimes.qwen_tts import QwenTTSRuntime
 
-        return QwenTTSRuntime(self.create_backend_context("tts_remote"))
+        return QwenTTSRuntime(
+            self.create_backend_context(), **self._init_kwargs.get("qwen3_tts", {})
+        )
 
     def create_sherpa_tts_runtime(self) -> TTSRuntimeProtocol:
         from .runtimes.sherpa_tts import SherpaTTSRuntime
 
-        return SherpaTTSRuntime(self.create_backend_context("tts_local"))
+        return SherpaTTSRuntime(
+            self.create_backend_context(),
+            **self._init_kwargs.get("sherpa_onnx_tts", {}),
+        )
 
     def switch_output_stream(self, server_type: str) -> None:
         logger.info("正在切换 TTS 输出流格式: %s", server_type)

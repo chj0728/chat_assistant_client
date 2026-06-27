@@ -97,10 +97,29 @@ class RemoteCallback(REMOTE_CALLBACK_BASE):
 
 
 class QwenTTSRuntime(TTSRuntimeProtocol):
-    def __init__(self, context: TTSBackendContext) -> None:
+    def __init__(self, context: TTSBackendContext, **kwargs) -> None:
+        self.kwargs = kwargs
+
         self.context = context
         self.runtime_lock = threading.RLock()
+
+        self.voice = self.kwargs.get("voice", "Cherry")
+        self.model = self.kwargs.get("model", "qwen3-tts-flash-realtime")
+        self.remote_url = self.kwargs.get("remote_url", None)
+        self.remote_mode = self.kwargs.get("remote_mode", "commit")
+
+        self.channels = self.kwargs.get("channels", 1)
+        self.sample_rate = self.kwargs.get("sample_rate", 24000)
+        self.dtype = self.kwargs.get("dtype", "int16")
+
         self.initialize_runtime()
+        logger.info(
+            "QwenTTSRuntime 初始化完成，voice=%s, model=%s, remote_url=%s, remote_mode=%s",
+            self.voice,
+            self.model,
+            self.remote_url,
+            self.remote_mode,
+        )
 
     def reset_runtime(self) -> None:
         qwen_tts = getattr(self, "qwen_tts", None)
@@ -134,11 +153,11 @@ class QwenTTSRuntime(TTSRuntimeProtocol):
             load_dotenv()
 
         if dashscope is None or QwenTtsRealtime is None or AudioFormat is None:
-            raise RuntimeError("dashscope 未安装，无法启用远端 TTS")
+            raise ImportError("dashscope 未安装，无法启用远端 TTS")
 
-        api_key = self.context.api_key or os.getenv("DASHSCOPE_API_KEY")
+        api_key = os.getenv("DASHSCOPE_API_KEY")
         if not api_key:
-            raise RuntimeError("未配置 DASHSCOPE_API_KEY，无法启用远端 TTS")
+            raise ValueError("未配置 DASHSCOPE_API_KEY，无法启用远端 TTS")
 
         dashscope.api_key = api_key
 
@@ -146,15 +165,15 @@ class QwenTTSRuntime(TTSRuntimeProtocol):
 
         self.callback = RemoteCallback(self.context.audio_queue)
         self.qwen_tts = QwenTtsRealtime(
-            model=self.context.model,
+            model=self.model,
             callback=self.callback,
-            url=self.context.remote_url,
+            url=self.remote_url,
         )
         self.qwen_tts.connect()
         self.qwen_tts.update_session(
-            voice=self.context.voice,
+            voice=self.voice,
             response_format=AudioFormat.PCM_24000HZ_MONO_16BIT,
-            mode=self.context.remote_mode,
+            mode=self.remote_mode,
         )
 
     def ensure_runtime(self) -> None:
@@ -235,9 +254,9 @@ class QwenTTSRuntime(TTSRuntimeProtocol):
             if not pcm_bytes:
                 return False
             with wave.open(filename, "wb") as wf:
-                wf.setnchannels(self.context.channels)
+                wf.setnchannels(self.channels)
                 wf.setsampwidth(2)
-                wf.setframerate(self.context.sample_rate)
+                wf.setframerate(self.sample_rate)
                 wf.writeframes(pcm_bytes)
             return True
         except Exception as e:
@@ -245,15 +264,15 @@ class QwenTTSRuntime(TTSRuntimeProtocol):
             return False
 
     def change_voice(self, voice: str) -> None:
-        self.context.voice = voice
+        self.voice = voice
         with self.runtime_lock:
             if self.qwen_tts is None:
                 return
             audio_format = cast(Any, AudioFormat)
             self.qwen_tts.update_session(
-                voice=self.context.voice,
+                voice=self.voice,
                 response_format=audio_format.PCM_24000HZ_MONO_16BIT,
-                mode=self.context.remote_mode,
+                mode=self.remote_mode,
             )
 
     ##############################################################################
