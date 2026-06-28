@@ -5,6 +5,7 @@ __all__ = [
     "QwenTTSRuntime",
     "SherpaTTSRuntime",
     "TTSRuntimeProtocol",
+    "VoxCPMCppTTSRuntime",
 ]
 
 
@@ -18,7 +19,11 @@ def __getattr__(name: str):
 
         return QwenTTSRuntime
     if name == "SherpaTTSRuntime":
-        from .sherpa_tts import SherpaTTSRuntime
+        from .sherpa_onnx_tts import SherpaTTSRuntime
 
         return SherpaTTSRuntime
+    if name == "VoxCPMCppTTSRuntime":
+        from .voxcpm_cpp_tts import VoxCPMCppTTSRuntime
+
+        return VoxCPMCppTTSRuntime
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

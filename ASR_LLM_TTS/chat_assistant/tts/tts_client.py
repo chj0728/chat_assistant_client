@@ -129,6 +129,8 @@ class TTSClientBase:
             )
         elif self.tts_server_type == "sherpa_onnx_tts":
             return self.create_sherpa_tts_runtime()
+        elif self.tts_server_type == "voxcpm_cpp_tts":
+            return self.create_voxcpm_cpp_tts_runtime()
 
         else:
             raise ValueError(f"未知的 TTS 服务器类型: {self.tts_server_type}")
@@ -141,11 +143,19 @@ class TTSClientBase:
         )
 
     def create_sherpa_tts_runtime(self) -> TTSRuntimeProtocol:
-        from .runtimes.sherpa_tts import SherpaTTSRuntime
+        from .runtimes.sherpa_onnx_tts import SherpaTTSRuntime
 
         return SherpaTTSRuntime(
             self.create_backend_context(),
             **self._init_kwargs.get("sherpa_onnx_tts", {}),
+        )
+
+    def create_voxcpm_cpp_tts_runtime(self) -> TTSRuntimeProtocol:
+        from .runtimes.voxcpm_cpp_tts import VoxCPMCppTTSRuntime
+
+        return VoxCPMCppTTSRuntime(
+            self.create_backend_context(),
+            **self._init_kwargs.get("voxcpm_cpp_tts", {}),
         )
 
     def switch_output_stream(self, server_type: str) -> None:

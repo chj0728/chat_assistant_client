@@ -158,6 +158,31 @@ TTS:
     sample_rate: 24000 # 需要与 TTS 服务器的输出采样率一致，确保音频播放正常，覆盖全局 sample_rate 设置
     playback_gain: 3.0 # 本地播放音量增益。覆盖全局 playback_gain 设置    
     # ---------------------------------------------------
+
+  voxcpm_cpp_tts:
+    # ----------- voxcpm_cpp_tts (VoxCPM TTS 服务) -----------
+    host: "127.0.0.1"
+    port: 8080
+    base_url: "" # 可选；为空时使用 http://{host}:{port}
+    speech_path: "/v1/audio/speech"
+    health_path: "/healthz"
+    enable_health_check: true
+    api_key: "" # 服务端未使用 --disable-auth 时填写 Bearer token
+
+    model: "voxcpm-0.5b" # 必须与 voxcpm-server 启动参数 --model-name 一致
+    voice: "Ethan" # 必须是已通过 /v1/voices 注册的 voice id
+    speed: 1.0
+    max_attempts: 1
+    chunk_size: 2048 # HTTP PCM 流式响应每次读取的字节数
+
+    # -------------- voxcpm_cpp_tts 播放参数覆盖全局设置 --------------
+    channels: 1 # 单声道
+    dtype: "int16" # VoxCPM C++ 服务的 pcm 为裸 int16 little-endian
+    buffer_size: 4096 # 音频缓冲区大小（帧数)。覆盖全局 buffer_size 设置
+    sample_rate: 24000 # 建议 voxcpm-server 同时设置 --output-sample-rate 24000
+    playback_gain: 1.0 # 本地播放音量增益。覆盖全局 playback_gain 设置
+    # ---------------------------------------------------------------
+
 ################################################
 
 ################# 唤醒词检测配置 #################
