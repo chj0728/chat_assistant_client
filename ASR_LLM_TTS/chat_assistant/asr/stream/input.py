@@ -1,6 +1,7 @@
 import threading
 import time
 import wave
+from collections import deque
 from pathlib import Path
 
 import numpy as np
@@ -24,6 +25,7 @@ class InputStream(InputStreamProtocol):
 
         self.recording_active = False
         self.segments_to_save = []
+        self.pre_recording_buffer = deque()
         self.saved_intervals = []
         self.last_active_time = time.time()
         self.last_vad_end_time = time.time()
@@ -64,7 +66,7 @@ class InputStream(InputStreamProtocol):
         """根据配置参数初始化 VAD 相关设置，包括 VAD 模式、无语音阈值、分贝阈值、最小/最大录音时长、静音持续时长等。"""
         vad_cfg = kwargs.get("VAD", {})
 
-        self.vad_mode = vad_cfg.get("vad_mode", 3)
+        self.vad_mode = vad_cfg.get("vad_mode", vad_cfg.get("mode", 3))
         self.output_dir = (
             Path(__file__).resolve().parent.parent / vad_cfg.get("output_dir", "output")
         ).resolve()
@@ -75,6 +77,9 @@ class InputStream(InputStreamProtocol):
         self.min_recording_duration = vad_cfg.get("min_recording_duration", 1.0)
         self.max_recording_duration = vad_cfg.get("max_recording_duration", 10.0)
         self.pause_duration = vad_cfg.get("pause_duration", 1.5)
+        self.pre_recording_buffer_duration = vad_cfg.get(
+            "pre_recording_buffer_duration", 0.5
+        )
         self.vad = webrtcvad.Vad(self.vad_mode)
 
     def start(self) -> None:
@@ -89,6 +94,7 @@ class InputStream(InputStreamProtocol):
             return
 
         self.segments_to_save = []
+        self.pre_recording_buffer.clear()
         self.saved_intervals = []
         self.last_active_time = time.time()
         self.last_vad_end_time = time.time()
@@ -119,6 +125,38 @@ class InputStream(InputStreamProtocol):
     def __reset_segment_state(self):
         """重置音频片段状态。"""
         self.segments_to_save.clear()
+
+    def __append_pre_recording_buffer(self, audio_bytes: bytes, timestamp: float) -> None:
+        """保存最近一小段历史音频，用于补齐有效录音开头。"""
+        if self.pre_recording_buffer_duration <= 0:
+            return
+
+        self.pre_recording_buffer.append((audio_bytes, timestamp))
+        while (
+            self.pre_recording_buffer
+            and timestamp - self.pre_recording_buffer[0][1]
+            > self.pre_recording_buffer_duration
+        ):
+            self.pre_recording_buffer.popleft()
+
+    def __build_audio_frames_with_pre_buffer(self) -> list[bytes]:
+        """录音片段满足时长要求后，把片段开始前的缓冲音频补到开头。"""
+        if not self.segments_to_save:
+            return []
+
+        start_time = self.segments_to_save[0][1]
+        pre_buffer_frames = [
+            audio_bytes
+            for audio_bytes, timestamp in self.pre_recording_buffer
+            if timestamp < start_time
+        ]
+        if pre_buffer_frames:
+            pre_buffer_duration = sum(len(frame) for frame in pre_buffer_frames) / (
+                2 * max(self.channels, 1) * self.samplerate
+            )
+            logger.info(f"补充录音开头缓冲: {pre_buffer_duration:.2f} 秒")
+
+        return pre_buffer_frames + [seg[0] for seg in self.segments_to_save]
 
     def __check_vad_activity(self, audio_bytes: bytes) -> bool:
         """
@@ -237,6 +275,7 @@ class InputStream(InputStreamProtocol):
                 audio_bytes = self.__float_to_pcm16(audio_np)
                 # 重置缓冲区
                 reset_buffer()
+                self.__append_pre_recording_buffer(audio_bytes, now)
 
                 # === NEW: 计算 RMS 能量 ===
                 # rms = np.sqrt(np.mean(audio_np**2) + 1e-8)
@@ -384,7 +423,7 @@ class InputStream(InputStreamProtocol):
         # ===============================
         # 3. 拼接音频
         # ===============================
-        audio_frames = [seg[0] for seg in self.segments_to_save]
+        audio_frames = self.__build_audio_frames_with_pre_buffer()
 
         self.asr_backend_context.audio_frames_queue.put(b"".join(audio_frames))
 
