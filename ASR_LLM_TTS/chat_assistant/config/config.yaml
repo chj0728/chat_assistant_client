@@ -34,7 +34,7 @@ ASR:
     pre_recording_buffer_duration: 0.5 # 有效录音保存前，补到开头的历史缓冲时长 (秒)
     pause_duration: 4 # 距离上次语音保存多长时间后，允许再次保存音频 (秒)
 
-  enable_external_asr: true # 是否启用外部 ASR 文本服务订阅功能，启用后会连接外部 ASR 文本服务获取识别结果，会强制关闭音频采集模块
+  enable_external_asr: false # 是否启用外部 ASR 文本服务订阅功能，启用后会连接外部 ASR 文本服务获取识别结果，会强制关闭音频采集模块
   EXTERNAL_ASR_TEXT_HOST: "192.168.10.101"
   EXTERNAL_ASR_TEXT_PORT: 9103
   EXTERNAL_ASR_RECONNECT_SECONDS: 10
@@ -157,7 +157,7 @@ TTS:
     dtype: "int16" # 音频数据类型，通常是 int16 或 float32，根据 TTS 服务器的输出格式调整。覆盖全局 dtype 设置
     buffer_size: 4096 # 音频缓冲区大小（帧数)。覆盖全局 buffer_size 设置
     sample_rate: 24000 # 需要与 TTS 服务器的输出采样率一致，确保音频播放正常，覆盖全局 sample_rate 设置
-    playback_gain: 3.0 # 本地播放音量增益。覆盖全局 playback_gain 设置    
+    playback_gain: 2.0 # 本地播放音量增益。覆盖全局 playback_gain 设置    
     # ---------------------------------------------------
 
   voxcpm_cpp_tts:
