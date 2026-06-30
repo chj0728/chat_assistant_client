@@ -125,8 +125,11 @@ class InputStream(InputStreamProtocol):
     def __reset_segment_state(self):
         """重置音频片段状态。"""
         self.segments_to_save.clear()
+        self.pre_recording_buffer.clear()
 
-    def __append_pre_recording_buffer(self, audio_bytes: bytes, timestamp: float) -> None:
+    def __append_pre_recording_buffer(
+        self, audio_bytes: bytes, timestamp: float
+    ) -> None:
         """保存最近一小段历史音频，用于补齐有效录音开头。"""
         if self.pre_recording_buffer_duration <= 0:
             return
@@ -275,7 +278,11 @@ class InputStream(InputStreamProtocol):
                 audio_bytes = self.__float_to_pcm16(audio_np)
                 # 重置缓冲区
                 reset_buffer()
-                self.__append_pre_recording_buffer(audio_bytes, now)
+
+                # 当没有待保存的音频段时，将音频数据添加到预录音缓冲区
+                if not self.segments_to_save:
+                    self.__append_pre_recording_buffer(audio_bytes, now)
+                    # logger.info("已将音频数据添加到预录音缓冲区")
 
                 # === NEW: 计算 RMS 能量 ===
                 # rms = np.sqrt(np.mean(audio_np**2) + 1e-8)
