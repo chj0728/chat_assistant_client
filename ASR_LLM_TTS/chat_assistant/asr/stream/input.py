@@ -26,7 +26,7 @@ class InputStream(InputStreamProtocol):
         self.recording_active = False
         self.segments_to_save = []
         self.pre_recording_buffer = deque()
-        self.saved_intervals = []
+        self.saved_intervals_dict = {"start": time.time(), "end": time.time()}
         self.last_active_time = time.time()
         self.last_vad_end_time = time.time()
 
@@ -72,7 +72,7 @@ class InputStream(InputStreamProtocol):
         ).resolve()
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        self.no_speech_threshold = vad_cfg.get("no_speech_threshold", 0.5)
+        self.no_speech_duration = vad_cfg.get("no_speech_duration", 0.5)
         self.decibel_threshold = vad_cfg.get("decibel_threshold", -40)
         self.min_recording_duration = vad_cfg.get("min_recording_duration", 1.0)
         self.max_recording_duration = vad_cfg.get("max_recording_duration", 10.0)
@@ -95,7 +95,7 @@ class InputStream(InputStreamProtocol):
 
         self.segments_to_save = []
         self.pre_recording_buffer.clear()
-        self.saved_intervals = []
+        self.saved_intervals_dict = {"start": time.time(), "end": time.time()}
         self.last_active_time = time.time()
         self.last_vad_end_time = time.time()
 
@@ -126,6 +126,7 @@ class InputStream(InputStreamProtocol):
         """重置音频片段状态。"""
         self.segments_to_save.clear()
         self.pre_recording_buffer.clear()
+        self.saved_intervals_dict = {"start": time.time(), "end": time.time()}
 
     def __append_pre_recording_buffer(
         self, audio_bytes: bytes, timestamp: float
@@ -299,7 +300,7 @@ class InputStream(InputStreamProtocol):
                 if decibel < self.decibel_threshold:
                     ### 静音时间超过 no_speech_threshold and 有待保存音频段 则保存音频段
                     if (
-                        now - self.last_active_time > self.no_speech_threshold
+                        now - self.last_active_time > self.no_speech_duration
                         and self.segments_to_save
                     ):
                         logger.info("静音时间超过阈值，收集历史音频段")
@@ -317,17 +318,30 @@ class InputStream(InputStreamProtocol):
                 else:
                     ### 如果 检测 VAD 活动，则保存音频段
                     if self.__check_vad_activity(audio_bytes):
+
+                        if now < self.last_vad_end_time + self.pause_duration:
+                            logger.warning("缓冲时间内，忽略音频")
+                            return
+
                         logger.info("检测到语音活动，分贝: {:.2f} dB".format(decibel))
                         self.last_active_time = now
                         self.segments_to_save.append((audio_bytes, now))
+                    else:
+                        if self.segments_to_save:
+                            logger.info(
+                                "未检测到语音活动，分贝: {:.2f} dB，继续等待，保存静音段".format(
+                                    decibel
+                                )
+                            )
+                            self.segments_to_save.append((audio_bytes, now))
 
                 ## 如果处于录音段内（已有数据） and 录音时长超过最大值，则保存音频段
                 if self.segments_to_save and (
-                    self.segments_to_save[-1][1] - self.segments_to_save[0][1]
-                    > (self.max_recording_duration - 0.2)
+                    (self.segments_to_save[-1][1] - self.segments_to_save[0][1])
+                    > self.max_recording_duration
                 ):
                     logger.info(
-                        f"录音时长超过最大值{self.max_recording_duration}秒，保存音频段"
+                        f"录音片段时长超过最大值{self.max_recording_duration}秒，保存音频段"
                     )
                     # self.segments_to_save.append((audio_bytes, now))
                     self.__finalize_pending_segments(now)
@@ -403,20 +417,20 @@ class InputStream(InputStreamProtocol):
         end_time = self.segments_to_save[-1][1]
 
         # 检查是否与之前的片段重叠
-        if self.saved_intervals and self.saved_intervals[-1][1] >= start_time:
+        if self.saved_intervals_dict["end"] >= start_time:
             logger.warning("当前片段与之前片段重叠，跳过保存")
             self.segments_to_save.clear()
             return None
 
         # 检查录音时长是否满足要求
+        # ( min_recording_duration + no_speech_threshold)<= recording_duration <= ( max_recording_duration + no_speech_threshold)
         recording_duration = end_time - start_time
-        # print(f"录音时长: {recording_duration:.2f} 秒")
         logger.info(f"录音时长: {recording_duration:.2f} 秒")
-        if recording_duration < self.min_recording_duration:
+        if recording_duration < (self.min_recording_duration + self.no_speech_duration):
             logger.warning("录音时长过短，跳过保存")
             self.segments_to_save.clear()
             return None
-        if recording_duration > self.max_recording_duration:
+        if recording_duration > (self.max_recording_duration + self.no_speech_duration):
             logger.warning("录音时长过长，跳过保存")
             self.segments_to_save.clear()
             return None
@@ -452,7 +466,8 @@ class InputStream(InputStreamProtocol):
         # # ===============================
         # # 5. 更新状态
         # # ===============================
-        self.saved_intervals.append((start_time, end_time))
+        self.saved_intervals_dict["start"] = start_time
+        self.saved_intervals_dict["end"] = end_time
         self.last_vad_end_time = end_time
         # 2023-11-01 17:00:00 更新 VAD 结束时间: 1700000000.000
         formatted_time = time.strftime(

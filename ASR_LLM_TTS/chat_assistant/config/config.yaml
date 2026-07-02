@@ -24,15 +24,15 @@ ASR:
     max_file_count: 20  # 最大保存音频文件数量，超过后循环覆盖
 
   VAD:
+    # reactive_kws_threshold: 100  # 重置唤醒词检测 激活 LLM 时间间隔 (秒) 
     output_dir: "output" # VAD 结果保存目录
     mode : 2 # 0：最宽松，允许更多非语音通过  1：平衡模式 2：较严格，减少非语音通过  3：最严格，过滤更多非语音
-    no_speech_threshold: 0.6 # 静音持续多长时间后认为一句话结束 (秒)
-    # reactive_kws_threshold: 100  # 重置唤醒词检测 激活 LLM 时间间隔 (秒) 
-    decibel_threshold: -35 # 分贝阈值，低于此值认为是静音 (dB)
-    min_recording_duration: 0.4 # 最短有效录音时长 (秒)
-    max_recording_duration: 10 # 最大有效录音时长 (秒)
-    pre_recording_buffer_duration: 1.0 # 有效录音保存前，补到开头的历史缓冲时长 (秒)
-    pause_duration: 4 # 距离上次语音保存多长时间后，允许再次保存音频 (秒)
+    decibel_threshold: -42 # 分贝阈值，低于此值认为是静音 (dB)
+    no_speech_duration: 0.8 # 静音持续多长时间后认为一句话结束 (秒)
+    min_recording_duration: 0.4 # 最短小有效录音片段时长 (秒)
+    max_recording_duration: 8 # 最大录音片段时长 (秒)
+    pre_recording_buffer_duration: 0.6 # 有效录音保存前，补到开头的历史缓冲时长 (秒)
+    pause_duration: 2 # 距离上次录音片段保存结束时间后，允许再次保存音频 (秒)
 
   enable_external_asr: false # 是否启用外部 ASR 文本服务订阅功能，启用后会连接外部 ASR 文本服务获取识别结果，会强制关闭音频采集模块
   EXTERNAL_ASR_TEXT_HOST: "192.168.10.101"
@@ -52,7 +52,7 @@ llm:
   temperature: 0.6 # 生成文本的随机程度，范围0-1，值越大越随机
   # （max_tokens + max_completion_tokens(限制模型回复tokens) +RAG 检索结果 tokens) 需要在模型的上下文窗口限制内，例如 2048 或 4096，具体取决于所使用的 LLM 模型
   max_tokens: 150 # 历史消息的最大 token 数量，配合 max_messages 控制上下文长度，根据实际情况调整
-  max_messages: 15 # 历史消息的最大条数，配合 max_tokens 控制上下文长度，根据实际情况调整
+  max_messages: 5 # 历史消息的最大条数，配合 max_tokens 控制上下文长度，根据实际情况调整
   max_completion_tokens: 100 # 只限制 生成内容（completion） 的 token 数量，不是输入（prompt）+输出（completion）的总token数，根据实际情况调整
 
   enable_cloud: true # 是否启用云端 LLM 服务，启用后会使用云端 API 进行推理，确保.env 中的 EAS_TOKEN 和 EAS_ENDPOINT 已正确配置
@@ -137,7 +137,7 @@ TTS:
     dtype: "float32" # 音频数据类型，通常是 int16 或 float32，根据 TTS 服务器的输出格式调整。覆盖全局 dtype 设置
     buffer_size: 4096 # 音频缓冲区大小（帧数)。覆盖全局 buffer_size 设置
     sample_rate: 16000 # 采样率（Hz），需要与 TTS 服务端的输出采样率一致，确保音频播放正常。覆盖全局 sample_rate 设置
-    playback_gain: 4.0 # 本地播放音量增益。覆盖全局 playback_gain 设置
+    playback_gain: 3.0 # 本地播放音量增益。覆盖全局 playback_gain 设置
     # ----------------------------------------------------------------
 
   qwen3_tts: 
@@ -157,7 +157,7 @@ TTS:
     dtype: "int16" # 音频数据类型，通常是 int16 或 float32，根据 TTS 服务器的输出格式调整。覆盖全局 dtype 设置
     buffer_size: 4096 # 音频缓冲区大小（帧数)。覆盖全局 buffer_size 设置
     sample_rate: 24000 # 需要与 TTS 服务器的输出采样率一致，确保音频播放正常，覆盖全局 sample_rate 设置
-    playback_gain: 2.0 # 本地播放音量增益。覆盖全局 playback_gain 设置    
+    playback_gain: 1.5 # 本地播放音量增益。覆盖全局 playback_gain 设置    
     # ---------------------------------------------------
 
   voxcpm_cpp_tts:
