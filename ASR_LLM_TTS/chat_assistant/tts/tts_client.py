@@ -34,11 +34,13 @@ class TTSClientBase:
 
         self._init_kwargs = kwargs
 
-        self.tts_server_type = kwargs.get("tts_server_type", "tts_local")
+        # self.tts_server_type = kwargs.get("tts_server_type", "tts_local")
+        self.primary_factory = kwargs.get("primary_factory", "qwen3_tts")
+        self.fallback_factory = kwargs.get("fallback_factory", "sherpa_onnx_tts")
         self.timeout_sec = kwargs.get("timeout_sec", 10.0)
 
         self.playback_start_delay_sec = kwargs.get("playback_start_delay_sec", 0.0)
-        self.sample_rate = kwargs.get(self.tts_server_type, {}).get(
+        self.sample_rate = kwargs.get(self.primary_factory, {}).get(
             "sample_rate", kwargs.get("sample_rate", 16000)
         )
 
@@ -81,7 +83,7 @@ class TTSClientBase:
         )
 
     def create_output_stream(self, server_type: str | None = None) -> MyOutputStream:
-        active_server_type = server_type or self.tts_server_type
+        active_server_type = server_type or self.primary_factory
         sample_rate = self.get_playback_config_value(
             active_server_type, "sample_rate", 16000
         )
@@ -114,26 +116,49 @@ class TTSClientBase:
 
     def create_tts_runtime(self) -> TTSRuntimeProtocol:
 
-        if self.tts_server_type == "qwen3_tts":
-            from .runtimes.fallback import FallbackTTSRuntime
+        # if self.tts_server_type == "qwen3_tts":
+        #     from .runtimes.fallback import FallbackTTSRuntime
 
-            return FallbackTTSRuntime(
-                context=self.create_backend_context(),
-                primary_factory=lambda: self.create_qwen_tts_runtime(),
-                fallback_factory=lambda: self.create_sherpa_tts_runtime(),
-                fallback_switch_callback=lambda: self.switch_output_stream(
-                    "sherpa_onnx_tts"
-                ),
-                primary_name="远端 Qwen TTS",
-                fallback_name="本地 Sherpa TTS",
-            )
-        elif self.tts_server_type == "sherpa_onnx_tts":
+        #     return FallbackTTSRuntime(
+        #         context=self.create_backend_context(),
+        #         primary_factory=lambda: self.create_qwen_tts_runtime(),
+        #         fallback_factory=lambda: self.create_sherpa_tts_runtime(),
+        #         fallback_switch_callback=lambda: self.switch_output_stream(
+        #             "sherpa_onnx_tts"
+        #         ),
+        #         primary_name="远端 Qwen TTS",
+        #         fallback_name="本地 Sherpa TTS",
+        #     )
+        # elif self.tts_server_type == "sherpa_onnx_tts":
+        #     return self.create_sherpa_tts_runtime()
+        # elif self.tts_server_type == "voxcpm_cpp_tts":
+        #     return self.create_voxcpm_cpp_tts_runtime()
+
+        # else:
+        #     raise ValueError(f"未知的 TTS 服务器类型: {self.tts_server_type}")
+
+        from .runtimes.fallback import FallbackTTSRuntime
+
+        return FallbackTTSRuntime(
+            context=self.create_backend_context(),
+            primary_factory=lambda: self.create_factory_runtime(self.primary_factory),
+            fallback_factory=lambda: self.create_factory_runtime(self.fallback_factory),
+            fallback_switch_callback=lambda: self.switch_output_stream(
+                self.fallback_factory
+            ),
+            primary_name=f"主 TTS 工厂: {self.primary_factory}",
+            fallback_name=f"备用 TTS 工厂: {self.fallback_factory}",
+        )
+
+    def create_factory_runtime(self, factory_name: str) -> TTSRuntimeProtocol:
+        if factory_name == "qwen3_tts":
+            return self.create_qwen_tts_runtime()
+        elif factory_name == "sherpa_onnx_tts":
             return self.create_sherpa_tts_runtime()
-        elif self.tts_server_type == "voxcpm_cpp_tts":
+        elif factory_name == "voxcpm_cpp_tts":
             return self.create_voxcpm_cpp_tts_runtime()
-
         else:
-            raise ValueError(f"未知的 TTS 服务器类型: {self.tts_server_type}")
+            raise ValueError(f"未知的 TTS 工厂名称: {factory_name}")
 
     def create_qwen_tts_runtime(self) -> TTSRuntimeProtocol:
         from .runtimes.qwen_tts import QwenTTSRuntime
@@ -161,6 +186,10 @@ class TTSClientBase:
     def switch_output_stream(self, server_type: str) -> None:
         logger.info("正在切换 TTS 输出流格式: %s", server_type)
         old_output_stream = self.output_stream
+
+        self.sample_rate = self.get_playback_config_value(
+            server_type, "sample_rate", 16000
+        )
 
         try:
             old_output_stream.stop()

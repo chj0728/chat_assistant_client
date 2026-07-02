@@ -105,7 +105,10 @@ llm:
 ###################### TTS 配置 ######################
 tts_enable: false # 是否启动激活 TTS 模块
 TTS:
-  tts_server_type: "qwen3_tts" # 默认使用本地 TTS 服务器 ，如果需要切换到远程服务器，修改为 qwen3_tts
+  # tts_server_type: "sherpa_onnx_tts" # 默认使用本地 TTS 服务器 ，如果需要切换到远程服务器，修改为 qwen3_tts
+  primary_factory: "qwen3_tts" # 主 TTS 工厂
+  fallback_factory: "sherpa_onnx_tts" # 备用 TTS 工厂，当主 TTS 工厂不可用时使用
+  
   timeout_sec: 5 # TTS 请求超时时间，单位秒，根据实际情况调整
 
   # ----- 全局播放参数设置，会被各 TTS 服务的播放参数覆盖 -----

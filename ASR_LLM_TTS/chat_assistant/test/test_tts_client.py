@@ -118,9 +118,7 @@ class StubTTSClient(TTSClient):
         self.created_output_stream_server_types: list[str | None] = []
         super().__init__(**kwargs)
 
-    def create_output_stream(
-        self, server_type: str | None = None
-    ) -> StubOutputStream:
+    def create_output_stream(self, server_type: str | None = None) -> StubOutputStream:
         self.created_output_stream_server_types.append(server_type)
         stream = StubOutputStream()
         self.created_output_streams.append(stream)
@@ -139,9 +137,12 @@ class StubTTSClient(TTSClient):
 
 def test_tts_client_initializes_queues_events_components_and_starts_backend() -> None:
     """测试 TTSClient 初始化时创建运行状态并启动后端。"""
-    client = StubTTSClient(tts_server_type="sherpa_onnx_tts", timeout_sec=7.5)
+    client = StubTTSClient(
+        primary_factory="qwen3_tts", fallback_factory="sherpa_onnx_tts", timeout_sec=7.5
+    )
 
-    assert client.tts_server_type == "sherpa_onnx_tts"
+    assert client.primary_factory == "qwen3_tts"
+    assert client.fallback_factory == "sherpa_onnx_tts"
     assert client.timeout_sec == 7.5
     assert isinstance(client.text_queue, queue.Queue)
     assert isinstance(client.audio_queue, queue.Queue)
@@ -177,7 +178,9 @@ def test_get_playback_config_value_prefers_server_specific_value() -> None:
         zipvoice_tts={"sample_rate": 24000, "buffer_size": 1024},
     )
 
-    assert client.get_playback_config_value("zipvoice_tts", "sample_rate", 8000) == 24000
+    assert (
+        client.get_playback_config_value("zipvoice_tts", "sample_rate", 8000) == 24000
+    )
     assert client.get_playback_config_value("zipvoice_tts", "buffer_size", 4096) == 1024
     assert client.get_playback_config_value("zipvoice_tts", "channels", 1) == 1
 
@@ -291,24 +294,26 @@ def test_switch_output_stream_replaces_stream_and_updates_backend() -> None:
 def test_from_config_passes_config_to_constructor() -> None:
     """测试 from_config 使用配置字典构造客户端。"""
     client = StubTTSClient.from_config(
-        {"tts_server_type": "zipvoice_tts", "timeout_sec": 12.0}
+        {"primary_factory": "sherpa_onnx_tts", "timeout_sec": 12.0}
     )
 
-    assert client.tts_server_type == "zipvoice_tts"
+    assert client.primary_factory == "sherpa_onnx_tts"
     assert client.timeout_sec == 12.0
 
 
 def test_reset_from_config_stops_and_reinitializes_client() -> None:
     """测试 reset_from_config 会停止旧后端并按新配置重建实例。"""
-    client = StubTTSClient(tts_server_type="sherpa_onnx_tts", timeout_sec=5.0)
+    client = StubTTSClient(primary_factory="sherpa_onnx_tts", timeout_sec=5.0)
     old_backend = client.tts_backend
     old_text_queue = client.text_queue
     old_audio_queue = client.audio_queue
 
-    client.reset_from_config({"tts_server_type": "zipvoice_tts", "timeout_sec": 15.0})
+    client.reset_from_config(
+        {"primary_factory": "sherpa_onnx_tts", "timeout_sec": 15.0}
+    )
 
     assert old_backend.stop_calls == 1
-    assert client.tts_server_type == "zipvoice_tts"
+    assert client.primary_factory == "sherpa_onnx_tts"
     assert client.timeout_sec == 15.0
     assert client.tts_backend is not old_backend
     assert client.text_queue is not old_text_queue
