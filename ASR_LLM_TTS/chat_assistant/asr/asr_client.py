@@ -31,12 +31,15 @@ class ASRClientBase:
         # self.asr_text_queue: queue.Queue[str] = queue.Queue(
         #     maxsize=10
         # )  # ASR识别结果文本队列，供外部使用
-        self.audio_frames_queue: queue.Queue[bytes] = queue.Queue(
+        self.audio_data_queue: queue.Queue[tuple[bytes, str | None]] = queue.Queue(
             maxsize=10
-        )  # 音频帧数据队列，供ASR后端使用
-        self.asr_voice_result_queue: queue.Queue[tuple[str, Any | None]] = queue.Queue(
-            maxsize=10
-        )  # ASR识别结果和声纹识别结果队列，供外部使用
+        )  # (音频帧, 音频待保存路径) 输入队列，供ASR后端使用
+        # self.asr_voice_result_queue: queue.Queue[tuple[str, Any | None]] = queue.Queue(
+        #     maxsize=10
+        # )  # ASR识别结果和声纹识别结果队列，供外部使用
+        self.result_data_queue: queue.Queue[tuple[str, Any | None, str | None]] = (
+            queue.Queue(maxsize=10)
+        )  # (asr_result, voice_id_result, audio_saved_path) 输出队列，ASR worker 将文本识别结果、声纹识别结果和音频保存路径放入其中供外部使用
 
         self.vision_id: Optional[str] = None
 
@@ -61,8 +64,9 @@ class ASRClientBase:
         """创建ASR后端上下文对象。"""
         return ASRBackendContext(
             # asr_text_queue=self.asr_text_queue,
-            audio_frames_queue=self.audio_frames_queue,
-            asr_voice_result_queue=self.asr_voice_result_queue,
+            audio_data_queue=self.audio_data_queue,
+            # asr_voice_result_queue=self.asr_voice_result_queue,
+            result_data_queue=self.result_data_queue,
             vision_id=self.vision_id,
             stop_event=self.stop_event,
             interrupt_event=self.interrupt_event,
@@ -142,12 +146,11 @@ if __name__ == "__main__":
             try:
 
                 # asr_result = asr_client.asr_text_queue.get(timeout=0.1)
-                asr_result, voice_id = asr_client.asr_voice_result_queue.get(
-                    timeout=0.1
-                )
-                if asr_result:
+                result_data = asr_client.result_data_queue.get(timeout=0.1)
+                if result_data:
+                    asr_result, voice_id, audio_saved_path = result_data
                     logger.info(
-                        f"ASR 识别结果: {asr_result}, 关联视觉ID: {asr_client.vision_id}, 关联声纹ID: {voice_id}"
+                        f"ASR 识别结果: {asr_result}, 关联视觉ID: {asr_client.vision_id}, 关联声纹ID: {voice_id}, 音频保存路径: {audio_saved_path}"
                     )
 
             except queue.Empty:

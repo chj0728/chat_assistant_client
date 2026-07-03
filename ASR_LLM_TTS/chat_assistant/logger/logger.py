@@ -6,21 +6,27 @@ import re
 import threading
 import time
 from datetime import time as dt_time
+from pathlib import Path
 
 # 获取环境变量中的 DEBUG_MODE，默认为 false
 DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
 
-# 获取当前文件所在目录
-current_dir = os.path.dirname(os.path.abspath(__file__))
-# logs 目录路径
-logs_dir = os.path.join(current_dir, "..", "logs")
-user_dialog_logs_dir = os.path.join(logs_dir, "user_dialogs")
+# 获取当前文件所在目录: ...ASR_LLM_TTS/chat_assistant/logger
+logger_dir = Path(__file__).resolve().parent
+
+# logs 目录路径: ...ASR_LLM_TTS/logs
+logs_dir = logger_dir.parents[1] / "logs"
+
+# logs_dir = os.path.join(current_dir, "../../../", "logs")
+# 年月日目录
+# logs_dir = os.path.join(logs_dir, time.strftime("%Y-%m-%d"))
+user_dialog_logs_dir = logs_dir / "user_dialogs"
 
 # logs_dir = "logs"
-if not os.path.exists(logs_dir):
-    os.makedirs(logs_dir, exist_ok=True)
-if not os.path.exists(user_dialog_logs_dir):
-    os.makedirs(user_dialog_logs_dir, exist_ok=True)
+if not logs_dir.exists():
+    logs_dir.mkdir(parents=True, exist_ok=True)
+if not user_dialog_logs_dir.exists():
+    user_dialog_logs_dir.mkdir(parents=True, exist_ok=True)
 
 # 定义宏，在日志消息中使用不同的颜色来区分不同级别的日志（需要支持 ANSI 转义序列的终端）
 LOG_COLORS = {
@@ -50,7 +56,7 @@ USER_DIALOG_LOG_FORMAT = (
     # # xml standard format
     # "<log><time>%(asctime)s</time><user_name>%(user_name)s</user_name><asr_text>%(asr_text)s</asr_text><llm_text>%(llm_text)s</llm_text></log>"
     # json standard format
-    '{"time": "%(asctime)s", "user_name": "%(user_name)s", "asr_text": "%(asr_text)s", "llm_text": "%(llm_text)s"}'
+    '{"time": "%(asctime)s", "user_name": "%(user_name)s", "asr_text": "%(asr_text)s", "llm_text": "%(llm_text)s", "audio_saved_path": "%(audio_saved_path)s"}'
     # json.dumps(
     #     {
     #         "time": "%(asctime)s",
@@ -172,6 +178,7 @@ def log_user_dialog(
     user_name: str | None,
     asr_text: str | None,
     llm_text: str | None,
+    audio_saved_path: str | None = None,
 ) -> None:
     """
     记录单轮用户对话，只保存时间、用户姓名、ASR 结果和 LLM 回复。
@@ -183,8 +190,16 @@ def log_user_dialog(
             "user_name": _normalize_dialog_text(user_name) or "未知用户",
             "asr_text": _normalize_dialog_text(asr_text),
             "llm_text": _normalize_dialog_text(llm_text),
+            "audio_saved_path": _normalize_dialog_text(audio_saved_path),
         },
     )
+
+
+def get_logs_dir() -> Path:
+    """
+    获取日志目录路径。
+    """
+    return logs_dir
 
 
 if __name__ == "__main__":

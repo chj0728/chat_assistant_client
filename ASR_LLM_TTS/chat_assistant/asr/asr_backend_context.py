@@ -15,7 +15,8 @@ class ASRBackendContext:
         samples_per_message: 每条消息包含的样本数。
         seconds_per_message: 模拟实时发送时，每条消息的时间长度，单位为秒。
         text_queue: 文本输出队列，ASR worker 将识别结果文本放入其中。
-        audio_frames_queue: 音频帧输入队列，InputStream 线程将音频帧数据放入其中供 ASR worker 识别。
+        audio_data_queue: (音频帧, 音频待保存路径) 输入队列，InputStream 线程将(音频帧, 音频待保存路径)放入其中供 ASR worker 识别。
+        result_data_queue: (asr_result, voice_id_result, audio_saved_path) 输出队列，ASR worker 将文本识别结果、声纹识别结果和音频保存路径放入其中供外部使用。
         stop_event: 停止事件，用于通知 ASR worker 停止运行。
         interrupt_event: 中断事件，用于通知 ASR worker 立即停止当前识别并清空状态。
     """
@@ -26,8 +27,13 @@ class ASRBackendContext:
     samples_per_message: int = 8000
     seconds_per_message: float = 0.1
     # asr_text_queue: queue.Queue[str] = queue.Queue(maxsize=10)
-    audio_frames_queue: queue.Queue[bytes] = queue.Queue(maxsize=10)
-    asr_voice_result_queue: queue.Queue[tuple[str, Any | None]] = queue.Queue(
+    # audio_frames_queue: queue.Queue[bytes] = queue.Queue(maxsize=10)
+    audio_data_queue: queue.Queue[tuple[bytes, str | None]] = queue.Queue(maxsize=10)
+    # asr_voice_result_queue: queue.Queue[tuple[str, Any | None]] = queue.Queue(
+    #     maxsize=10
+    # )
+    # (asr_result, voice_id_result,audio_saved_path) 文本识别结果、声纹识别结果和音频保存路径队列，供外部使用
+    result_data_queue: queue.Queue[tuple[str, Any | None, str | None]] = queue.Queue(
         maxsize=10
     )
     vision_id: Optional[str] = None

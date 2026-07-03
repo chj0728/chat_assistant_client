@@ -12,6 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import yaml
+from logger.logger import get_logs_dir
 
 ACTIVE_LOG_NAME = "asr_llm_tts"
 RELOAD_CONFIG_SERVICE = "/reload_config"
@@ -25,7 +26,8 @@ def get_project_root_dir() -> Path:
 
 def get_default_logs_dir() -> Path:
     """Resolve logs directory under the chat_assistant package root."""
-    return get_project_root_dir() / "logs"
+    # return get_project_root_dir() / "logs"
+    return get_logs_dir()
 
 
 def get_default_config_path() -> Path:
@@ -120,8 +122,8 @@ def format_yaml_value(value, base_indent: int = 0) -> str:
         items = ", ".join(f"'{v}'" for v in value)
         return f"[{items}]"
     if isinstance(value, str):
-        if '\n' in value or '"' in value or '{' in value:
-            lines = value.split('\n')
+        if "\n" in value or '"' in value or "{" in value:
+            lines = value.split("\n")
             indent_str = " " * (base_indent + 2)
             formatted = "|\n" + "\n".join(indent_str + line for line in lines)
             return formatted
@@ -168,7 +170,7 @@ def _replace_line_value(
             prefix = m.group(1)
             rest = line[len(prefix) :]
             comment = _extract_inline_comment(rest)
-            
+
             del_count = 0
             for j in range(i + 1, len(lines)):
                 next_line = lines[j]
@@ -178,7 +180,7 @@ def _replace_line_value(
                     del_count += 1
                 else:
                     break
-                    
+
             for _ in range(del_count):
                 lines.pop(i + 1)
 

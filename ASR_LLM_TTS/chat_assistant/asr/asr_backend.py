@@ -102,8 +102,8 @@ class ASRBackend(ASRBackendBase):
         while not self.asr_backend_context.stop_event.is_set():
             try:
                 # 从 ASRBackendContext 的音频输入队列中获取音频数据，等待超时时间为 0.1 秒
-                audio_frames = self.asr_backend_context.audio_frames_queue.get(
-                    timeout=0.1
+                audio_frames, audio_saved_path = (
+                    self.asr_backend_context.audio_data_queue.get(timeout=0.1)
                 )
                 pcm16_bytes = self.asr_runtime.normalize_audio_frames(audio_frames)
 
@@ -116,8 +116,11 @@ class ASRBackend(ASRBackendBase):
                     self.async_asr_voice_recognize_pcm16_bytes(pcm16_bytes)
                 )
                 # self.asr_backend_context.asr_text_queue.put(asr_text)
-                self.asr_backend_context.asr_voice_result_queue.put(
-                    (asr_text, voice_id)
+                # self.asr_backend_context.asr_voice_result_queue.put(
+                #     (asr_text, voice_id)
+                # )
+                self.asr_backend_context.result_data_queue.put(
+                    (asr_text, voice_id, audio_saved_path)
                 )
             except Exception as e:
                 logger.error(
@@ -193,8 +196,12 @@ class ASRBackend(ASRBackendBase):
 
                         # 复用既有队列格式：(asr_text, voice_id)。
                         # 外部服务未提供声纹结果，故 voice_id 为 None。
-                        self.asr_backend_context.asr_voice_result_queue.put(
-                            (text, None)
+                        # self.asr_backend_context.asr_voice_result_queue.put(
+                        #     (text, None)
+                        # )
+                        # 将识别结果放入 result_data_queue，audio_saved_path 为 None
+                        self.asr_backend_context.result_data_queue.put(
+                            (text, None, None)
                         )
                         logger.info(f"[External ASR] 收到文本: {text}")
 

@@ -40,6 +40,7 @@ class ChatAssistant:
         self.current_user_id = None
         self.current_user_name = None
         self.current_user_face_status = False
+        self.audio_saved_path = None
 
         self.asr_text_queue = Queue(maxsize=MAX_QUEUE_SIZE)
         self.llm_text_queue = Queue(maxsize=MAX_QUEUE_SIZE)
@@ -70,6 +71,7 @@ class ChatAssistant:
         self.resolved_user_names_queue = Queue(maxsize=MAX_QUEUE_SIZE)
         self.response_data = ResponseData()
         self.response_data.clear()
+        self.audio_saved_path = None
 
     @staticmethod
     def _shutdown_component(component, component_name: str) -> None:
@@ -146,12 +148,14 @@ class ChatAssistant:
             self.__update_status()
 
             try:
-                asr_result, voice_id = self.asr_client.asr_voice_result_queue.get(
-                    timeout=0.1
-                )
-                logger.info(f"ASR 结果: [{asr_result}], Voice ID: [{voice_id}]")
-                if asr_result:
-                    await self.Inference(input_text=asr_result, voice_id=voice_id)
+                result_data = self.asr_client.result_data_queue.get(timeout=0.1)
+                if result_data:
+                    asr_result, voice_id, self.audio_saved_path = result_data
+                    logger.info(f"asr_text: [{asr_result}]")
+                    logger.info(f"voice_id: [{voice_id}]")
+                    logger.info(f"audio_saved_path: [{self.audio_saved_path}]")
+                    if asr_result:
+                        await self.Inference(input_text=asr_result, voice_id=voice_id)
 
             except queue.Empty:
                 continue
@@ -930,6 +934,7 @@ class ChatAssistant:
         user_name: str | None,
         asr_text: str | None,
         llm_text: str | None,
+        audio_saved_path: str | None = None,
     ) -> None:
         """
         保存单轮用户对话记录，失败时不影响主交互流程。
@@ -940,6 +945,7 @@ class ChatAssistant:
                 user_name=user_name,
                 asr_text=asr_text,
                 llm_text=llm_text,
+                audio_saved_path=audio_saved_path,
             )
         except Exception as e:
             logger.error(f"保存用户对话记录失败: {e}")
@@ -1136,7 +1142,9 @@ class ChatAssistant:
             user_name=current_user_name,
             asr_text=self.asr_text,
             llm_text=self.llm_text,
+            audio_saved_path=self.audio_saved_path,
         )
+        self.audio_saved_path = None
 
         if not self.llm_stream_infer_enable:
             ## -------- tts 播放 -----------

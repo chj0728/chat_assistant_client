@@ -25,7 +25,7 @@ ASR:
 
   VAD:
     # reactive_kws_threshold: 100  # 重置唤醒词检测 激活 LLM 时间间隔 (秒) 
-    output_dir: "output" # VAD 结果保存目录
+    output_dir: "audio" # VAD 结果保存目录
     mode : 2 # 0：最宽松，允许更多非语音通过  1：平衡模式 2：较严格，减少非语音通过  3：最严格，过滤更多非语音
     decibel_threshold: -42 # 分贝阈值，低于此值认为是静音 (dB)
     no_speech_duration: 0.8 # 静音持续多长时间后认为一句话结束 (秒)

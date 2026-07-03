@@ -9,6 +9,7 @@ import numpy as np
 import sounddevice as sd
 import webrtcvad
 from logger import logger
+from logger.logger import get_logs_dir
 
 from ..asr_backend_context import ASRBackendContext
 from .protocol import InputStreamProtocol
@@ -67,10 +68,16 @@ class InputStream(InputStreamProtocol):
 
     def _init_vad_settings(self, vad_cfg: dict[str, Any]) -> None:
         """从 VAD 配置读取分段阈值、输出目录和 WebRTC VAD 参数。"""
+
         self.vad_mode = vad_cfg.get("vad_mode", vad_cfg.get("mode", 3))
+
+        # example: self.output_dir = '...logs/{output_dir}/2024-06-20'
         self.output_dir = (
-            Path(__file__).resolve().parent.parent / vad_cfg.get("output_dir", "output")
+            get_logs_dir()
+            / vad_cfg.get("output_dir", "output")
+            / time.strftime("%Y-%m-%d")
         ).resolve()
+
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         self.no_speech_duration = vad_cfg.get("no_speech_duration", 0.5)
@@ -396,11 +403,14 @@ class InputStream(InputStreamProtocol):
 
             audio_frames = self._build_audio_frames_with_pre_buffer()
             audio_bytes = b"".join(audio_frames)
-            audio_output_path = self._next_audio_output_path()
+            audio_saved_name = self._next_audio_output_name()
+            audio_saved_path = self._next_audio_output_path(audio_saved_name)
 
-            self.asr_backend_context.audio_frames_queue.put(audio_bytes)
-            self._write_wav(audio_output_path, audio_bytes)
-            logger.info(f"保存音频文件: {audio_output_path}")
+            self.asr_backend_context.audio_data_queue.put(
+                (audio_bytes, str(audio_saved_name))
+            )
+            self._write_wav(audio_saved_path, audio_bytes)
+            logger.info(f"保存音频文件: {audio_saved_path}")
 
             self.last_saved_end = end_time
             # self.last_vad_end_time = end_time
@@ -430,10 +440,19 @@ class InputStream(InputStreamProtocol):
             return False
         return True
 
-    def _next_audio_output_path(self) -> Path:
-        """生成循环覆盖的 WAV 输出路径。"""
-        self.audio_file_count = (self.audio_file_count % self.max_file_count) + 1
-        return self.output_dir / f"audio_{self.audio_file_count}.wav"
+    def _next_audio_output_path(self, audio_saved_name: str | None = None) -> Path:
+        """生成循环轮转的输出文件路径，文件名可指定或自动生成。"""
+
+        if audio_saved_name is None:
+            self.audio_file_count = (self.audio_file_count % self.max_file_count) + 1
+            audio_saved_name = f"audio_{self.audio_file_count}.wav"
+
+        return self.output_dir / audio_saved_name
+
+    def _next_audio_output_name(self) -> str:
+        """生成 年-月-日_时-分-秒.wav 格式的输出文件名。"""
+        timestamp = time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())
+        return f"{timestamp}.wav"
 
     def _write_wav(self, audio_output_path: Path, audio_bytes: bytes) -> None:
         """将 mono PCM16 字节流写入 WAV 文件。"""
