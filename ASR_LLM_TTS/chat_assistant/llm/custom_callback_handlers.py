@@ -22,6 +22,19 @@ class my_callback_handler(BaseCallbackHandler):
     # def on_chain_start(self, serialized, inputs, **kwargs):
     #     logger.debug("链开始")
 
+    # # 查看日志专用
+    def on_chat_model_start(self, serialized, messages, **kwargs):
+        logger.debug("\n========== on_chat_model_start MESSAGES START ==========")
+
+        for batch_index, batch in enumerate(messages):
+            logger.debug(f"\n--- Batch {batch_index} ---")
+
+            for msg in batch:
+                logger.debug(f"\n{msg.type}:\n{msg.content}")
+                logger.debug("--------------------------------")
+
+        logger.debug("============= on_chat_model_start MESSAGES END =============\n")
+
 
 def get_callback_handlers():
     """返回默认启用的回调处理器列表。"""

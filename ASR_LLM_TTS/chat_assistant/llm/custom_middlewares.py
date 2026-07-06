@@ -41,11 +41,13 @@ from llm.custom_context import CustomContext
 def test_before_agent(state: AgentState, runtime: Runtime) -> None:
     # global call_flag
     # call_flag = True
-    logger.debug("=======> Before Agent Dynamic Middleware")
+    logger.debug("\n=======> Before Agent Dynamic Middleware Start(Test Before Agent)")
     # messages = state["messages"]
     # logger.debug(f"Current messages: {[m for m in messages]}")
     # for m in messages:
     #     m.pretty_print()
+
+    logger.debug("\n=======> Before Agent Dynamic Middleware End(Test Before Agent)")
 
 
 @before_model
@@ -56,11 +58,12 @@ def trim_messages_before_model(
     official docs: https://docs.langchain.com/oss/python/langchain/short-term-memory#trim-messages
     """
 
-    logger.debug(f"runtime.context.user_id------------>: \n{runtime.context.user_id}")
+    logger.debug("\n=======> Before Model Middleware Start(Trim Messages)")
 
+    logger.debug(f"\n Current runtime.context.user_id: \n{runtime.context.user_id}")
+
+    logger.debug("\n Current messages:\n ")
     messages = state["messages"]
-
-    logger.debug("\n=======> Before Model Middleware:\n Current messages:\n ")
     for i, m in enumerate(messages):
         logger.debug(f"Message {i}: {m}")
 
@@ -112,13 +115,15 @@ def trim_messages_before_model(
         allow_partial=False,
     )
 
-    logger.debug(
-        "\n=======> Before Model Middleware:\n Trimmed messages to fit context window:\n "
-    )
+    logger.debug("\n Trimmed messages:\n ")
+
     for i, m in enumerate(trimmed_messages):
         logger.debug(f"Message {i}: {m}")
 
     # return {"messages": trimmed}
+
+    logger.debug("\n=======> Before Model Middleware End(Trim Messages)")
+
     return {"messages": [RemoveMessage(id=REMOVE_ALL_MESSAGES), *trimmed_messages]}
 
 
@@ -170,6 +175,7 @@ def update_system_prompt_dynamically(
 @dynamic_prompt
 def dynamic_system_prompt(request: ModelRequest) -> str:
     """根据上下文动态生成系统提示词"""
+    logger.debug("\n=======> Dynamic Prompt Middleware Start(Dynamic System Prompt)")
     dynamic_system_prompt = ""
     if request.runtime.context:
 
@@ -180,7 +186,8 @@ def dynamic_system_prompt(request: ModelRequest) -> str:
         logger.debug(f"RAG 提示词内容块：{rag_prompt}")
 
         dynamic_system_prompt = (default_system_prompt or "") + (rag_prompt or "")
-
+    logger.debug(f"动态系统提示词内容块：{dynamic_system_prompt}")
+    logger.debug("\n=======> Dynamic Prompt Middleware End(Dynamic System Prompt)")
     return dynamic_system_prompt
 
 
@@ -189,31 +196,35 @@ def delete_system_message_after_model(
     state: AgentState, runtime: Runtime
 ) -> dict[str, Any] | None:
     """删除模型回复中的系统消息，避免系统消息被后续对话历史保留和重复使用。"""
+    logger.debug("\n=======> After Model Middleware Start(Delete SystemMessage)")
     messages = state["messages"]
 
-    logger.debug("\n=======> After Model Middleware:\n Current messages:\n ")
+    logger.debug("\n Current messages:\n ")
     for i, m in enumerate(messages):
         logger.debug(f"Message {i}: {m}")
 
     # 删除 AI 回复中的系统消息
     cleaned_messages = [m for m in messages if not isinstance(m, SystemMessage)]
 
-    logger.debug(
-        "\n=======> After Model Middleware:\n Cleaned messages (removed SystemMessage):\n "
-    )
+    # logger.debug(
+    #     "\n=======> After Model Middleware:\n Cleaned messages (removed SystemMessage):\n "
+    # )
+    logger.debug("\n Cleaned messages (removed SystemMessage):\n ")
     for i, m in enumerate(cleaned_messages):
         logger.debug(f"Message {i}: {m}")
 
+    logger.debug("\n=======> After Model Middleware End(Delete SystemMessage)")
     return {"messages": [RemoveMessage(id=REMOVE_ALL_MESSAGES), *cleaned_messages]}
 
 
 @after_agent
 def test_after_agent(state: AgentState, runtime: Runtime) -> None:
-    logger.debug("=======> After Agent Dynamic Middleware")
+    logger.debug("=======> After Agent Middleware Start(Test After Agent)")
     # messages = state["messages"]
     # logger.debug(f"Current messages: {[m for m in messages]}")
     # for m in messages:
     #     m.pretty_print()
+    logger.debug("=======> After Agent Middleware End(Test After Agent)")
 
 
 def get_custom_middlewares() -> list:

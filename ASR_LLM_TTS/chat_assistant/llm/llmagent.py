@@ -61,30 +61,6 @@ from llm.custom_tools import get_custom_tools
 # ------------------------ 全局常量 ------------------------
 load_dotenv()
 
-# 查看日志专用
-"""
-from langchain_core.callbacks import BaseCallbackHandler
-class DebugMessageCallback(BaseCallbackHandler):
-
-    def on_chat_model_start(
-        self,
-        serialized,
-        messages,
-        **kwargs
-    ):
-        logger.info("\n========== FINAL MESSAGES ==========")
-
-        for batch_index, batch in enumerate(messages):
-            logger.info(f"\n--- Batch {batch_index} ---")
-
-            for msg in batch:
-                logger.info(f"{msg.type}:")
-                logger.info(msg.content)
-                logger.info("--------------------------------")
-
-        logger.info("====================================\n")
-"""
-
 
 def GET_API_TOKEN_FROM_ENV():
     """从环境变量获取 API_TOKEN，并进行基本验证。"""
@@ -268,9 +244,6 @@ class LLMAgent:
         # 初始化使用统计回调处理器，用于收集和记录模型调用的使用数据，如 token 数量、调用次数等。这些数据可以用于监控模型的使用情况和优化性能。
         ## refer from: https://docs.langchain.com/oss/python/langchain/models#token-usage
         self.callback_handlers = get_callback_handlers()
-
-        # 查看日志专用
-        # self.callback_handlers.append(DebugMessageCallback())
 
         # 初始化 ChatOpenAI 模型实例，并拉取远端模型信息，失败时回退默认模型
         self.llm_model = self._init_chat_model()
