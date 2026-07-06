@@ -205,6 +205,7 @@ class InputStream(InputStreamProtocol):
         if audio_np.size == 0:
             return float("-inf")
         rms = np.sqrt(np.mean(np.square(audio_np)))
+        logger.debug(f"音频 RMS: {rms:.6f}")
         return 20 * np.log10(max(rms, 1e-10))
 
     @staticmethod
@@ -300,6 +301,7 @@ class InputStream(InputStreamProtocol):
             self._append_pre_recording_buffer(audio_bytes, timestamp)
 
         decibel = self._calculate_decibel(audio_np)
+        logger.debug(f"音频分贝: {decibel:.2f} dB，时间戳: {timestamp:.3f}")
         if decibel < self.decibel_threshold:
             self._handle_silence(audio_bytes, timestamp)
         elif self._has_speech(audio_bytes):

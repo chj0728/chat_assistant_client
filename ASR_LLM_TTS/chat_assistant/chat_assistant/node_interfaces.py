@@ -172,6 +172,12 @@ SERVICE_SPECS = (
         "handle_interrupt_audio",
         callback_group_attr="interrupt_cb_group",
     ),
+    ServiceSpec(
+        Trigger,
+        "interrupt",
+        "handle_interrupt",
+        callback_group_attr="interrupt_cb_group",
+    ),
     ServiceSpec(GenerateWav, "tts_generate_wav", "handle_tts_generate_wav"),
     ServiceSpec(GetString, "delete_user_context", "handle_delete_user_context"),
 )

@@ -216,8 +216,12 @@ ros_cfg:
   user_face_stale_timeout_sec: 5 # 用户人脸信息过期时间，超过此时间未更新则认为用户离开，回退为 None (秒)
 ##############################################
 
+################## 上层交互逻辑 ###################
 enable_replace_special_characters: false # 是否启用替换特殊字符功能
 enable_interrupt_tts: true # 是否启用打断 TTS 功能
-energy_instability_check: false # 是否启用能量不稳定性检测
-energy_frames: 50  # 能量窗口最大帧数 (内部使用)  50 x 0.1s = 5s
-energy_instability_threshold: 2.5  # 能量不稳定性阈值，超过此值认为多人说话
+enable_interrupt_by_asr_face: true # 是否启用通过 ASR, 人脸信息打断(ASR 有效文本，启用了人脸识别，且检测到人脸信息，打断 LLM，TTS 后台输出)
+##############################################
+
+# energy_instability_check: false # 是否启用能量不稳定性检测
+# energy_frames: 50  # 能量窗口最大帧数 (内部使用)  50 x 0.1s = 5s
+# energy_instability_threshold: 2.5  # 能量不稳定性阈值，超过此值认为多人说话

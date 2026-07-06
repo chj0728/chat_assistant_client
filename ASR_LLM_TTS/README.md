@@ -184,10 +184,16 @@ ros2 service call /activate_assistant std_srvs/srv/Trigger
 ros2 service call /idle_assistant std_srvs/srv/Trigger
 ```
 
-### 打断语音播放
+### 打断 TTS 后台输出
 
 ```bash
 ros2 service call /interrupt_audio std_srvs/srv/Trigger
+```
+
+### 打断 LLM 和 TTS 后台输出（包括音频播放，语音合成）
+
+```bash
+ros2 service call /interrupt std_srvs/srv/Trigger
 ```
 
 ### 播放固定音频文件（传入音频文件路径，播放该音频文件）

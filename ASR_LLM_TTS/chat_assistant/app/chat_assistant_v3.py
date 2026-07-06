@@ -236,9 +236,7 @@ class ChatAssistant:
         self.kws_fuzzy_similarity_threshold = kws_cfg.get(
             "fuzzy_similarity_threshold", 0.78
         )
-        self.enable_replace_special_characters = self.configs.get(
-            "enable_replace_special_characters", False
-        )
+
         self.word_map = SPECIAL_WORD_MAP
         self.text_processor = AssistantTextProcessor(
             wake_word=self.set_kws,
@@ -265,7 +263,6 @@ class ChatAssistant:
         self.last_tts_time = time.time()
         self.last_interface_time = time.time()
 
-        self.enable_interrupt_tts = self.configs.get("enable_interrupt_tts", False)
         self.state = AssistantState.IDLE
         self.state_lock = threading.Lock()
 
@@ -275,6 +272,14 @@ class ChatAssistant:
 
         self.enable_user_face_info = self.configs.get("ros_cfg", {}).get(
             "enable_user_face_info", False
+        )
+
+        self.enable_replace_special_characters = self.configs.get(
+            "enable_replace_special_characters", False
+        )
+        self.enable_interrupt_tts = self.configs.get("enable_interrupt_tts", False)
+        self.enable_interrupt_by_asr_face = self.configs.get(
+            "enable_interrupt_by_asr_face", False
         )
 
     def _initial_component_state(self, config_key: str) -> ComponentState:
@@ -445,18 +450,36 @@ class ChatAssistant:
         except Exception:
             return False
 
-    def interrupt(self):
+    def interrupt(self) -> bool:
         """
-        负责中断当前 TTS 播放
+        负责中断 LLM（文本推理），TTS （包括音频播放，语音合成）后台输出
         """
-        # print("中断当前 TTS 播放")
-        logger.info("开始中断后台播放...")
+        return self.interrupt_llm() and self.interrupt_tts()
+
+    def interrupt_llm(self) -> bool:
+        """
+        负责中断 LLM（文本推理）后台输出
+        """
+        logger.info("正在打断 LLM 后台输出...")
         try:
-            self.tts_client.interrupt()
-            logger.info("后台播放已中断")
+            self.llm_client.interrupt()
+            logger.info("LLM 后台输出已打断")
             return True
         except Exception as e:
-            logger.error(f"中断后台播放失败: {e}")
+            logger.error(f"打断 LLM 后台输出失败: {e}")
+            return False
+
+    def interrupt_tts(self) -> bool:
+        """
+        负责中断 TTS （包括音频播放，语音合成）后台输出
+        """
+        logger.info("正在打断 TTS 后台输出...")
+        try:
+            self.tts_client.interrupt()
+            logger.info("TTS 后台输出已打断")
+            return True
+        except Exception as e:
+            logger.error(f"打断 TTS 后台输出失败: {e}")
             return False
 
     def check_tts_status(self) -> bool:
@@ -1074,6 +1097,14 @@ class ChatAssistant:
 
             self.last_interface_time = time.time()
             logger.info("未启用唤醒词激活功能")
+
+        # asr 有效文本，启用了人脸识别，且检测到人脸信息，打断 LLM，TTS 后台输出
+        if (
+            self.asr_text
+            and self.current_user_face_status
+            and self.enable_interrupt_by_asr_face
+        ):
+            self.interrupt()
 
         self.llm_text = ""
         # -------- 检查 LLM Agent 状态 ----------

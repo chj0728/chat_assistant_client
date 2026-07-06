@@ -149,14 +149,24 @@ class ChatAssistantServiceHandlersMixin:
         logger.info("聊天助手完整交互已完成")
         return response
 
-    def handle_interrupt_audio(self: ChatAssistantNodeOwner, request, response):
+    def handle_interrupt(self: ChatAssistantNodeOwner, request, response):
         """
-        打断当前播放音频服务
+        打断 LLM 和 TTS 后台输出服务
         """
-        logger.info("收到打断当前播放音频请求")
+        logger.info("收到打断 LLM 和 TTS 后台输出请求")
         self.chat_assistant.interrupt()
         response.success = True
-        response.message = "已打断当前播放音频"
+        response.message = "已打断 LLM 和 TTS 后台输出"
+        return response
+
+    def handle_interrupt_audio(self: ChatAssistantNodeOwner, request, response):
+        """
+        打断 TTS 后台输出服务
+        """
+        logger.info("收到打断 TTS 后台输出请求")
+        self.chat_assistant.interrupt_tts()
+        response.success = True
+        response.message = "已打断 TTS 后台输出"
         return response
 
     def handle_play_audio(self: ChatAssistantNodeOwner, request, response):

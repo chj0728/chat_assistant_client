@@ -1,6 +1,7 @@
 import asyncio
 import importlib
 import sys
+import threading
 import types
 from dataclasses import dataclass, field
 from types import SimpleNamespace
@@ -244,6 +245,7 @@ def build_agent_shell(llmagent_module):
     agent.async_sqlite_saver = None
     agent.in_memory_checkpointer = DummyCheckpointer()
     agent._background_loop = None
+    agent.interrupt_event = threading.Event()
     return agent
 
 
@@ -581,6 +583,39 @@ def test_chat_response_stream_keeps_intent_tag_unsplit(monkeypatch):
     result = list(agent.chat_response_stream("hello"))
 
     assert result == [(plain_text, 0), (intent_text, 1)]
+
+
+def test_interrupt_stops_chat_response_stream(monkeypatch):
+    """测试 interrupt 会停止后续同步流式输出。"""
+    llmagent_module = load_llmagent_module(monkeypatch)
+    agent = build_agent_shell(llmagent_module)
+    agent.tiny_agent = DummyAgent(
+        stream_result=[
+            AIMessageChunk(content="a" * 55),
+            AIMessageChunk(content="b" * 55),
+        ]
+    )
+
+    stream = agent.chat_response_stream("hello")
+    first_fragment = next(stream)
+    agent.interrupt()
+    remaining_fragments = list(stream)
+
+    assert first_fragment == ("a" * 50, 0)
+    assert remaining_fragments == []
+
+
+def test_chat_response_stream_clears_previous_interrupt(monkeypatch):
+    """测试新一轮同步流式请求会清除上一次中断状态。"""
+    llmagent_module = load_llmagent_module(monkeypatch)
+    agent = build_agent_shell(llmagent_module)
+    agent.tiny_agent = DummyAgent(stream_result=[AIMessageChunk(content="a" * 55)])
+    agent.interrupt()
+
+    result = list(agent.chat_response_stream("hello"))
+
+    assert result == [("a" * 50, 0), ("a" * 5, 1)]
+    assert not agent.interrupt_event.is_set()
 
 
 def test_async_chat_response_direct_agent_path(monkeypatch):

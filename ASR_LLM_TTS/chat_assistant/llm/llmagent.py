@@ -17,7 +17,7 @@ import re
 import threading
 import time
 from pathlib import Path
-from queue import Queue
+from queue import Empty, Queue
 from typing import Any, AsyncIterator, Generator
 
 import requests
@@ -222,6 +222,7 @@ class LLMAgent:
         self.enable_health_check = enable_health_check
         self.health_check_active = False
         self.health_check_thread = None
+        self.interrupt_event = threading.Event()
 
         self.dynamic_middlewares = dynamic_middlewares if dynamic_middlewares else []
         self.custom_middlewares = get_custom_middlewares()  # 获取自定义中间件列表
@@ -620,6 +621,9 @@ class LLMAgent:
                 config=self._build_runtime_config(thread_id=vision_id),
                 stream_mode="messages",
             ):
+                if self.interrupt_event.is_set():
+                    logger.info("LLM 后台流式输出已中断")
+                    break
                 output_queue.put(("chunk", chunk))
         except Exception as exc:
             output_queue.put(("error", exc))
@@ -665,6 +669,10 @@ class LLMAgent:
 
     def stop(self):
         self.close()
+
+    def interrupt(self):
+        """中断当前 LLM 流式输出。"""
+        self.interrupt_event.set()
 
     async def aclose(self):
         """异步关闭后台事件循环线程。"""
@@ -1034,6 +1042,7 @@ class LLMAgent:
         """
         发送用户输入，获取 RAG 增强提示词，并以同步流式方式返回LLM生成的分段内容。
         """
+        self.interrupt_event.clear()
         index = 0
         messages, context, runtime_config = self._prepare_request(
             user_text, vision_id=vision_id, voice_id=voice_id, rag_id=rag_id
@@ -1047,6 +1056,9 @@ class LLMAgent:
             config=runtime_config,
             stream_mode="messages",
         ):
+            if self.interrupt_event.is_set():
+                logger.info("LLM 同步流式输出已中断")
+                break
 
             fragments, buffer, index = self._append_stream_chunk(
                 buffer,
@@ -1057,10 +1069,21 @@ class LLMAgent:
                 punctuation_marks=STREAM_PUNCTUATION_MARKS,
             )
             for fragment in fragments:
+                if self.interrupt_event.is_set():
+                    logger.info("LLM 同步流式输出已中断")
+                    return
+
                 yield fragment
+
+        if self.interrupt_event.is_set():
+            return
 
         fragments, _ = self._flush_remaining_stream_buffer(buffer, index)
         for fragment in fragments:
+            if self.interrupt_event.is_set():
+                logger.info("LLM 同步流式输出已中断")
+                return
+
             yield fragment
 
     async def async_chat_response(
@@ -1094,6 +1117,7 @@ class LLMAgent:
         """
         发送用户输入，获取 RAG 增强提示词，并以异步流式方式返回LLM生成的分段内容。
         """
+        self.interrupt_event.clear()
         index = 0
         messages, context, runtime_config = self._prepare_request(
             user_text, vision_id=vision_id, voice_id=voice_id
@@ -1108,6 +1132,9 @@ class LLMAgent:
                 stream_mode="messages",
             )
             async for chunk in chunk_iter:
+                if self.interrupt_event.is_set():
+                    logger.info("LLM 异步流式输出已中断")
+                    break
                 fragments, buffer, index = self._append_stream_chunk(
                     buffer,
                     index,
@@ -1117,6 +1144,9 @@ class LLMAgent:
                     punctuation_marks=STREAM_PUNCTUATION_MARKS,
                 )
                 for fragment in fragments:
+                    if self.interrupt_event.is_set():
+                        logger.info("LLM 异步流式输出已中断")
+                        return
                     yield fragment
         else:
             logger.debug("通过后台事件循环调用 agent.astream 进行流式对话")
@@ -1130,7 +1160,16 @@ class LLMAgent:
             )
 
             while True:
-                event_type, payload = await asyncio.to_thread(output_queue.get)
+                if self.interrupt_event.is_set():
+                    logger.info("LLM 后台异步流式输出已中断")
+                    background_task.cancel()
+                    break
+                try:
+                    event_type, payload = await asyncio.to_thread(
+                        output_queue.get, True, 0.05
+                    )
+                except Empty:
+                    continue
                 if event_type == "done":
                     break
                 if event_type == "error":
@@ -1147,11 +1186,22 @@ class LLMAgent:
                     punctuation_marks=STREAM_PUNCTUATION_MARKS,
                 )
                 for fragment in fragments:
+                    if self.interrupt_event.is_set():
+                        logger.info("LLM 后台异步流式输出已中断")
+                        background_task.cancel()
+                        return
                     yield fragment
 
-            await asyncio.wrap_future(background_task)
+            if not self.interrupt_event.is_set():
+                await asyncio.wrap_future(background_task)
+        if self.interrupt_event.is_set():
+            return
+
         fragments, _ = self._flush_remaining_stream_buffer(buffer, index)
         for fragment in fragments:
+            if self.interrupt_event.is_set():
+                logger.info("LLM 异步流式输出已中断")
+                return
             yield fragment
 
     # async list checkpoints
