@@ -1,9 +1,9 @@
 # --- 基础工具 ---
 numpy
 scipy
-setuptools
+# setuptools
 
-# --- 配置与网络 ---
+# --- 配置与网络 ---#
 python-dotenv
 pyyaml
 requests

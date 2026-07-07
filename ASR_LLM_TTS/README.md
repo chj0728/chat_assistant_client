@@ -27,9 +27,9 @@ pip3 install -r ./ASR_LLM_TTS/requirements.txt -i https://mirrors.tuna.tsinghua.
 curl -LsSf https://astral.sh/uv/install.sh | sh
 uv venv venv --system-site-packages # --python 3.12
 source venv/bin/activate
-uv pip install -r ./ASR_LLM_TTS/requirements.txt -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
+uv pip install -r ./ASR_LLM_TTS/requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
 
-uv pip install -U -r ./ASR_LLM_TTS/requirements.txt -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
+uv pip install -U -r ./ASR_LLM_TTS/requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
 ```
 
 ## Build with ROS2
@@ -37,11 +37,16 @@ uv pip install -U -r ./ASR_LLM_TTS/requirements.txt -i https://mirrors.tuna.tsin
 - build the interfaces and package
 
 ```bash
-cd ASR_LLM_TTS
-colcon build --symlink-install && source install/setup.bash
+# cd ASR_LLM_TTS
+# colcon build --symlink-install && source install/setup.bash
 
 # colcon build --symlink-install --packages-select chat_assistant_interfaces
 # colcon build --symlink-install --packages-select chat_assistant
+
+# key point: 使用 python -m colcon来编译，使用虚拟环境下的python库运行
+# python -m colcon build --symlink-install
+cd ASR_LLM_TTS
+./build.sh
 ```
 
 ## Run the chat assistant

@@ -17,7 +17,7 @@ fi
 ENABLE_SCRIPT=true
 SHELL_DIR=$(dirname "$(readlink -f "$0")")
 WORK_DIR=$(cd "$SHELL_DIR/chat_assistant" && pwd)
-LOGS_DIR="$WORK_DIR/logs"
+LOGS_DIR="$SHELL_DIR/logs"
 LOG_RETENTION_COUNT=40
 RESTART_DELAY=1
 # =================================================
@@ -44,9 +44,11 @@ echo $$ > "$RUN_PID_FILE"
 # ===================== 节点配置区 =====================
 # 格式: "节点名称|启动命令"
 # 方便后续添加新节点，只需在此数组中追加即可
+# 需要将路径切换到 ASR_LLM_TTS/chat_assistant 目录下再启动节点
 NODES=(
     "web_server|python3 -m chat_assistant.web.web_server --host 0.0.0.0 --port 17890"
-    "chat_assistant_node|python3 -m chat_assistant.chat_assistant_node"
+    # "chat_assistant_node|python3 -m chat_assistant.chat_assistant_node"
+    "chat_assistant_node|ros2 run chat_assistant chat_assistant_node"
 )
 
 declare -A PIDS
