@@ -56,7 +56,8 @@ USER_DIALOG_LOG_FORMAT = (
     # # xml standard format
     # "<log><time>%(asctime)s</time><user_name>%(user_name)s</user_name><asr_text>%(asr_text)s</asr_text><llm_text>%(llm_text)s</llm_text></log>"
     # json standard format
-    '{"time": "%(asctime)s", "user_name": "%(user_name)s", "asr_text": "%(asr_text)s", "llm_text": "%(llm_text)s", "audio_saved_path": "%(audio_saved_path)s"}'
+    # '{"time": "%(asctime)s", "user_name": "%(user_name)s", "asr_text": "%(asr_text)s", "llm_text": "%(llm_text)s", "audio_saved_path": "%(audio_saved_path)s"}'
+    '{"audio_saved_path": "%(audio_saved_path)s", "asr_text": "%(asr_text)s", "llm_text": "%(llm_text)s", "time": "%(asctime)s", "user_name": "%(user_name)s"}'
     # json.dumps(
     #     {
     #         "time": "%(asctime)s",
