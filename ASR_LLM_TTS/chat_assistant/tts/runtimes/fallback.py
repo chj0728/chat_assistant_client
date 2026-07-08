@@ -97,6 +97,22 @@ class FallbackTTSRuntime(TTSRuntimeProtocol):
             except Exception as e:
                 logger.warning("停止 TTS runtime 失败: %s", e)
 
+    def interrupt(self) -> None:
+        self._context.interrupt_event.set()
+
+        runtime = (
+            self._fallback_runtime
+            if self._active_runtime == _ActiveRuntime.FALLBACK
+            else self._primary_runtime
+        )
+        if runtime is None:
+            return
+
+        try:
+            runtime.interrupt()
+        except Exception as e:
+            logger.warning("中断 TTS runtime 失败: %s", e)
+
     def tts_infer(self, text: str) -> None:
         if self._active_runtime == _ActiveRuntime.FALLBACK:
             self._get_fallback_runtime().tts_infer(text)

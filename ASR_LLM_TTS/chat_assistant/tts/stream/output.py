@@ -68,10 +68,13 @@ class MyOutputStream(MyOutputStreamProtocol):
         self.playback_gain = max(playback_gain, 0.0)
 
         self.stop_event = threading.Event()
-        self.interrupt_event = threading.Event()
         self.playback_started_event = threading.Event()
         self.output_stream = self._create_output_stream(device)
         self._reset_playback_state()
+
+    def _is_interrupted(self) -> bool:
+        """返回共享 TTS 上下文是否已请求中断。"""
+        return self.context.interrupt_event.is_set()
 
     def _create_output_stream(self, device: int | str | None) -> Any:
         """创建 sounddevice 输出流。"""
@@ -133,9 +136,11 @@ class MyOutputStream(MyOutputStreamProtocol):
         if status:
             logger.debug(f"音频回调状态: {status}")
 
-        if self.stop_event.is_set() or self.interrupt_event.is_set():
+        if self.stop_event.is_set() or self._is_interrupted():
+            logger.debug("音频回调收到停止/打断信号，清空输出缓冲")
             outdata.fill(0)
             self._reset_playback_state()
+            self.stop_event.clear()
             return
 
         with self.audio_lock:
@@ -150,6 +155,10 @@ class MyOutputStream(MyOutputStreamProtocol):
         """从内部缓冲和 TTS 队列取音频，尽量填满本次输出帧。"""
         filled = 0
         while filled < frames:
+            if self._is_interrupted():
+                logger.debug("播放缓冲填充被中断")
+                break
+
             if self.playback_buffer.shape[0] == 0 and not self._load_next_chunk():
                 break
 
@@ -163,6 +172,10 @@ class MyOutputStream(MyOutputStreamProtocol):
     def _load_next_chunk(self) -> bool:
         """从音频队列读取下一个 PCM 块并放入播放缓冲。"""
         while True:
+            if self._is_interrupted():
+                logger.debug("播放缓冲加载被中断")
+                return False
+
             try:
                 chunk = self.context.audio_queue.get_nowait()
             except queue.Empty:
@@ -221,11 +234,9 @@ class MyOutputStream(MyOutputStreamProtocol):
         self.output_stream.close()
 
     def interrupt(self) -> None:
-        """短暂置位中断信号，清空当前播放缓冲。"""
-        self.interrupt_event.set()
-        time.sleep(0.2)
+        """立即清空本地播放状态；中断信号由共享上下文维护。"""
+        time.sleep(0.01)
         self._reset_playback_state()
-        self.interrupt_event.clear()
 
     def wait_until_playback_starts(self, timeout_sec: float = 5.0) -> bool:
         """等待音频进入确认播放状态。"""

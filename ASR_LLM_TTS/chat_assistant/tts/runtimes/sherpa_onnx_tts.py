@@ -67,6 +67,12 @@ class SherpaTTSRuntime(TTSRuntimeProtocol):
     def _build_http_url(self, path: str) -> str:
         return f"http://{self.host}:{self.port}{path}"
 
+    def _should_stop_request(self) -> bool:
+        return (
+            self._context.stop_event.is_set()
+            or self._context.interrupt_event.is_set()
+        )
+
     def _tts_request(self, text):
         if self.use_websocket:
             self._tts_request_ws(text)
@@ -78,13 +84,12 @@ class SherpaTTSRuntime(TTSRuntimeProtocol):
             with self.request_stream(text, data_type="pcm") as resp:
                 resp.raise_for_status()
                 for chunk in resp.iter_content(chunk_size=self.chunk_size):
-                    if (
-                        self._context.stop_event.is_set()
-                        or self._context.interrupt_event.is_set()
-                    ):
+                    if self._should_stop_request():
                         return
                     if not chunk:
                         continue
+                    if self._should_stop_request():
+                        return
                     self._context.audio_queue.put(chunk)
         except Exception as e:
             logger.error(f"HTTP TTS 请求失败: {e}")
@@ -197,14 +202,18 @@ class SherpaTTSRuntime(TTSRuntimeProtocol):
                 await self._ws.send(json.dumps(payload, ensure_ascii=False))
 
                 while True:
-                    if (
-                        self._context.stop_event.is_set()
-                        or self._context.interrupt_event.is_set()
-                    ):
+                    if self._should_stop_request():
                         logger.info("TTS WebSocket 收到停止/打断信号")
                         return
 
-                    message = await self._ws.recv()
+                    try:
+                        message = await asyncio.wait_for(self._ws.recv(), timeout=0.1)
+                    except asyncio.TimeoutError:
+                        continue
+
+                    if self._should_stop_request():
+                        logger.info("TTS WebSocket 收到停止/打断信号")
+                        return
 
                     if isinstance(message, bytes):
                         self._context.audio_queue.put(message)
@@ -261,6 +270,11 @@ class SherpaTTSRuntime(TTSRuntimeProtocol):
                 self._ws_thread.join(timeout=3)
             self._ws_loop = None
             self._ws_thread = None
+
+    def interrupt(self) -> None:
+        """中断当前正在进行的 TTS 推理。"""
+        self._context.interrupt_event.set()
+        logger.info("TTS 推理已中断")
 
     def tts_infer(self, text: str) -> None:
         self._tts_request(text)

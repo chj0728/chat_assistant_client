@@ -454,7 +454,13 @@ class ChatAssistant:
         """
         负责中断 LLM（文本推理），TTS （包括音频播放，语音合成）后台输出
         """
-        return self.interrupt_llm() and self.interrupt_tts()
+        llm_interrupt_result = self.interrupt_llm()
+
+        time.sleep(0.01)
+
+        tts_interrupt_result = self.interrupt_tts()
+
+        return llm_interrupt_result and tts_interrupt_result
 
     def interrupt_llm(self) -> bool:
         """
@@ -1006,13 +1012,14 @@ class ChatAssistant:
         # )
         # return True
 
+        logger.info("\n\n开始一次完整的交互流程...")
+
         # -------------  检查人脸信息 -------------
         if self.enable_user_face_info and not self.current_user_face_status:
-            logger.warning("未检测到有效人脸信息，跳过本次交互")
+            logger.warning("[启用人脸信息检测] 当前未检测到人脸信息，跳过本次交互")
             self.last_interface_time = time.time()
             return False
-
-        logger.info("\n\n开始一次完整的交互流程...")
+        # ----------------------------------------
 
         current_user_id = user_id if user_id is not None else self.current_user_id
         current_user_name = (
@@ -1042,6 +1049,8 @@ class ChatAssistant:
 
             logger.warning("ASR 模块未激活，跳过本次交互")
             return False
+        # --------------------------------------
+
         # -------- asr 识别 -----------
         if audio_frames is not None:
 
@@ -1064,6 +1073,7 @@ class ChatAssistant:
             self.last_interface_time = time.time()
             # self.set_state(AssistantState.LISTENING)
             return False
+        # --------------------------------
 
         # -------- 判断asr_text中汉字数量，过少则忽略 ----------
         chinese_char_count = self.text_processor.count_chinese_characters(self.asr_text)
@@ -1071,20 +1081,23 @@ class ChatAssistant:
             logger.warning("ASR 识别文本中汉字数量过少，跳过本次交互")
             self.last_interface_time = time.time()
             return False
+        # --------------------------------------------------
 
-        # ------- 替换特殊词汇 -------
+        # ---------------- 替换特殊词汇 --------------------
         if self.enable_replace_special_characters:
             logger.info(f"替换前 ASR 文本: {self.asr_text}")
             self.asr_text = self.text_processor.replace_special_characters(
                 self.asr_text
             )
             logger.info(f"替换后 ASR 文本: {self.asr_text}")
+        # ------------------------------------------------
 
-        ## 更新asr_text队列
+        # -------------- 更新asr_text队列 ------------------
         self.__push_queue(self.asr_text_queue, self.asr_text)
         ##  更新 asr_text
         # self.response_json["asr_text"] = self.asr_text
         self.response_data.asr_text = self.asr_text
+        # ------------------------------------------------
 
         # ----------- 唤醒词检测 -----------
         if self.kws_enabled:
@@ -1097,14 +1110,12 @@ class ChatAssistant:
 
             self.last_interface_time = time.time()
             logger.info("未启用唤醒词激活功能")
+        # ---------------------------------
 
-        # asr 有效文本，启用了人脸识别，且检测到人脸信息，打断 LLM，TTS 后台输出
-        if (
-            self.asr_text
-            and self.current_user_face_status
-            and self.enable_interrupt_by_asr_face
-        ):
+        #  ------------- 检测到人脸信息，打断 LLM，TTS 后台输出 -------------
+        if self.current_user_face_status and self.enable_interrupt_by_asr_face:
             self.interrupt()
+        # --------------------------------------------------------------
 
         self.llm_text = ""
         # -------- 检查 LLM Agent 状态 ----------
@@ -1116,6 +1127,7 @@ class ChatAssistant:
             self.__update_llm_text(self.llm_text)
 
             return False
+        # ---------------------------------------
 
         if self.llm_stream_infer_enable:
             # -------- llm tts stream --------------
@@ -1158,7 +1170,7 @@ class ChatAssistant:
             # self.llm_text = await self.async_llm_infer(
             #     self.asr_text, vision_id=current_vision_id, voice_id=current_voice_id
             # )
-            ## llm同步推理
+            ## --------- llm 推理 ----------
             self.llm_text = self.llm_infer(
                 self.asr_text,
                 vision_id=current_user_id,
@@ -1168,6 +1180,16 @@ class ChatAssistant:
 
             self.__update_llm_text(self.llm_text)
 
+            ## -------- tts 播放 -----------
+            if not self.check_tts_status():
+
+                self.last_interface_time = time.time()
+                return False
+            self.tts_infer(self.llm_text)
+
+            # ------------------------------
+
+        # ---------------- 保存用户对话记录 -----------------
         self._log_user_dialog(
             user_id=current_user_id,
             user_name=current_user_name,
@@ -1176,12 +1198,7 @@ class ChatAssistant:
             audio_saved_path=self.audio_saved_path,
         )
         self.audio_saved_path = None
-
-        if not self.llm_stream_infer_enable:
-            ## -------- tts 播放 -----------
-            if not self.check_tts_status():
-                return False
-            self.tts_infer(self.llm_text)
+        # ------------------------------------------------
 
         # ------------ 查询是否需要再次query to resolve -----------------
         if self.llm_client.get_query_to_resolve():
@@ -1202,6 +1219,7 @@ class ChatAssistant:
         ###############################################################
 
         logger.info("本次交互完成")
+        self.last_interface_time = time.time()
         return True
 
     async def Inference(

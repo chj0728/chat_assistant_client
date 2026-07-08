@@ -18,7 +18,6 @@ class OutputStreamProtocol(Protocol):
         _playback_start_delay_sec: 播放起播确认延迟秒数，用于判断音频播放状态的起播条件，确保在音频数据连续播放达到一定时间后才确认进入播放状态。
         _playback_hangover_sec: 播放挂起秒数，用于在音频数据短暂中断时保持播放状态，避免因回调调度抖动导致的状态频繁切换。
         _stop_event: 停止事件，用于控制音频输出流的停止，当该事件被设置时，音频输出流应立即停止播放并清空相关状态。
-        _interrupt_event: 中断事件，用于控制音频输出流的中断，当该事件被设置时，音频输出流应立即中断当前播放并清空相关状态。
         _playback_started_event: 播放开始事件，用于通知 TTS 客户端音频播放已经开始，当音频播放状态进入播放状态时应设置该事件，反之则应清除该事件。
 
     """
@@ -32,7 +31,6 @@ class OutputStreamProtocol(Protocol):
     _playback_start_delay_sec: float
     _playback_hangover_sec: float
     _stop_event: threading.Event
-    _interrupt_event: threading.Event
     _playback_started_event: threading.Event
 
     def start(self) -> None:

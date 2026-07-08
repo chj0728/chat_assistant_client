@@ -17,7 +17,7 @@ from .stream import (
     MyOutputStream,
 )
 
-INTERRUPT_GRACE_PERIOD_SEC = 0.2
+INTERRUPT_GRACE_PERIOD_SEC = 0.1
 LOCAL_AUDIO_STOP_WAIT_SEC = 0.1
 
 
@@ -237,14 +237,15 @@ class TTSClientBase:
 
     def speak(self, text, interrupt=True):
         """请求 TTS 播放指定的文本内容，如果 interrupt 参数为 True，则在请求播放前会先中断当前的播放状态，确保新的文本能够立即被播放而不会与之前的播放内容产生冲突或叠加。"""
-        self.interrupt_event.clear()
         normalized_text = text.strip()
-
-        if interrupt and normalized_text:
-            self.interrupt()
-
         if not normalized_text:
             return
+
+        self.interrupt_event.clear()
+
+        if interrupt:
+            self.interrupt()
+            self.interrupt_event.clear()
 
         self.text_queue.put(normalized_text)
 
@@ -252,8 +253,10 @@ class TTSClientBase:
         """
         1. 停止本地音频文件播放
         2. 清空文本和音频队列，确保没有残留的待播放内容
-        3. 调用 TTS 后端的中断方法，确保正在播放的 TTS 音频被中断
+        3. 调用 TTS 后端的中断方法
         """
+        self.interrupt_event.set()
+
         self.stop_local_audio_playback()
 
         if not self.text_queue.empty() or not self.audio_queue.empty():

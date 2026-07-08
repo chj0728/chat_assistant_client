@@ -193,6 +193,7 @@ def test_speak_enqueues_normalized_text_and_interrupts() -> None:
 
     assert client.text_queue.get_nowait() == "你好"
     assert client.tts_backend.interrupt_calls == 1
+    assert not client.interrupt_event.is_set()
 
 
 def test_speak_can_append_without_interrupting() -> None:
@@ -230,6 +231,19 @@ def test_interrupt_clears_queues_stops_local_audio_and_interrupts_backend(monkey
     assert client.audio_queue.empty()
     assert sound.stop_calls == 1
     assert client.tts_backend.interrupt_calls == 1
+    assert client.interrupt_event.is_set()
+
+
+def test_speak_clears_previous_interrupt_before_enqueue(monkeypatch):
+    """测试 speak(interrupt=True) 打断旧播放后会允许新文本继续合成。"""
+    client = StubTTSClient()
+    monkeypatch.setattr("tts.tts_client.time.sleep", lambda _: None)
+
+    client.interrupt()
+    client.speak("新的语音", interrupt=True)
+
+    assert client.text_queue.get_nowait() == "新的语音"
+    assert not client.interrupt_event.is_set()
 
 
 def test_is_active_reflects_backend_and_local_audio() -> None:

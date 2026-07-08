@@ -623,7 +623,7 @@ class LLMAgent:
             ):
                 if self.interrupt_event.is_set():
                     logger.info("LLM 后台流式输出已中断")
-                    break
+                    return
                 output_queue.put(("chunk", chunk))
         except Exception as exc:
             output_queue.put(("error", exc))
@@ -642,6 +642,14 @@ class LLMAgent:
     ) -> tuple | None:
         """在后台事件循环中获取检查点元组。"""
         return await self._get_async_sqlite_saver().aget_tuple(config=config)
+
+    async def _cancel_background_task(self, background_task) -> None:
+        """取消后台流式任务，并消费取消异常，避免留下未处理的 future 状态。"""
+        background_task.cancel()
+        try:
+            await asyncio.wrap_future(background_task)
+        except asyncio.CancelledError:
+            pass
 
     def close(self):
         """停止后台事件循环线程并释放长期资源。"""
@@ -1058,7 +1066,7 @@ class LLMAgent:
         ):
             if self.interrupt_event.is_set():
                 logger.info("LLM 同步流式输出已中断")
-                break
+                return
 
             fragments, buffer, index = self._append_stream_chunk(
                 buffer,
@@ -1134,7 +1142,7 @@ class LLMAgent:
             async for chunk in chunk_iter:
                 if self.interrupt_event.is_set():
                     logger.info("LLM 异步流式输出已中断")
-                    break
+                    return
                 fragments, buffer, index = self._append_stream_chunk(
                     buffer,
                     index,
@@ -1162,7 +1170,7 @@ class LLMAgent:
             while True:
                 if self.interrupt_event.is_set():
                     logger.info("LLM 后台异步流式输出已中断")
-                    background_task.cancel()
+                    await self._cancel_background_task(background_task)
                     break
                 try:
                     event_type, payload = await asyncio.to_thread(
@@ -1188,7 +1196,7 @@ class LLMAgent:
                 for fragment in fragments:
                     if self.interrupt_event.is_set():
                         logger.info("LLM 后台异步流式输出已中断")
-                        background_task.cancel()
+                        await self._cancel_background_task(background_task)
                         return
                     yield fragment
 

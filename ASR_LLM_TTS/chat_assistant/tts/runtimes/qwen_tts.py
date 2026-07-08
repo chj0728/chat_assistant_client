@@ -31,9 +31,10 @@ REMOTE_CALLBACK_BASE = cast(Any, QwenTtsRealtimeCallback)
 
 
 class RemoteCallback(REMOTE_CALLBACK_BASE):
-    def __init__(self, audio_queue) -> None:
+    def __init__(self, audio_queue, interrupt_event: threading.Event) -> None:
         super().__init__()
         self._audio_queue = audio_queue
+        self._interrupt_event = interrupt_event
         self.complete_event = threading.Event()
         self.session_finished_event = threading.Event()
         self.connection_closed_event = threading.Event()
@@ -62,7 +63,7 @@ class RemoteCallback(REMOTE_CALLBACK_BASE):
                 pcm_bytes = base64.b64decode(response["delta"])
                 with self._lock:
                     self._response_chunks.append(pcm_bytes)
-                if self._playback_enabled:
+                if self._playback_enabled and not self._interrupt_event.is_set():
                     self._audio_queue.put(pcm_bytes)
 
             if event_type == "response.done":
@@ -163,7 +164,9 @@ class QwenTTSRuntime(TTSRuntimeProtocol):
 
     def init_qwen_tts(self) -> None:
 
-        self.callback = RemoteCallback(self.context.audio_queue)
+        self.callback = RemoteCallback(
+            self.context.audio_queue, self.context.interrupt_event
+        )
         self.qwen_tts = QwenTtsRealtime(
             model=self.model,
             callback=self.callback,
@@ -244,6 +247,14 @@ class QwenTTSRuntime(TTSRuntimeProtocol):
     def stop(self) -> None:
         with self.runtime_lock:
             self.session_to_finish()
+
+    def interrupt(self) -> None:
+        """中断当前正在进行的远端 TTS 推理。"""
+        self.context.interrupt_event.set()
+        callback = getattr(self, "callback", None)
+        if callback is not None:
+            callback.complete_event.set()
+        logger.info("远端 TTS 推理已中断")
 
     def tts_infer(self, text: str) -> None:
         self.synthesize(text, playback_enabled=True)

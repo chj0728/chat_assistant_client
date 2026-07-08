@@ -96,7 +96,8 @@ class MyTTSBackend(TTSBackendBase):
     def generate_wav(self, text: str, filename: str) -> bool:
         return self.tts_runtime.generate_wav(text, filename)
 
-    def interrupt(self):
+    def interrupt(self) -> None:
+        self.tts_runtime.interrupt()
         self.output_stream.interrupt()
 
     def is_active(self) -> bool:

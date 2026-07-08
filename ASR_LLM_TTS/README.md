@@ -30,6 +30,7 @@ source venv/bin/activate
 uv pip install -r ./ASR_LLM_TTS/requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
 
 uv pip install -U -r ./ASR_LLM_TTS/requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
+uv pip uninstall setuptools
 ```
 
 ## Build with ROS2

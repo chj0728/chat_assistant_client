@@ -22,6 +22,7 @@ log/
 *.db*
 
 *.history
+*.temp
 
 RAG/
 

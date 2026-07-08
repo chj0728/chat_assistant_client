@@ -12,6 +12,10 @@ class TTSRuntimeProtocol(Protocol):
         """关闭运行时资源。"""
         ...
 
+    def interrupt(self) -> None:
+        """中断当前正在进行的 TTS 推理。"""
+        pass
+
     def tts_infer(self, text: str) -> None:
         """执行 TTS 推理，将合成的音频数据块放入 TTSBackendContext 的 audio_queue 供播放线程使用。
         Args:
