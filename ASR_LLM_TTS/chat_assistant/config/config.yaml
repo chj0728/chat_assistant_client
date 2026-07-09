@@ -19,9 +19,9 @@ ASR:
     enable: true # 是否启用音频采集模块
 
     enable_enhancement: true # 是否启用音频增强模块，启用后会对采集的音频进行降噪处理
-    enhancement_model_path: "models/speech_enhancement/dpdfnet2.onnx" # 音频增强模型文件路径，确保文件存在
+    enhancement_model_path: "models/speech_enhancement/dpdfnet4.onnx" # 音频增强模型文件路径，确保文件存在
     enhancement_provider: "cpu" # 音频增强模型推理设备，支持 "cpu" 或 "cuda"，根据实际情况调整
-    enhancement_num_threads: 1 # 音频增强模型推理线程数
+    enhancement_num_threads: 2 # 音频增强模型推理线程数
 
     samplerate: 16000 # 8000 ，16000， 32000， 48000 # 采样率（Hz）每秒多少个采样点（帧）
     channels: 1 # 单声道
