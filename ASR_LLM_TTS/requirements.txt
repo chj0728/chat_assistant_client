@@ -13,7 +13,11 @@ websockets
 playsound3
 pypinyin
 sounddevice
+soundfile
 webrtcvad
+
+# --- 人声增强与降噪 ---
+sherpa-onnx
 
 # --- LLM / OpenAI / LangChain ---
 openai

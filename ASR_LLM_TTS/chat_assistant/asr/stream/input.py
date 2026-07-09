@@ -8,13 +8,14 @@ from typing import Any
 import numpy as np
 import sounddevice as sd
 import webrtcvad
+from config import get_default_pkg_dir
 from logger import logger
 from logger.logger import get_logs_dir
 
 from ..asr_backend_context import ASRBackendContext
 from .protocol import InputStreamProtocol
 
-AudioSegment = tuple[bytes, float]
+AudioSegment = tuple[bytes, np.ndarray, float]
 
 
 class InputStream(InputStreamProtocol):
@@ -33,6 +34,7 @@ class InputStream(InputStreamProtocol):
         """初始化输入流配置、运行状态和 VAD 实例。"""
         self.asr_backend_context = asr_backend_context
         self.device = device
+        self.speech_denoiser: Any | None = None
 
         self.recording_active = False
         self.recorder_thread: threading.Thread | None = None
@@ -49,7 +51,15 @@ class InputStream(InputStreamProtocol):
 
     def _init_audio_settings(self, audio_cfg: dict[str, Any]) -> None:
         """从 Audio 配置读取采样率、通道数、块大小和文件轮转参数。"""
+
         self.enable = audio_cfg.get("enable", False)
+
+        self.enable_enhancement = audio_cfg.get("enable_enhancement", False)
+        self.enhancement_model_path = self._resolve_enhancement_model_path(audio_cfg)
+        self.enhancement_provider = audio_cfg.get("enhancement_provider", "cpu")
+        self.enhancement_num_threads = audio_cfg.get("enhancement_num_threads", 1)
+        self.enhancement_debug = audio_cfg.get("enhancement_debug", False)
+
         self.samplerate = audio_cfg.get("samplerate", 16000)
         self.channels = audio_cfg.get("channels", 1)
         self.chunk_duration_ms = audio_cfg.get("chunk_duration_ms", 20)
@@ -95,11 +105,76 @@ class InputStream(InputStreamProtocol):
         self.chunk_frames = int(self.samplerate * self.chunk_duration_ms / 1000)
         self.chunk_bytes = self.chunk_frames * self.PCM_SAMPLE_WIDTH
 
+    @staticmethod
+    def _default_enhancement_model_path() -> Path:
+        """返回仓库内默认 dpdfnet 模型路径。"""
+
+        pkg_dir = get_default_pkg_dir()
+        model_path = pkg_dir / "models" / "speech_enhancement" / "dpdfnet2.onnx"
+        if model_path.exists():
+            return model_path
+        raise FileNotFoundError(
+            f"音频增强模型文件不存在，请检查配置或下载模型: {model_path}"
+        )
+
+    def _resolve_enhancement_model_path(self, audio_cfg: dict[str, Any]) -> Path:
+        """解析音频增强模型路径，兼容相对路径和未启用增强的场景。"""
+        configured_path = audio_cfg.get("enhancement_model_path")
+        if configured_path is None:
+            if not self.enable_enhancement:
+                return Path()
+            return self._default_enhancement_model_path()
+
+        model_path = Path(configured_path).expanduser()
+        if model_path.is_absolute():
+            return model_path
+        return get_default_pkg_dir() / model_path
+
+    def _ensure_speech_denoiser(self) -> bool:
+        """按需初始化 sherpa-onnx DPDFNet 降噪器。"""
+        if self.speech_denoiser is not None:
+            return True
+
+        model_path = self.enhancement_model_path.resolve()
+        if not model_path.exists():
+            logger.error(f"音频增强模型不存在，已跳过降噪: {model_path}")
+            self.enable_enhancement = False
+            return False
+
+        try:
+            import sherpa_onnx
+
+            config = sherpa_onnx.OfflineSpeechDenoiserConfig(
+                model=sherpa_onnx.OfflineSpeechDenoiserModelConfig(
+                    dpdfnet=sherpa_onnx.OfflineSpeechDenoiserDpdfNetModelConfig(
+                        model=str(model_path),
+                    ),
+                    num_threads=self.enhancement_num_threads,
+                    debug=self.enhancement_debug,
+                    provider=self.enhancement_provider,
+                )
+            )
+            if not config.validate():
+                logger.error("音频增强配置校验失败，已跳过降噪")
+                self.enable_enhancement = False
+                return False
+
+            self.speech_denoiser = sherpa_onnx.OfflineSpeechDenoiser(config)
+            logger.info(f"音频增强模块已启用: {model_path}")
+            return True
+        except Exception as exc:
+            logger.error(f"音频增强模块初始化失败，已跳过降噪: {exc}")
+            self.enable_enhancement = False
+            return False
+
     def start(self) -> None:
         """启动音频输入流，准备好接收和处理音频数据。"""
         if not self.enable:
             logger.warning("音频采集模块未启用")
             return
+
+        if self.enable_enhancement:
+            self._ensure_speech_denoiser()
 
         if self.recording_active:
             logger.warning("录音线程已在运行，忽略重复启动请求")
@@ -148,16 +223,18 @@ class InputStream(InputStreamProtocol):
         self.pre_recording_buffer.clear()
 
     def _append_pre_recording_buffer(
-        self, audio_bytes: bytes, timestamp: float
+        self, audio_bytes: bytes, audio_np: np.ndarray, timestamp: float
     ) -> None:
         """保存最近一小段历史音频，用于补齐有效录音开头。"""
         if self.pre_recording_buffer_duration <= 0:
             return
 
-        self.pre_recording_buffer.append((audio_bytes, timestamp))
+        self.pre_recording_buffer.append(
+            (audio_bytes, self._to_mono_float32(audio_np), timestamp)
+        )
         while (
             self.pre_recording_buffer
-            and timestamp - self.pre_recording_buffer[0][1]
+            and timestamp - self.pre_recording_buffer[0][2]
             > self.pre_recording_buffer_duration
         ):
             self.pre_recording_buffer.popleft()
@@ -167,10 +244,10 @@ class InputStream(InputStreamProtocol):
         if not self.segments_to_save:
             return []
 
-        start_time = self.segments_to_save[0][1]
+        start_time = self.segments_to_save[0][2]
         pre_buffer_frames = [
             audio_bytes
-            for audio_bytes, timestamp in self.pre_recording_buffer
+            for audio_bytes, _, timestamp in self.pre_recording_buffer
             if timestamp < start_time
         ]
 
@@ -180,8 +257,25 @@ class InputStream(InputStreamProtocol):
             )
             logger.info(f"补充录音开头缓冲: {pre_buffer_duration:.2f} 秒")
 
-        segment_frames = [audio_bytes for audio_bytes, _ in self.segments_to_save]
+        segment_frames = [audio_bytes for audio_bytes, _, _ in self.segments_to_save]
         return pre_buffer_frames + segment_frames
+
+    def _build_audio_samples_with_pre_buffer(self) -> np.ndarray:
+        """拼接预录音缓冲和当前有效片段，生成 float32 音频数组。"""
+        if not self.segments_to_save:
+            return np.empty(0, dtype=np.float32)
+
+        start_time = self.segments_to_save[0][2]
+        pre_buffer_samples = [
+            audio_np
+            for _, audio_np, timestamp in self.pre_recording_buffer
+            if timestamp < start_time
+        ]
+        segment_samples = [audio_np for _, audio_np, _ in self.segments_to_save]
+        samples = pre_buffer_samples + segment_samples
+        if not samples:
+            return np.empty(0, dtype=np.float32)
+        return np.ascontiguousarray(np.concatenate(samples), dtype=np.float32)
 
     def _has_speech(self, audio_bytes: bytes) -> bool:
         """检查 mono PCM16 音频中是否包含 WebRTC VAD 识别到的语音。"""
@@ -209,13 +303,47 @@ class InputStream(InputStreamProtocol):
         return 20 * np.log10(max(rms, 1e-10))
 
     @staticmethod
-    def _float_to_pcm16(audio_np: np.ndarray) -> bytes:
-        """将 sounddevice 的 float32 音频转换为 mono PCM16 字节流。"""
+    def _to_mono_float32(audio_np: np.ndarray) -> np.ndarray:
+        """将 sounddevice 音频整理为连续的 mono float32 数组。"""
         if audio_np.ndim == 2:
             audio_np = audio_np[:, 0]
+        return np.ascontiguousarray(audio_np, dtype=np.float32)
 
+    @staticmethod
+    def _float_to_pcm16(audio_np: np.ndarray) -> bytes:
+        """将 sounddevice 的 float32 音频转换为 mono PCM16 字节流。"""
+        audio_np = InputStream._to_mono_float32(audio_np)
         audio_clipped = np.clip(audio_np, -1.0, 1.0)
         return (audio_clipped * 32767).astype(np.int16).tobytes()
+
+    def _enhance_audio_samples(
+        self, samples: np.ndarray, fallback_audio_bytes: bytes
+    ) -> bytes:
+        """对完整语音片段做离线人声增强，并返回 PCM16 字节流。"""
+        if not self.enable_enhancement or samples.size == 0:
+            logger.warning("音频增强未启用或输入音频为空，保留原始音频")
+            return fallback_audio_bytes
+        if not self._ensure_speech_denoiser():
+            logger.warning("音频增强器未初始化，保留原始音频")
+            return fallback_audio_bytes
+
+        try:
+            if self.speech_denoiser is None:
+                logger.warning("音频增强器未初始化，保留原始音频")
+                return fallback_audio_bytes
+
+            denoised = self.speech_denoiser.run(samples, self.samplerate)
+
+            if denoised.sample_rate != self.samplerate:
+                logger.warning(
+                    "音频增强输出采样率与输入不一致，保留原始音频: "
+                    f"{denoised.sample_rate} != {self.samplerate}"
+                )
+                return fallback_audio_bytes
+            return self._float_to_pcm16(np.asarray(denoised.samples, dtype=np.float32))
+        except Exception as exc:
+            logger.error(f"音频增强失败，保留原始音频: {exc}")
+            return fallback_audio_bytes
 
     def _finalize_pending_segments(self, timestamp: float) -> None:
         """在片段结束时校验缓冲间隔并触发保存。"""
@@ -298,17 +426,19 @@ class InputStream(InputStreamProtocol):
     ) -> None:
         """处理一个分析窗口内的音频，按能量和 VAD 结果更新分段状态。"""
         if not self.segments_to_save:
-            self._append_pre_recording_buffer(audio_bytes, timestamp)
+            self._append_pre_recording_buffer(audio_bytes, audio_np, timestamp)
 
         decibel = self._calculate_decibel(audio_np)
         logger.debug(f"音频分贝: {decibel:.2f} dB，时间戳: {timestamp:.3f}")
         if decibel < self.decibel_threshold:
-            self._handle_silence(audio_bytes, timestamp)
+            self._handle_silence(audio_bytes, audio_np, timestamp)
         elif self._has_speech(audio_bytes):
-            self._handle_speech(audio_bytes, timestamp, decibel)
+            self._handle_speech(audio_bytes, audio_np, timestamp, decibel)
         elif self.segments_to_save:
             logger.info(f"未检测到语音活动，分贝: {decibel:.2f} dB，继续等待")
-            self.segments_to_save.append((audio_bytes, timestamp))
+            self.segments_to_save.append(
+                (audio_bytes, self._to_mono_float32(audio_np), timestamp)
+            )
 
         if self._exceeds_max_recording_duration():
             logger.info(
@@ -316,12 +446,16 @@ class InputStream(InputStreamProtocol):
             )
             self._finalize_pending_segments(timestamp)
 
-    def _handle_silence(self, audio_bytes: bytes, timestamp: float) -> None:
+    def _handle_silence(
+        self, audio_bytes: bytes, audio_np: np.ndarray, timestamp: float
+    ) -> None:
         """处理低于分贝阈值的音频，并在静音超时后结束当前片段。"""
         if not self.segments_to_save:
             return
 
-        self.segments_to_save.append((audio_bytes, timestamp))
+        self.segments_to_save.append(
+            (audio_bytes, self._to_mono_float32(audio_np), timestamp)
+        )
         if timestamp - self.last_active_time > self.no_speech_duration:
             logger.info("静音时间超过阈值，收集历史音频段")
             self._finalize_pending_segments(timestamp)
@@ -329,7 +463,11 @@ class InputStream(InputStreamProtocol):
             logger.info("静音时间未超过阈值，继续等待")
 
     def _handle_speech(
-        self, audio_bytes: bytes, timestamp: float, decibel: float
+        self,
+        audio_bytes: bytes,
+        audio_np: np.ndarray,
+        timestamp: float,
+        decibel: float,
     ) -> None:
         """处理检测到语音的音频块，并记录活跃时间。"""
         if timestamp < self.last_saved_end + self.pause_duration:
@@ -338,14 +476,16 @@ class InputStream(InputStreamProtocol):
 
         logger.info(f"检测到语音活动，分贝: {decibel:.2f} dB")
         self.last_active_time = timestamp
-        self.segments_to_save.append((audio_bytes, timestamp))
+        self.segments_to_save.append(
+            (audio_bytes, self._to_mono_float32(audio_np), timestamp)
+        )
 
     def _exceeds_max_recording_duration(self) -> bool:
         """判断当前片段是否已经超过最大录音时长。"""
         if not self.segments_to_save:
             return False
         return (
-            self.segments_to_save[-1][1] - self.segments_to_save[0][1]
+            self.segments_to_save[-1][2] - self.segments_to_save[0][2]
             > self.max_recording_duration
         )
 
@@ -398,13 +538,16 @@ class InputStream(InputStreamProtocol):
             #     logger.warning("缓冲时间内，跳过保存音频")
             #     return
 
-            start_time = self.segments_to_save[0][1]
-            end_time = self.segments_to_save[-1][1]
+            start_time = self.segments_to_save[0][2]
+            end_time = self.segments_to_save[-1][2]
             if not self._is_valid_recording_interval(start_time, end_time):
                 return
 
             audio_frames = self._build_audio_frames_with_pre_buffer()
             audio_bytes = b"".join(audio_frames)
+            if self.enable_enhancement:
+                audio_samples = self._build_audio_samples_with_pre_buffer()
+                audio_bytes = self._enhance_audio_samples(audio_samples, audio_bytes)
             audio_saved_name = self._next_audio_output_name()
             audio_saved_path = self._next_audio_output_path(audio_saved_name)
 
