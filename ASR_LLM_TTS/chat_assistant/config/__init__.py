@@ -15,6 +15,11 @@ def get_default_config_path() -> Path:
     return Path(__file__).resolve().parent / "config.yaml"
 
 
+def get_default_pkg_dir() -> Path:
+    """Return the default package directory path."""
+    return Path(__file__).resolve().parent.parent
+
+
 def _resolve_config_path(config_path: str | Path | None = None) -> Path:
     """Resolve config path to an absolute normalized path."""
     path = Path(config_path) if config_path else get_default_config_path()
