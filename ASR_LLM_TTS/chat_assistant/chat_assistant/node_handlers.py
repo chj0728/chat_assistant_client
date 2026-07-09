@@ -66,8 +66,8 @@ class ChatAssistantNodeOwner(Protocol):
     tts_status_publisher: Publisher
     resolved_user_name_publisher: Publisher
 
-    current_user_id: String | None
-    current_user_name: String | None
+    current_user_id: str | None
+    current_user_name: str | None
     last_user_id_msg_time: Any
     user_id_stale_timeout_sec: float
 
@@ -276,7 +276,11 @@ class ChatAssistantServiceHandlersMixin:
         #     self.chat_assistant.async_llm_infer(input_text, vision_id=user_id)
         # )
         llm_result = self.chat_assistant.llm_infer(
-            input_text, vision_id=user_id, is_active_ask=is_active_ask
+            input_text,
+            vision_id=user_id,
+            rag_id=user_id,
+            rag_name=self.current_user_name,
+            is_active_ask=is_active_ask,
         )
 
         if llm_result is None:

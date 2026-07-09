@@ -72,14 +72,19 @@ def GET_API_ENDPOINT_FROM_ENV():
     return os.getenv("API_ENDPOINT", "").strip()
 
 
-DEFAULT_MODEL_ID = "qwen3.7-max"
+def GET_MODEL_ID_FROM_ENV():
+    """从环境变量获取 MODEL_ID，并进行基本验证。"""
+    return os.getenv("MODEL_ID", "").strip()
+
+
+DEFAULT_MODEL_ID = GET_MODEL_ID_FROM_ENV() or "qwen3.7-max"
 DEFAULT_DB_PATH = (
     Path(__file__).resolve().parent.parent / "db" / "agent_conversations.db"
 )
 DEFAULT_SYSTEM_PROMPT = (
     "你需要简洁且有礼貌地回答用户的问题，请保持回答简短且有条理，控制在120字以内。\n"
     "正文中请正常使用中文标点符号来表达停顿和语义边界，便于流式切分和语音合成。\n"
-    "如果你不确定答案，可以礼貌地告诉用户你不知道。\n"
+    "如果不确定精确答案，先回答已知的相关信息，再说明具体细节以官方配置表或门店信息为准；避免生硬输出“抱歉，我无法回答”。\n"
     "只有当用户回答退出、结束等相关内容时，调用结束对话的工具函数，礼貌地结束对话。"
 )
 INTENT_TAG_START = "<INTENT>"
@@ -767,6 +772,7 @@ class LLMAgent:
         self,
         user_text: str,
         rag_id: str | None = None,
+        rag_name: str | None = None,
         voice_id: str | None = None,
         is_active_ask: bool = False,
     ) -> str:
@@ -776,6 +782,7 @@ class LLMAgent:
             res = self.rag_client.query(
                 query=user_text,
                 vision_user_id=rag_id,
+                vision_user_name=rag_name,
                 voice_user_id=voice_id,
                 is_active_ask=is_active_ask,
             )
@@ -795,6 +802,7 @@ class LLMAgent:
         vision_id: str | None = None,
         voice_id: str | None = None,
         rag_id: str | None = None,
+        rag_name: str | None = None,
         is_active_ask: bool = False,
     ) -> CustomContext:
         """构建运行时上下文。"""
@@ -802,6 +810,7 @@ class LLMAgent:
         rag_prompt = self._build_rag_prompt(
             user_text,
             rag_id=rag_id,
+            rag_name=rag_name,
             voice_id=voice_id,
             is_active_ask=is_active_ask,
         )
@@ -817,6 +826,7 @@ class LLMAgent:
         vision_id: str | None = None,
         voice_id: str | None = None,
         rag_id: str | None = None,
+        rag_name: str | None = None,
         is_active_ask: bool = False,
     ) -> tuple[list, CustomContext, RunnableConfig]:
         """统一构造消息、上下文和运行时配置。"""
@@ -831,6 +841,7 @@ class LLMAgent:
             vision_id=vision_id,
             voice_id=voice_id,
             rag_id=rag_id,
+            rag_name=rag_name,
             is_active_ask=is_active_ask,
         )
         logger.debug(f"构建运行时上下文-------------->: {custom_context}")
@@ -1018,6 +1029,7 @@ class LLMAgent:
         vision_id: str | None = None,
         voice_id: str | None = None,
         rag_id: str | None = None,
+        rag_name: str | None = None,
         is_active_ask: bool = False,
     ) -> str | None:
         """
@@ -1028,6 +1040,7 @@ class LLMAgent:
             vision_id=vision_id,
             voice_id=voice_id,
             rag_id=rag_id,
+            rag_name=rag_name,
             is_active_ask=is_active_ask,
         )
         result = (self._get_agent() if vision_id else self.tiny_agent).invoke(
@@ -1046,6 +1059,7 @@ class LLMAgent:
         vision_id: str | None = None,
         voice_id: str | None = None,
         rag_id: str | None = None,
+        rag_name: str | None = None,
     ) -> Generator[tuple[str, int], Any, None]:
         """
         发送用户输入，获取 RAG 增强提示词，并以同步流式方式返回LLM生成的分段内容。
@@ -1053,7 +1067,11 @@ class LLMAgent:
         self.interrupt_event.clear()
         index = 0
         messages, context, runtime_config = self._prepare_request(
-            user_text, vision_id=vision_id, voice_id=voice_id, rag_id=rag_id
+            user_text,
+            vision_id=vision_id,
+            voice_id=voice_id,
+            rag_id=rag_id,
+            rag_name=rag_name,
         )
         buffer = ""
         stream_agent = self._select_stream_agent(vision_id)

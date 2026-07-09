@@ -582,6 +582,7 @@ class ChatAssistant:
         vision_id: str | None = None,
         voice_id: str | None = None,
         rag_id: str | None = None,
+        rag_name: str | None = None,
         is_active_ask: bool = False,
     ) -> str:
         """
@@ -590,7 +591,8 @@ class ChatAssistant:
             input_text (str): 输入文本
             vision_id (str | None): 可选的视觉 ID，用于记忆相同用户的对话上下文，如果为 None 直接与LLM 进行对话
             voice_id (str | None): 可选的语音 ID
-            rag_id (str | None): 可选的 RAG ID
+            rag_id (str | None): 可选的 RAG 用户 uuid
+            rag_name (str | None): 可选的 RAG 用户姓名
             is_active_ask (bool): 是否为主动提问，默认为 False
         Returns:
             str: LLM 生成的文本响应，失败时返回空字符串
@@ -600,7 +602,10 @@ class ChatAssistant:
             vision_id if vision_id is not None else self.current_user_id
         )
         effective_voice_id = voice_id if voice_id is not None else None
-        effective_rag_id = rag_id if rag_id is not None else None
+        effective_rag_id = rag_id if rag_id is not None else self.current_user_id
+        effective_rag_name = (
+            rag_name if rag_name is not None else self.current_user_name
+        )
         llm_text = ""
         time_now = time.time()
         try:
@@ -609,6 +614,7 @@ class ChatAssistant:
                 vision_id=effective_vision_id,
                 voice_id=effective_voice_id,
                 rag_id=effective_rag_id,
+                rag_name=effective_rag_name,
                 is_active_ask=is_active_ask,
             )
             if not llm_text:
@@ -617,6 +623,8 @@ class ChatAssistant:
             logger.info(
                 f"LLM 推理结果: [{llm_text}], 耗时: {(time.time() - time_now) * 1000:.2f} ms"
             )
+
+            self._handle_rag_llm_response(llm_text)
 
             self.last_interface_time = time.time()
             return llm_text
@@ -633,6 +641,7 @@ class ChatAssistant:
         vision_id: str | None = None,
         voice_id: str | None = None,
         rag_id: str | None = None,
+        rag_name: str | None = None,
     ) -> Iterator[tuple[str, int]]:
         """
         接收输入文本（可选携带用户 ID），调用 LLM 完成流式推理，逐步返回生成的文本响应片段和对应的索引
@@ -640,7 +649,8 @@ class ChatAssistant:
             input_text (str): 输入文本
             vision_id (str | None): 可选的视觉 ID，用于记忆相同用户的对话上下文，如果为 None 直接与LLM 进行对话
             voice_id (str | None): 可选的语音 ID
-            rag_id (str | None): 可选的 RAG ID
+            rag_id (str | None): 可选的 RAG 用户 uuid
+            rag_name (str | None): 可选的 RAG 用户姓名
         Returns:
             Iterator[tuple[str, int]]: 生成器，逐步返回LLM 生成的文本响应片段和对应的索引，失败时返回空字符串和当前索引
         """
@@ -649,7 +659,10 @@ class ChatAssistant:
             vision_id if vision_id is not None else self.current_user_id
         )
         effective_voice_id = voice_id if voice_id is not None else None
-        effective_rag_id = rag_id if rag_id is not None else None
+        effective_rag_id = rag_id if rag_id is not None else self.current_user_id
+        effective_rag_name = (
+            rag_name if rag_name is not None else self.current_user_name
+        )
         time_now = time.time()
         llm_response_chunks = []
         index = 0
@@ -662,6 +675,7 @@ class ChatAssistant:
                 vision_id=effective_vision_id,
                 voice_id=effective_voice_id,
                 rag_id=effective_rag_id,
+                rag_name=effective_rag_name,
             ):
                 logger.info(
                     f"LLM 流式推理输出 [{index}]: [{llm_response_chunk}], 耗时: {(time.time() - time_now) * 1000:.2f} ms"
@@ -881,7 +895,7 @@ class ChatAssistant:
             # self.flag_kws = 1
             self.llm_agent_state = ComponentState.ACTIVE
 
-            self.tts_client.interrupt()
+            self.interrupt()
 
             time.sleep(0.1)
 
@@ -925,7 +939,7 @@ class ChatAssistant:
                     logger.info("TTS处于 ACTIVE 状态，准备播放提示语音")
                     if self.tts_client.is_active() and self.enable_interrupt_tts:
                         logger.info("TTS 播放中，启用了打断功能，准备中断播放")
-                        self.tts_client.interrupt()
+                        self.interrupt()
                         time.sleep(0.1)
 
                     self.tts_infer(f"你可以说出:{self.set_kws} 来唤醒我!")
@@ -979,6 +993,21 @@ class ChatAssistant:
         except Exception as e:
             logger.error(f"保存用户对话记录失败: {e}")
 
+    def _handle_rag_llm_response(self, llm_text: str | None) -> None:
+        """将 LLM 回复交给 RAG 处理（如 MOVE_TO_WAIT 时重置机器人位置）。
+        - @2026-7-9 by liujinyou
+        """
+        if not llm_text:
+            return
+        _rag = getattr(self.llm_client, "rag_client", None)
+        if _rag is None:
+            return
+        try:
+            if _rag.handle_llm_response(llm_text):
+                logger.info("RAG 已根据 LLM 回复更新机器人位置")
+        except Exception as e:
+            logger.warning("RAG 处理 LLM 回复失败: %s", e)
+
     ##########################################################
 
     ####################### 核心交互流程 #######################
@@ -1025,12 +1054,11 @@ class ChatAssistant:
         current_user_name = (
             self.current_user_name if self.current_user_name is not None else None
         )
-        current_rag_id = (
-            current_user_name if current_user_name is not None else current_user_id
-        )
+        current_rag_id = current_user_id
+        current_rag_name = current_user_name
         current_voice_id = voice_id if voice_id is not None else None
         logger.info(
-            f"本次交互用户 ID: {current_user_id}, 用户 Name: {current_user_name}, Voice_ID: {current_voice_id}, RAG_ID: {current_rag_id}"
+            f"本次交互用户 ID: {current_user_id}, 用户 Name: {current_user_name}, Voice_ID: {current_voice_id}, RAG_ID: {current_rag_id}, RAG_Name: {current_rag_name}"
         )
 
         # current_vision_id = user_id if user_id is not None else self.current_user_id
@@ -1150,6 +1178,7 @@ class ChatAssistant:
                 vision_id=current_user_id,
                 voice_id=current_voice_id,
                 rag_id=current_rag_id,
+                rag_name=current_rag_name,
             ):
                 self.__push_queue(
                     self.llm_text_queue, [{"index": index, "text": chunk.strip()}]
@@ -1176,6 +1205,7 @@ class ChatAssistant:
                 vision_id=current_user_id,
                 voice_id=current_voice_id,
                 rag_id=current_rag_id,
+                rag_name=current_rag_name,
             )
 
             self.__update_llm_text(self.llm_text)
@@ -1189,6 +1219,23 @@ class ChatAssistant:
 
             # ------------------------------
 
+        # ------------ 语言规则双向标记 + RAG 处理 LLM 回复 ----------------
+        ## history:
+        ## @2026-7-9 by liujinyou
+        _rag = getattr(self.llm_client, "rag_client", None)
+        if _rag is not None and self.llm_text:
+            try:
+                if current_user_id:
+                    _rag.visitor_state.mark_steps_from_texts(
+                        current_user_id,
+                        query=self.asr_text,
+                        response=self.llm_text,
+                    )
+                _rag.handle_llm_response(self.llm_text)
+            except Exception as _e:
+                logger.warning("RAG 后处理 LLM 回复失败: %s", _e)
+        # ------------------------------------------------
+
         # ---------------- 保存用户对话记录 -----------------
         self._log_user_dialog(
             user_id=current_user_id,
@@ -1201,6 +1248,8 @@ class ChatAssistant:
         # ------------------------------------------------
 
         # ------------ 查询是否需要再次query to resolve -----------------
+        ## history:
+        ## @2026-7-9 by liujinyou
         if self.llm_client.get_query_to_resolve():
 
             logger.info("需要再次查询以解析名称")
@@ -1216,6 +1265,22 @@ class ChatAssistant:
             self.__push_queue(self.resolved_user_names_queue, resolve_name)
 
             logger.info(f"解析得到名称: {resolve_name}")
+
+            if resolve_name and current_user_id:
+                _rag = getattr(self.llm_client, "rag_client", None)
+                if _rag is not None:
+                    try:
+                        if _rag.commit_extracted_name(current_user_id, resolve_name):
+                            self.current_user_name = resolve_name.strip()
+                            logger.info(
+                                "抽取姓名已写入 RAG 状态: user_id=%s name=%s",
+                                current_user_id,
+                                self.current_user_name,
+                            )
+                    except Exception as _e:
+                        logger.warning("抽取姓名写入 RAG 状态失败: %s", _e)
+        # ----------------------------------------------------------------
+
         ###############################################################
 
         logger.info("本次交互完成")

@@ -267,9 +267,18 @@ class TTSClientBase:
         self.tts_backend.interrupt()
 
     def is_active(self) -> bool:
-        """判断 OutputStream 是否处于播放状态 或者当前是否有本地音频正在播放，适用于需要判断 TTS 客户端整体播放状态的场景。"""
-        return self.tts_backend.is_active() or (
-            self.sound is not None and self.sound.is_alive()
+        """根据以下条件判断 TTS 客户端是否处于活跃状态：
+        1. TTS 后端是否处于活跃状态
+        2. 当前是否有本地音频正在播放
+        3. 文本队列是否为空
+        4. 音频队列是否为空 \n
+        如果任一条件为 True，则认为 TTS 客户端处于活跃状态
+        """
+        return (
+            self.tts_backend.is_active()
+            or (self.sound is not None and self.sound.is_alive())
+            or not self.text_queue.empty()
+            or not self.audio_queue.empty()
         )
 
     def play_audio(self, file_path, block=False):
