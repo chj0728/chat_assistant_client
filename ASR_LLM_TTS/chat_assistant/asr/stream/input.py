@@ -46,6 +46,9 @@ class InputStream(InputStreamProtocol):
         self.last_active_time = time.time()
         # self.last_vad_end_time = time.time()
 
+        self.tmp_audio_bytes = b""
+        self.tmp_audio_saved_path = None
+
         self._init_audio_settings(kwargs.get("Audio", {}))
         self._init_vad_settings(kwargs.get("VAD", {}))
 
@@ -551,11 +554,15 @@ class InputStream(InputStreamProtocol):
             audio_saved_name = self._next_audio_output_name()
             audio_saved_path = self._next_audio_output_path(audio_saved_name)
 
+            self.tmp_audio_bytes = audio_bytes
+            self.tmp_audio_saved_path = audio_saved_path
+
             self.asr_backend_context.audio_data_queue.put(
                 (audio_bytes, str(audio_saved_name))
             )
-            self._write_wav(audio_saved_path, audio_bytes)
-            logger.info(f"保存音频文件: {audio_saved_path}")
+
+            # self._write_wav(audio_saved_path, audio_bytes)
+            # logger.info(f"保存音频文件: {audio_saved_path}")
 
             self.last_saved_end = end_time
             # self.last_vad_end_time = end_time
@@ -606,3 +613,13 @@ class InputStream(InputStreamProtocol):
             wf.setsampwidth(self.PCM_SAMPLE_WIDTH)
             wf.setframerate(self.samplerate)
             wf.writeframes(audio_bytes)
+
+    # 保存 WAV 文件接口，由上层调用主动触发
+    def save_tmp_wav(self) -> bool:
+        if self.tmp_audio_bytes and self.tmp_audio_saved_path:
+            self._write_wav(self.tmp_audio_saved_path, self.tmp_audio_bytes)
+            logger.info(f"保存音频文件: {self.tmp_audio_saved_path}")
+            self.tmp_audio_bytes = b""
+            self.tmp_audio_saved_path = None
+            return True
+        return False

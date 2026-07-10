@@ -1211,13 +1211,27 @@ class ChatAssistant:
             self.__update_llm_text(self.llm_text)
 
             ## -------- tts 播放 -----------
-            if not self.check_tts_status():
+            # if not self.check_tts_status():
+            #     self.last_interface_time = time.time()
+            #     return False
+            # self.tts_infer(self.llm_text)
 
-                self.last_interface_time = time.time()
-                return False
-            self.tts_infer(self.llm_text)
-
+            if self.check_tts_status():
+                self.tts_infer(self.llm_text)
             # ------------------------------
+
+        # ---------------- 保存用户对话记录 -----------------
+        self._log_user_dialog(
+            user_id=current_user_id,
+            user_name=current_user_name,
+            asr_text=self.asr_text,
+            llm_text=self.llm_text,
+            audio_saved_path=self.audio_saved_path,
+        )
+        self.audio_saved_path = None
+        # ---------------- 保存临时音频文件 -----------------
+        self.asr_client.save_tmp_wav()
+        # ------------------------------------------------
 
         # ------------ 语言规则双向标记 + RAG 处理 LLM 回复 ----------------
         ## history:
@@ -1234,17 +1248,6 @@ class ChatAssistant:
                 _rag.handle_llm_response(self.llm_text)
             except Exception as _e:
                 logger.warning("RAG 后处理 LLM 回复失败: %s", _e)
-        # ------------------------------------------------
-
-        # ---------------- 保存用户对话记录 -----------------
-        self._log_user_dialog(
-            user_id=current_user_id,
-            user_name=current_user_name,
-            asr_text=self.asr_text,
-            llm_text=self.llm_text,
-            audio_saved_path=self.audio_saved_path,
-        )
-        self.audio_saved_path = None
         # ------------------------------------------------
 
         # ------------ 查询是否需要再次query to resolve -----------------

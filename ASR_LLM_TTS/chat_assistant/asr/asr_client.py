@@ -109,6 +109,9 @@ class ASRClientBase:
         self.asr_backend.update_vision_id(vision_id)
         # logger.info(f"ASR 客户端视觉ID已更新: {self.vision_id}")
 
+    def save_tmp_wav(self) -> bool:
+        return self.asr_backend.save_tmp_wav()
+
 
 class ASRClient(ASRClientBase):
     """ASR客户端实现类，基于ASRClientBase实现具体功能。"""

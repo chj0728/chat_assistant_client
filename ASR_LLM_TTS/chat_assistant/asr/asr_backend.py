@@ -341,3 +341,6 @@ class ASRBackend(ASRBackendBase):
         )
         voice_id = vr_results[0] if vr_results else None
         return asr_text, voice_id
+
+    def save_tmp_wav(self) -> bool:
+        return self.asr_input_stream.save_tmp_wav()
