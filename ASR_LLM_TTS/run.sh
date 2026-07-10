@@ -20,6 +20,7 @@ WORK_DIR=$(cd "$SHELL_DIR/chat_assistant" && pwd)
 LOGS_DIR="$SHELL_DIR/logs"
 LOG_RETENTION_COUNT=40
 RESTART_DELAY=1
+SHUTDOWN_TIMEOUT=5
 # =================================================
 
 if [ "$ENABLE_SCRIPT" != "true" ]; then
@@ -60,20 +61,46 @@ kill_all_nodes() {
     local sig=$1
     for name in "${!PIDS[@]}"; do
         local pid="${PIDS[$name]}"
-        if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
-            echo "[INFO] Killing $name (PID=$pid) with SIG$sig"
-            kill -"$sig" "$pid" 2>/dev/null || true
+        if [[ -n "$pid" ]] && kill -0 -- "-$pid" 2>/dev/null; then
+            echo "[INFO] Killing $name (PGID=$pid) with SIG$sig"
+            kill -"$sig" -- "-$pid" 2>/dev/null || true
         fi
     done
+}
+
+wait_all_nodes() {
+    local deadline=$((SECONDS + SHUTDOWN_TIMEOUT))
+
+    while (( SECONDS < deadline )); do
+        local running=false
+        for pid in "${PIDS[@]}"; do
+            if kill -0 -- "-$pid" 2>/dev/null; then
+                running=true
+                break
+            fi
+        done
+
+        if [[ "$running" == "false" ]]; then
+            wait "${PIDS[@]}" 2>/dev/null || true
+            return 0
+        fi
+        sleep 0.1
+    done
+
+    return 1
 }
 
 shutdown() {
     echo "[INFO] Shutdown requested"
     trap - SIGINT SIGTERM 
 
-    kill_all_nodes TERM
-    sleep 1
-    kill_all_nodes KILL
+    # 与直接在终端按 Ctrl+C 保持一致，并将信号传给 ros2 run 的子进程。
+    kill_all_nodes INT
+    if ! wait_all_nodes; then
+        echo "[WARN] Graceful shutdown timed out after ${SHUTDOWN_TIMEOUT}s, forcing exit"
+        kill_all_nodes KILL
+        wait "${PIDS[@]}" 2>/dev/null || true
+    fi
     
     echo "[INFO] Exit"
     rm -f "$RUN_PID_FILE"
@@ -132,7 +159,9 @@ start_all_nodes() {
         local cmd="${node_info#*|}"
         
         echo "[INFO] Starting $name..."
-        $cmd &
+        # 后台任务默认可能忽略 SIGINT。重置信号处理并创建独立进程组，
+        # 以便退出时同时通知 ros2 run 及其启动的实际节点。
+        setsid env --default-signal=INT,QUIT bash -c 'exec bash -c "$1"' _ "$cmd" &
         local pid=$!
         PIDS["$name"]=$pid
         echo "$cmd started with PID $pid" &> "$SHELL_DIR/${name}.log"
@@ -179,7 +208,7 @@ while true; do
     echo "[WARN] A process exited (code=$EXIT_CODE), restarting all nodes in $RESTART_DELAY seconds..."
     
     # 清理遗留进程
-    kill_all_nodes TERM
+    kill_all_nodes INT
     
     sleep "$RESTART_DELAY"
 done
