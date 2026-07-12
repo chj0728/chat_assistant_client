@@ -1,0 +1,221 @@
+#!/bin/bash
+set -e
+
+sleep 1
+
+# 读取动态参数 debug ,设置环境变量
+# example: ./run.sh debug
+if [[ "$1" == "debug" ]]; then
+    export DEBUG_MODE=true
+    echo "Debug mode enabled"
+else
+    export DEBUG_MODE=false
+    echo "Debug mode disabled"
+fi
+
+# ===================== 配置区 =====================
+ENABLE_SCRIPT=true
+SHELL_DIR=$(dirname "$(readlink -f "$0")")
+WORK_DIR=$(cd "$SHELL_DIR/../" && pwd)
+PACKAGE_DIR=$(cd "$SHELL_DIR/../chat_assistant" && pwd)
+LOGS_DIR="$WORK_DIR/logs"
+LOG_RETENTION_COUNT=40
+RESTART_DELAY=1
+SHUTDOWN_TIMEOUT=5
+# =================================================
+
+if [ "$ENABLE_SCRIPT" != "true" ]; then
+    echo "Script execution is disabled"
+    exit 0
+fi
+
+RUN_PID_FILE="$WORK_DIR/.run.pid"
+
+if [[ -f "$RUN_PID_FILE" ]]; then
+    old_run_pid=$(cat "$RUN_PID_FILE")
+    if [[ -n "$old_run_pid" ]] && kill -0 "$old_run_pid" 2>/dev/null && [[ "$old_run_pid" != "$$" ]]; then
+        echo "[INFO] Found previous run.sh (PID=$old_run_pid), shutting it down..."
+        kill -INT "$old_run_pid" 2>/dev/null || true
+        # Wait a bit for the previous script to shutdown child processes gracefully
+        sleep 1.5
+        kill -9 "$old_run_pid" 2>/dev/null || true
+    fi
+fi
+echo $$ > "$RUN_PID_FILE"
+
+# ===================== 节点配置区 =====================
+# 格式: "节点名称|启动命令"
+# 方便后续添加新节点，只需在此数组中追加即可
+# 需要将路径切换到 ASR_LLM_TTS/chat_assistant 目录下再启动节点
+NODES=(
+    "web_server|python3 -m chat_assistant.web.web_server --host 0.0.0.0 --port 17890"
+    # "chat_assistant_node|python3 -m chat_assistant.chat_assistant_node"
+    "chat_assistant_node|ros2 run chat_assistant chat_assistant_node"
+)
+
+declare -A PIDS
+
+##########################
+# 进程管理模块
+##########################
+kill_all_nodes() {
+    local sig=$1
+    for name in "${!PIDS[@]}"; do
+        local pid="${PIDS[$name]}"
+        if [[ -n "$pid" ]] && kill -0 -- "-$pid" 2>/dev/null; then
+            echo "[INFO] Killing $name (PGID=$pid) with SIG$sig"
+            kill -"$sig" -- "-$pid" 2>/dev/null || true
+        fi
+    done
+}
+
+wait_all_nodes() {
+    local deadline=$((SECONDS + SHUTDOWN_TIMEOUT))
+
+    while (( SECONDS < deadline )); do
+        local running=false
+        for pid in "${PIDS[@]}"; do
+            if kill -0 -- "-$pid" 2>/dev/null; then
+                running=true
+                break
+            fi
+        done
+
+        if [[ "$running" == "false" ]]; then
+            wait "${PIDS[@]}" 2>/dev/null || true
+            return 0
+        fi
+        sleep 0.1
+    done
+
+    return 1
+}
+
+shutdown() {
+    echo "[INFO] Shutdown requested"
+    trap - SIGINT SIGTERM 
+
+    # 与直接在终端按 Ctrl+C 保持一致，并将信号传给 ros2 run 的子进程。
+    kill_all_nodes INT
+    if ! wait_all_nodes; then
+        echo "[WARN] Graceful shutdown timed out after ${SHUTDOWN_TIMEOUT}s, forcing exit"
+        kill_all_nodes KILL
+        wait "${PIDS[@]}" 2>/dev/null || true
+    fi
+    
+    echo "[INFO] Exit"
+    rm -f "$RUN_PID_FILE"
+    exit 0
+}
+
+reload() {
+    echo "[INFO] Reload requested"
+    kill_all_nodes TERM
+}
+
+cleanup_legacy_nodes() {
+    echo "[INFO] Checking for legacy processes in log files..."
+    for node_info in "${NODES[@]}"; do
+        local name="${node_info%%|*}"
+        local log_file="$LOGS_DIR/${name}.log"
+        if [[ -f "$log_file" ]]; then
+            local old_pid=$(grep -o 'PID [0-9]*' "$log_file" | awk '{print $2}')
+            if [[ -n "$old_pid" ]] && kill -0 "$old_pid" 2>/dev/null; then
+                echo "[INFO] Legacy process $name (PID=$old_pid) is still running. Killing it..."
+                kill -TERM "$old_pid" 2>/dev/null || true
+                sleep 0.5
+                kill -9 "$old_pid" 2>/dev/null || true
+            fi
+        fi
+    done
+}
+
+cleanup_old_logs() {
+    if [[ ! -d "$LOGS_DIR" ]]; then
+        echo "[INFO] Log directory not found, skip cleanup: $LOGS_DIR"
+        return
+    fi
+
+    local log_entries=()
+    mapfile -d '' log_entries < <(find "$LOGS_DIR" -maxdepth 1 -mindepth 1 \( -type f -o -type d \) -name 'asr_llm_tts.*' -printf '%T@\t%p\0' | sort -z -nr)
+
+    local total_logs=${#log_entries[@]}
+    if (( total_logs <= LOG_RETENTION_COUNT )); then
+        echo "[INFO] Log cleanup skipped, found $total_logs archived logs"
+        return
+    fi
+
+    echo "[INFO] Cleaning archived logs, keeping latest $LOG_RETENTION_COUNT of $total_logs entries"
+    for ((i=LOG_RETENTION_COUNT; i<total_logs; i++)); do
+        local entry="${log_entries[$i]}"
+        local log_path="${entry#*$'\t'}"
+        echo "[INFO] Removing old log: $(basename "$log_path")"
+        rm -rf "$log_path"
+    done
+}
+
+start_all_nodes() {
+
+    # 先清空日志文件，再将启动信息写入日志文件，并追加到总日志中
+    : > "$LOGS_DIR/nodes.log"
+
+    for node_info in "${NODES[@]}"; do
+        local name="${node_info%%|*}"
+        local cmd="${node_info#*|}"
+        
+        echo "[INFO] Starting $name..."
+        # 后台任务默认可能忽略 SIGINT。重置信号处理并创建独立进程组，
+        # 以便退出时同时通知 ros2 run 及其启动的实际节点。
+        setsid env --default-signal=INT,QUIT bash -c 'exec bash -c "$1"' _ "$cmd" &
+        local pid=$!
+        PIDS["$name"]=$pid
+        # echo "$cmd started with PID $pid" &> "$LOGS_DIR/${name}.log"
+        # echo "$cmd started with PID $pid" &>> "$LOGS_DIR/nodes.log"
+        echo "cmd: [$cmd] , PID: [$pid]" &>> "$LOGS_DIR/nodes.log"
+    done
+}
+
+wait_any_node() {
+    local pid_list=("${PIDS[@]}")
+    wait -n "${pid_list[@]}"
+}
+
+trap shutdown SIGINT
+trap reload SIGTERM
+
+##########################
+# 环境准备
+##########################
+cd "$SHELL_DIR"
+echo "run.sh path: $(pwd)"
+
+cd "$WORK_DIR"
+echo "work dir path: $(pwd)"
+
+source "$WORK_DIR/../venv/bin/activate"
+source "$WORK_DIR/install/setup.bash"
+
+# 清理历史归档日志
+cleanup_old_logs
+
+# 清理记录在日志中的历史遗留进程
+cleanup_legacy_nodes
+
+##########################
+# 主循环：守护进程
+##########################
+while true; do
+    # 启动所有节点
+    start_all_nodes
+    
+    # 等待任意一个后台进程退出
+    wait_any_node
+    EXIT_CODE=$?
+
+    echo "[WARN] A process exited (code=$EXIT_CODE), restarting all nodes in $RESTART_DELAY seconds..."
+    
+    # 清理遗留进程
+    kill_all_nodes INT
+    
+    sleep "$RESTART_DELAY"
+done

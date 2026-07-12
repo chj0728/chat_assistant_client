@@ -4,7 +4,7 @@ This project implements a chat assistant that integrates Automatic Speech Recogn
 
 ## Workflow diagram of the complete chat assistant
 
-![alt text](<workflow.svg>)
+![alt text](<./docs/workflow.svg>)
 
 ## Clone the repository
 
@@ -30,7 +30,7 @@ source venv/bin/activate
 uv pip install -r ./ASR_LLM_TTS/requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
 
 uv pip install -U -r ./ASR_LLM_TTS/requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
-uv pip uninstall setuptools
+uv pip uninstall setuptools # 使用ros系统自带的setuptools，否则colcon build --symlink-install无法真正的 symlink 安装
 ```
 
 ## Build with ROS2
