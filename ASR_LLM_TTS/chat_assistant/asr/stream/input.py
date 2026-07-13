@@ -84,14 +84,11 @@ class InputStream(InputStreamProtocol):
 
         self.vad_mode = vad_cfg.get("vad_mode", vad_cfg.get("mode", 3))
 
-        # example: self.output_dir = '...logs/{output_dir}/2024-06-20'
-        self.output_dir = (
-            get_logs_dir()
-            / vad_cfg.get("output_dir", "output")
-            / time.strftime("%Y-%m-%d")
+        self.output_root_dir = (
+            get_logs_dir() / vad_cfg.get("output_dir", "output")
         ).resolve()
-
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.output_dir = self.output_root_dir
+        self._refresh_output_dir()
 
         self.no_speech_duration = vad_cfg.get("no_speech_duration", 0.5)
         self.decibel_threshold = vad_cfg.get("decibel_threshold", -40)
@@ -599,7 +596,15 @@ class InputStream(InputStreamProtocol):
             self.audio_file_count = (self.audio_file_count % self.max_file_count) + 1
             audio_saved_name = f"audio_{self.audio_file_count}.wav"
 
-        return self.output_dir / audio_saved_name
+        return self._refresh_output_dir() / audio_saved_name
+
+    def _refresh_output_dir(self) -> Path:
+        """按当前日期刷新音频输出目录，并确保目录已经创建。"""
+        output_dir = self.output_root_dir / time.strftime("%Y-%m-%d")
+        if output_dir != self.output_dir:
+            output_dir.mkdir(parents=True, exist_ok=True)
+            self.output_dir = output_dir
+        return self.output_dir
 
     def _next_audio_output_name(self) -> str:
         """生成 年-月-日_时-分-秒.wav 格式的输出文件名。"""
