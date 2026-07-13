@@ -11,6 +11,7 @@ set -e
 
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 WORK_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
+PKG_DIR="$WORK_DIR/chat_assistant"
 LOGS_DIR="$WORK_DIR/logs"
 RUN_PID_FILE="$WORK_DIR/.run.pid"
 NODE_PID_DIR="$WORK_DIR/.run.pids"
@@ -240,6 +241,8 @@ prepare_environment() {
     mkdir -p "$LOGS_DIR" "$NODE_PID_DIR"
     cleanup_old_logs
     cleanup_tracked_nodes
+
+    cd "$PKG_DIR"
 }
 
 # 持续监控节点；任一节点退出后，完整停止本轮节点再统一重启。
