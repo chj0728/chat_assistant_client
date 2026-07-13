@@ -1,81 +1,102 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
 
-sleep 1
+# chat_assistant 进程守护脚本。
+#
+# 功能：
+#   1. 加载 Python 虚拟环境及 ROS 2 工作空间；
+#   2. 启动并监控 Web 服务和 ROS 2 节点；
+#   3. 任一节点异常退出时，统一清理后重启全部节点；
+#   4. 通过 PID 文件清理上一次异常退出后遗留的进程组。
 
-# 读取动态参数 debug ,设置环境变量
-# example: ./run.sh debug
-if [[ "$1" == "debug" ]]; then
-    export DEBUG_MODE=true
-    echo "Debug mode enabled"
-else
-    export DEBUG_MODE=false
-    echo "Debug mode disabled"
-fi
-
-# ===================== 配置区 =====================
-ENABLE_SCRIPT=true
-SHELL_DIR=$(dirname "$(readlink -f "$0")")
-WORK_DIR=$(cd "$SHELL_DIR/../" && pwd)
-PACKAGE_DIR=$(cd "$SHELL_DIR/../chat_assistant" && pwd)
+SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+WORK_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
 LOGS_DIR="$WORK_DIR/logs"
+RUN_PID_FILE="$WORK_DIR/.run.pid"
+NODE_PID_DIR="$WORK_DIR/.run.pids"
+
 LOG_RETENTION_COUNT=40
 RESTART_DELAY=1
 SHUTDOWN_TIMEOUT=5
-# =================================================
 
-if [ "$ENABLE_SCRIPT" != "true" ]; then
-    echo "Script execution is disabled"
-    exit 0
-fi
-
-RUN_PID_FILE="$WORK_DIR/.run.pid"
-
-if [[ -f "$RUN_PID_FILE" ]]; then
-    old_run_pid=$(cat "$RUN_PID_FILE")
-    if [[ -n "$old_run_pid" ]] && kill -0 "$old_run_pid" 2>/dev/null && [[ "$old_run_pid" != "$$" ]]; then
-        echo "[INFO] Found previous run.sh (PID=$old_run_pid), shutting it down..."
-        kill -INT "$old_run_pid" 2>/dev/null || true
-        # Wait a bit for the previous script to shutdown child processes gracefully
-        sleep 1.5
-        kill -9 "$old_run_pid" 2>/dev/null || true
-    fi
-fi
-echo $$ > "$RUN_PID_FILE"
-
-# ===================== 节点配置区 =====================
-# 格式: "节点名称|启动命令"
-# 方便后续添加新节点，只需在此数组中追加即可
-# 需要将路径切换到 ASR_LLM_TTS/chat_assistant 目录下再启动节点
+# 节点格式："名称|启动命令"。
+# 每个节点均在独立进程组中运行，确保停止时可以同时清理其子进程。
 NODES=(
     "web_server|python3 -m chat_assistant.web.web_server --host 0.0.0.0 --port 17890"
-    # "chat_assistant_node|python3 -m chat_assistant.chat_assistant_node"
     "chat_assistant_node|ros2 run chat_assistant chat_assistant_node"
 )
 
 declare -A PIDS
 
-##########################
-# 进程管理模块
-##########################
-kill_all_nodes() {
-    local sig=$1
+# 停止 PID 文件中记录的旧守护脚本，避免同时运行多个 run.sh。
+stop_previous_supervisor() {
+    if [[ ! -f "$RUN_PID_FILE" ]]; then
+        return
+    fi
+
+    local old_pid old_cmd
+    old_pid=$(<"$RUN_PID_FILE")
+    if [[ ! "$old_pid" =~ ^[0-9]+$ ]] || [[ "$old_pid" == "$$" ]]; then
+        return
+    fi
+    if ! kill -0 "$old_pid" 2>/dev/null; then
+        return
+    fi
+
+    old_cmd=$(ps -p "$old_pid" -o args= 2>/dev/null || true)
+    if [[ "$old_cmd" != *"run.sh"* ]]; then
+        echo "[WARN] Ignoring stale run PID file (PID=$old_pid)"
+        return
+    fi
+
+    echo "[INFO] Found previous run.sh (PID=$old_pid), shutting it down..."
+    kill -INT "$old_pid" 2>/dev/null || true
+    local deadline=$((SECONDS + SHUTDOWN_TIMEOUT))
+    while kill -0 "$old_pid" 2>/dev/null && (( SECONDS < deadline )); do
+        sleep 0.1
+    done
+    if kill -0 "$old_pid" 2>/dev/null; then
+        echo "[WARN] Previous run.sh did not exit in time, forcing exit"
+        kill -KILL "$old_pid" 2>/dev/null || true
+    fi
+}
+
+# 仅在 PID 文件仍属于当前脚本时删除它，避免误删新实例的记录。
+cleanup_supervisor_pid() {
+    if [[ -f "$RUN_PID_FILE" ]] && [[ "$(<"$RUN_PID_FILE")" == "$$" ]]; then
+        rm -f "$RUN_PID_FILE"
+    fi
+}
+
+# 判断指定进程组是否仍有进程存活。
+is_process_group_running() {
+    local pgid=$1
+    kill -0 -- "-$pgid" 2>/dev/null
+}
+
+# 向本轮启动的所有存活节点进程组发送指定信号。
+signal_all_nodes() {
+    local signal=$1
+    local name pid
+
     for name in "${!PIDS[@]}"; do
-        local pid="${PIDS[$name]}"
-        if [[ -n "$pid" ]] && kill -0 -- "-$pid" 2>/dev/null; then
-            echo "[INFO] Killing $name (PGID=$pid) with SIG$sig"
-            kill -"$sig" -- "-$pid" 2>/dev/null || true
+        pid=${PIDS[$name]}
+        if is_process_group_running "$pid"; then
+            echo "[INFO] Sending SIG$signal to $name (PGID=$pid)"
+            kill -"$signal" -- "-$pid" 2>/dev/null || true
         fi
     done
 }
 
-wait_all_nodes() {
+# 等待本轮全部节点进程组退出，超时返回非零状态。
+wait_for_all_nodes() {
     local deadline=$((SECONDS + SHUTDOWN_TIMEOUT))
+    local pid running
 
     while (( SECONDS < deadline )); do
-        local running=false
+        running=false
         for pid in "${PIDS[@]}"; do
-            if kill -0 -- "-$pid" 2>/dev/null; then
+            if is_process_group_running "$pid"; then
                 running=true
                 break
             fi
@@ -91,131 +112,178 @@ wait_all_nodes() {
     return 1
 }
 
-shutdown() {
-    echo "[INFO] Shutdown requested"
-    trap - SIGINT SIGTERM 
+# 优雅停止全部节点；超时后升级为 SIGKILL，避免遗留子进程占用端口。
+stop_all_nodes() {
+    local signal=${1:-INT}
 
-    # 与直接在终端按 Ctrl+C 保持一致，并将信号传给 ros2 run 的子进程。
-    kill_all_nodes INT
-    if ! wait_all_nodes; then
-        echo "[WARN] Graceful shutdown timed out after ${SHUTDOWN_TIMEOUT}s, forcing exit"
-        kill_all_nodes KILL
-        wait "${PIDS[@]}" 2>/dev/null || true
-    fi
-    
-    echo "[INFO] Exit"
-    rm -f "$RUN_PID_FILE"
-    exit 0
-}
-
-reload() {
-    echo "[INFO] Reload requested"
-    kill_all_nodes TERM
-}
-
-cleanup_legacy_nodes() {
-    echo "[INFO] Checking for legacy processes in log files..."
-    for node_info in "${NODES[@]}"; do
-        local name="${node_info%%|*}"
-        local log_file="$LOGS_DIR/${name}.log"
-        if [[ -f "$log_file" ]]; then
-            local old_pid=$(grep -o 'PID [0-9]*' "$log_file" | awk '{print $2}')
-            if [[ -n "$old_pid" ]] && kill -0 "$old_pid" 2>/dev/null; then
-                echo "[INFO] Legacy process $name (PID=$old_pid) is still running. Killing it..."
-                kill -TERM "$old_pid" 2>/dev/null || true
-                sleep 0.5
-                kill -9 "$old_pid" 2>/dev/null || true
-            fi
-        fi
-    done
-}
-
-cleanup_old_logs() {
-    if [[ ! -d "$LOGS_DIR" ]]; then
-        echo "[INFO] Log directory not found, skip cleanup: $LOGS_DIR"
+    signal_all_nodes "$signal"
+    if wait_for_all_nodes; then
         return
     fi
 
-    local log_entries=()
-    mapfile -d '' log_entries < <(find "$LOGS_DIR" -maxdepth 1 -mindepth 1 \( -type f -o -type d \) -name 'asr_llm_tts.*' -printf '%T@\t%p\0' | sort -z -nr)
+    echo "[WARN] Node shutdown timed out after ${SHUTDOWN_TIMEOUT}s, forcing exit"
+    signal_all_nodes KILL
+    wait "${PIDS[@]}" 2>/dev/null || true
+}
 
-    local total_logs=${#log_entries[@]}
+# 处理 Ctrl+C：停止所有节点并删除本轮运行状态。
+shutdown() {
+    echo "[INFO] Shutdown requested"
+    trap - SIGINT SIGTERM
+    stop_all_nodes INT
+    rm -rf "$NODE_PID_DIR"
+    echo "[INFO] Exit"
+    exit 0
+}
+
+# SIGTERM 用作热重载信号：停止节点，由主循环负责重新启动。
+reload() {
+    echo "[INFO] Reload requested"
+    signal_all_nodes TERM
+}
+
+# 清理上一次异常退出时记录的节点。
+# 清理前会核对 PID 和启动命令，避免 PID 被复用后误杀无关进程。
+cleanup_tracked_nodes() {
+    local node_info name cmd pid_file old_pid old_cmd
+
+    echo "[INFO] Checking for previously tracked node processes..."
+    for node_info in "${NODES[@]}"; do
+        name=${node_info%%|*}
+        cmd=${node_info#*|}
+        pid_file="$NODE_PID_DIR/${name}.pid"
+
+        if [[ ! -f "$pid_file" ]]; then
+            continue
+        fi
+
+        old_pid=$(<"$pid_file")
+        if [[ ! "$old_pid" =~ ^[0-9]+$ ]] || ! kill -0 "$old_pid" 2>/dev/null; then
+            rm -f "$pid_file"
+            continue
+        fi
+
+        old_cmd=$(ps -p "$old_pid" -o args= 2>/dev/null || true)
+        if [[ "$old_cmd" != *"$cmd"* ]]; then
+            echo "[WARN] Ignoring stale PID file for $name (PID=$old_pid)"
+            rm -f "$pid_file"
+            continue
+        fi
+
+        echo "[INFO] Stopping previous $name process group (PGID=$old_pid)"
+        kill -TERM -- "-$old_pid" 2>/dev/null || true
+        sleep 0.5
+        if is_process_group_running "$old_pid"; then
+            kill -KILL -- "-$old_pid" 2>/dev/null || true
+        fi
+        rm -f "$pid_file"
+    done
+}
+
+# 只保留最新的归档日志，避免日志目录无限增长。
+cleanup_old_logs() {
+    local log_entries=()
+    local total_logs entry log_path
+
+    mapfile -d '' log_entries < <(
+        find "$LOGS_DIR" -maxdepth 1 -mindepth 1 \
+            \( -type f -o -type d \) \
+            -name 'asr_llm_tts.*' -printf '%T@\t%p\0' |
+            sort -z -nr
+    )
+
+    total_logs=${#log_entries[@]}
     if (( total_logs <= LOG_RETENTION_COUNT )); then
         echo "[INFO] Log cleanup skipped, found $total_logs archived logs"
         return
     fi
 
     echo "[INFO] Cleaning archived logs, keeping latest $LOG_RETENTION_COUNT of $total_logs entries"
-    for ((i=LOG_RETENTION_COUNT; i<total_logs; i++)); do
-        local entry="${log_entries[$i]}"
-        local log_path="${entry#*$'\t'}"
+    for ((i = LOG_RETENTION_COUNT; i < total_logs; i++)); do
+        entry=${log_entries[$i]}
+        log_path=${entry#*$'\t'}
         echo "[INFO] Removing old log: $(basename "$log_path")"
         rm -rf "$log_path"
     done
 }
 
+# 启动全部节点，并记录进程组 ID，供停止和异常恢复使用。
 start_all_nodes() {
+    local node_info name cmd pid
 
-    # 先清空日志文件，再将启动信息写入日志文件，并追加到总日志中
     : > "$LOGS_DIR/nodes.log"
-
     for node_info in "${NODES[@]}"; do
-        local name="${node_info%%|*}"
-        local cmd="${node_info#*|}"
-        
+        name=${node_info%%|*}
+        cmd=${node_info#*|}
+
         echo "[INFO] Starting $name..."
-        # 后台任务默认可能忽略 SIGINT。重置信号处理并创建独立进程组，
-        # 以便退出时同时通知 ros2 run 及其启动的实际节点。
-        setsid env --default-signal=INT,QUIT bash -c 'exec bash -c "$1"' _ "$cmd" &
-        local pid=$!
+        # 后台 shell 默认可能忽略 SIGINT，因此显式恢复信号并创建独立进程组。
+        setsid env --default-signal=INT,QUIT \
+            bash -c 'exec bash -c "$1"' _ "$cmd" &
+        pid=$!
+
         PIDS["$name"]=$pid
-        # echo "$cmd started with PID $pid" &> "$LOGS_DIR/${name}.log"
-        # echo "$cmd started with PID $pid" &>> "$LOGS_DIR/nodes.log"
-        echo "cmd: [$cmd] , PID: [$pid]" &>> "$LOGS_DIR/nodes.log"
+        printf '%s\n' "$pid" > "$NODE_PID_DIR/${name}.pid"
+        printf 'cmd: [%s], PID: [%s]\n' "$cmd" "$pid" >> "$LOGS_DIR/nodes.log"
     done
 }
 
-wait_any_node() {
-    local pid_list=("${PIDS[@]}")
-    wait -n "${pid_list[@]}"
+# 加载运行环境，并准备日志和 PID 目录。
+prepare_environment() {
+    echo "run.sh path: $SCRIPT_DIR"
+    echo "work dir path: $WORK_DIR"
+
+    cd "$WORK_DIR"
+    source "$WORK_DIR/../venv/bin/activate"
+    source "$WORK_DIR/install/setup.bash"
+
+    mkdir -p "$LOGS_DIR" "$NODE_PID_DIR"
+    cleanup_old_logs
+    cleanup_tracked_nodes
 }
 
-trap shutdown SIGINT
-trap reload SIGTERM
+# 持续监控节点；任一节点退出后，完整停止本轮节点再统一重启。
+supervise_nodes() {
+    local exit_code
 
-##########################
-# 环境准备
-##########################
-cd "$SHELL_DIR"
-echo "run.sh path: $(pwd)"
+    while true; do
+        start_all_nodes
 
-cd "$WORK_DIR"
-echo "work dir path: $(pwd)"
+        # wait -n 的非零状态必须放在条件语句中处理，避免被 set -e 直接终止脚本。
+        if wait -n "${PIDS[@]}"; then
+            exit_code=0
+        else
+            exit_code=$?
+        fi
 
-source "$WORK_DIR/../venv/bin/activate"
-source "$WORK_DIR/install/setup.bash"
+        echo "[WARN] A process exited (code=$exit_code), restarting all nodes in $RESTART_DELAY seconds..."
+        stop_all_nodes INT
+        sleep "$RESTART_DELAY"
+    done
+}
 
-# 清理历史归档日志
-cleanup_old_logs
+# 脚本入口：初始化配置、接管旧实例，然后进入节点守护循环。
+main() {
+    # 可选参数 debug 用于向所有子进程传递调试模式。
+    if [[ "${1:-}" == "debug" ]]; then
+        export DEBUG_MODE=true
+        echo "Debug mode enabled"
+    else
+        export DEBUG_MODE=false
+        echo "Debug mode disabled"
+    fi
 
-# 清理记录在日志中的历史遗留进程
-cleanup_legacy_nodes
+    trap cleanup_supervisor_pid EXIT
+    trap shutdown SIGINT
+    trap reload SIGTERM
 
-##########################
-# 主循环：守护进程
-##########################
-while true; do
-    # 启动所有节点
-    start_all_nodes
-    
-    # 等待任意一个后台进程退出
-    wait_any_node
-    EXIT_CODE=$?
+    stop_previous_supervisor
+    printf '%s\n' "$$" > "$RUN_PID_FILE"
+    prepare_environment
+    supervise_nodes
+}
 
-    echo "[WARN] A process exited (code=$EXIT_CODE), restarting all nodes in $RESTART_DELAY seconds..."
-    
-    # 清理遗留进程
-    kill_all_nodes INT
-    
-    sleep "$RESTART_DELAY"
-done
+# 直接执行脚本时进入主流程；被测试或其他脚本 source 时只加载函数。
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi

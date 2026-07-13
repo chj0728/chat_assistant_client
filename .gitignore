@@ -9,6 +9,8 @@ log/
 **/venv/
 
 **/logs/
+**/.run.pid
+**/.run.pids/
 
 **.log
 
