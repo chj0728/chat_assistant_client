@@ -1,24 +1,17 @@
 import asyncio
 import json
-import threading
-import time
-from concurrent.futures import TimeoutError as FutureTimeoutError
-from typing import Optional
 
 import requests
 from logger import logger
+from transport import ThreadedWebSocketClient
 
 from ..backend_context import TTSBackendContext
 from .protocol import TTSRuntimeProtocol
 
 try:
-    import websockets
     from websockets.exceptions import ConnectionClosed
 except ImportError:  # pragma: no cover - exercised only in minimal test envs
-    websockets = None
     ConnectionClosed = Exception
-
-WS_STARTUP_WAIT_SEC = 1.0
 
 
 class SherpaTTSRuntime(TTSRuntimeProtocol):
@@ -26,10 +19,6 @@ class SherpaTTSRuntime(TTSRuntimeProtocol):
         self.kwargs = kwargs
 
         self._context = context
-        self._ws_loop: Optional[asyncio.AbstractEventLoop] = None
-        self._ws = None
-        self._ws_thread: Optional[threading.Thread] = None
-        self._ws_started = threading.Event()
 
         self.host = self.kwargs.get("host", "0.0.0.0")
         self.port = self.kwargs.get("port", 50000)
@@ -39,6 +28,12 @@ class SherpaTTSRuntime(TTSRuntimeProtocol):
         self.ws_path = self.kwargs.get("ws_path", "/ws/api/tts")
         self.ws_ping_interval = self.kwargs.get("ws_ping_interval", None)
         self.ws_ping_timeout = self.kwargs.get("ws_ping_timeout", None)
+        self._ws_client = ThreadedWebSocketClient(
+            f"ws://{self.host}:{self.port}{self.ws_path}",
+            name="TTS",
+            ping_interval=self.ws_ping_interval,
+            ping_timeout=self.ws_ping_timeout,
+        )
 
         self.speaker_id = self.kwargs.get("speaker_id", 1)
         self.speed = self.kwargs.get("speed", 1.0)
@@ -69,8 +64,7 @@ class SherpaTTSRuntime(TTSRuntimeProtocol):
 
     def _should_stop_request(self) -> bool:
         return (
-            self._context.stop_event.is_set()
-            or self._context.interrupt_event.is_set()
+            self._context.stop_event.is_set() or self._context.interrupt_event.is_set()
         )
 
     def _tts_request(self, text):
@@ -96,90 +90,22 @@ class SherpaTTSRuntime(TTSRuntimeProtocol):
 
     def _tts_request_ws(self, text):
         try:
-            self._start_ws_runtime()
-            self._run_ws_coro(self._tts_request_ws_async(text), timeout=10)
+            self._ws_client.start()
+            self._ws_client.run(self._tts_request_ws_async(text), timeout=10)
         except TimeoutError:
             logger.error("TTS WebSocket 请求超时")
-            self._run_ws_coro(self._close_ws_async(), timeout=self._context.timeout)
+            self._close_ws_connection()
         except Exception as e:
             logger.error(f"WebSocket TTS 请求失败: {e}")
-            self._run_ws_coro(self._close_ws_async(), timeout=self._context.timeout)
+            self._close_ws_connection()
 
-    def _start_ws_runtime(self):
-        if self._ws_thread is not None and self._ws_thread.is_alive():
-            return
-
-        if websockets is None:
-            raise RuntimeError("websockets 未安装，无法启用 WebSocket TTS")
-
-        self._ws_started.clear()
-        self._ws_thread = threading.Thread(
-            target=self._ws_loop_worker,
-            daemon=True,
-            name="tts-ws-loop",
-        )
-        self._ws_thread.start()
-
-        if not self._ws_started.wait(timeout=5):
-            raise RuntimeError("WebSocket 事件循环线程启动超时")
-
-    def _ws_loop_worker(self):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        self._ws_loop = loop
-        self._ws_started.set()
-        logger.info("TTS WebSocket 事件循环线程已启动")
+    def _close_ws_connection(self):
         try:
-            loop.run_forever()
-        finally:
-            try:
-                loop.run_until_complete(self._close_ws_async())
-            except Exception as e:
-                logger.warning(f"WebSocket 线程退出清理失败: {e}")
-            finally:
-                loop.close()
-
-    def _run_ws_coro(self, coro, timeout: Optional[float]):
-        if self._ws_loop is None:
-            raise RuntimeError("WebSocket 事件循环未初始化")
-
-        future = asyncio.run_coroutine_threadsafe(coro, self._ws_loop)
-        try:
-            return future.result(timeout=timeout)
-        except FutureTimeoutError:
-            future.cancel()
-            raise TimeoutError from None
-
-    async def _ensure_ws_connected(self):
-        if self._ws is not None:
-            return
-
-        url = f"ws://{self.host}:{self.port}{self.ws_path}"
-        self._ws = (
-            await websockets.connect(
-                url,
-                max_size=None,
-                ping_interval=self.ws_ping_interval,
-                ping_timeout=self.ws_ping_timeout,
+            self._ws_client.run(
+                self._ws_client.close_connection(), timeout=self._context.timeout
             )
-            if websockets is not None
-            else None
-        )
-        if self._ws is None:
-            raise RuntimeError("websockets 未安装，无法启用 WebSocket TTS")
-        logger.info(f"TTS WebSocket 已连接: {url}")
-
-    async def _close_ws_async(self):
-        if self._ws is None:
-            return
-
-        try:
-            await self._ws.close()
-            logger.info("TTS WebSocket 已关闭")
         except Exception as e:
-            logger.warning(f"关闭 TTS WebSocket 失败: {e}")
-        finally:
-            self._ws = None
+            logger.warning(f"WebSocket 连接清理失败: {e}")
 
     async def _tts_request_ws_async(self, text):
         payload = {
@@ -189,17 +115,18 @@ class SherpaTTSRuntime(TTSRuntimeProtocol):
         }
 
         for attempt in range(2):
-            await self._ensure_ws_connected()
-            assert self._ws is not None
+            ws = await self._ws_client.connect()
+            if ws is None:
+                raise ConnectionError("WebSocket 连接失败，未返回连接对象")
 
             try:
                 while True:
                     try:
-                        await asyncio.wait_for(self._ws.recv(), timeout=0.1)
+                        await asyncio.wait_for(ws.recv(), timeout=0.1)
                     except (asyncio.TimeoutError, ConnectionClosed):
                         break
 
-                await self._ws.send(json.dumps(payload, ensure_ascii=False))
+                await ws.send(json.dumps(payload, ensure_ascii=False))
 
                 while True:
                     if self._should_stop_request():
@@ -207,7 +134,7 @@ class SherpaTTSRuntime(TTSRuntimeProtocol):
                         return
 
                     try:
-                        message = await asyncio.wait_for(self._ws.recv(), timeout=0.1)
+                        message = await asyncio.wait_for(ws.recv(), timeout=0.1)
                     except asyncio.TimeoutError:
                         continue
 
@@ -235,7 +162,7 @@ class SherpaTTSRuntime(TTSRuntimeProtocol):
                     logger.info(f"收到 WebSocket 事件: {event}")
             except ConnectionClosed as e:
                 logger.warning(f"WebSocket 已断开，准备重连: {e}")
-                self._ws = None
+                self._ws_client.invalidate(ws)
                 if attempt == 1:
                     raise
 
@@ -244,11 +171,10 @@ class SherpaTTSRuntime(TTSRuntimeProtocol):
         if not self.use_websocket:
             return
 
-        self._start_ws_runtime()
-        time.sleep(WS_STARTUP_WAIT_SEC)
+        self._ws_client.start()
         try:
-            self._run_ws_coro(
-                self._ensure_ws_connected(), timeout=self._context.timeout
+            self._ws_client.run(
+                self._ws_client.connect(), timeout=self._context.timeout
             )
         except TimeoutError:
             logger.error("TTS WebSocket 连接超时")
@@ -256,20 +182,7 @@ class SherpaTTSRuntime(TTSRuntimeProtocol):
             logger.error(f"TTS WebSocket 连接失败: {e}")
 
     def stop(self) -> None:
-        if self._ws_loop is None:
-            return
-
-        try:
-            self._run_ws_coro(self._close_ws_async(), timeout=3)
-        except Exception as e:
-            logger.warning(f"WebSocket 清理失败: {e}")
-        finally:
-            if self._ws_loop is not None:
-                self._ws_loop.call_soon_threadsafe(self._ws_loop.stop)
-            if self._ws_thread is not None:
-                self._ws_thread.join(timeout=3)
-            self._ws_loop = None
-            self._ws_thread = None
+        self._ws_client.stop(timeout=3)
 
     def interrupt(self) -> None:
         """中断当前正在进行的 TTS 推理。"""

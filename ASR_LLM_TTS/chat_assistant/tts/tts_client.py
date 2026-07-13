@@ -275,11 +275,15 @@ class TTSClientBase:
         如果任一条件为 True，则认为 TTS 客户端处于活跃状态
         """
         return (
-            self.tts_backend.is_active()
+            self.output_stream_active()
             or (self.sound is not None and self.sound.is_alive())
             or not self.text_queue.empty()
             or not self.audio_queue.empty()
         )
+
+    def output_stream_active(self) -> bool:
+        """判断输出流是否处于活跃状态。"""
+        return self.tts_backend.is_active()
 
     def play_audio(self, file_path, block=False):
         """播放指定路径的本地音频文件，适用于需要播放预先合成的音频文件的场景。"""

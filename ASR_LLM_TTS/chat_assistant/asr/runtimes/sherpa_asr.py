@@ -1,19 +1,18 @@
-import asyncio
 import io
 import json
 import os
 import re
-import threading
-import time
 import wave
-from concurrent.futures import TimeoutError as FutureTimeoutError
-from typing import Optional
 
 import numpy as np
 import requests
-import websockets
 from logger import logger
-from websockets.exceptions import ConnectionClosed
+from transport import ThreadedWebSocketClient
+
+try:
+    from websockets.exceptions import ConnectionClosed
+except ImportError:  # pragma: no cover - 仅在缺少可选依赖的环境触发
+    ConnectionClosed = Exception
 
 from ..asr_backend_context import ASRBackendContext
 from .protocol import ASRRuntimeProtocol
@@ -50,21 +49,20 @@ class SherpaASRRuntime(ASRRuntimeProtocol):
         self.ws_ping_interval = self.asr_cfg.get("ws_ping_interval", None)
         self.ws_ping_timeout = self.asr_cfg.get("ws_ping_timeout", None)
 
-        self._ws_loop: Optional[asyncio.AbstractEventLoop] = None
-        self._ws = None
-        self._ws_thread: Optional[threading.Thread] = None
-        self._ws_started = threading.Event()
+        self._ws_client = ThreadedWebSocketClient(
+            f"ws://{self.host}:{self.port}{self.ws_path}",
+            name="ASR",
+            ping_interval=self.ws_ping_interval,
+            ping_timeout=self.ws_ping_timeout,
+        )
 
     def start(self) -> None:
         ############# 如果使用 WebSocket 模式，提前启动事件循环线程，避免首次请求时的启动延迟 #############
         if self.use_websocket:
-            self.__start_ws_runtime()
+            self._ws_client.start()
             # self.start_mic_stream() # 目前不默认启动麦克风流式识别，由上层传输wav文件时调用 recognize() 方法即可
-            time.sleep(1.0)  # 确保事件循环线程启动完成
             try:
-                self.__run_ws_coro(
-                    self.__ensure_ws_connected(), timeout=self.timeout_sec
-                )
+                self._ws_client.run(self._ws_client.connect(), timeout=self.timeout_sec)
             except TimeoutError:
                 logger.error("ASR WebSocket 连接超时")
             except Exception as e:
@@ -73,20 +71,8 @@ class SherpaASRRuntime(ASRRuntimeProtocol):
         logger.info("ASR Runtime 已启动")
 
     def stop(self) -> None:
-        if self.use_websocket and self._ws_loop is not None:
-            try:
-                self.__run_ws_coro(self.__close_ws_async(), timeout=self.timeout_sec)
-            except TimeoutError:
-                logger.error("ASR WebSocket 关闭超时")
-            except Exception as e:
-                logger.error(f"ASR WebSocket 关闭异常: {e}")
-            finally:
-                if self._ws_loop is not None:
-                    self._ws_loop.call_soon_threadsafe(self._ws_loop.stop)
-                if self._ws_thread is not None:
-                    self._ws_thread.join(timeout=3)
-                self._ws_loop = None
-                self._ws_thread = None
+        if self.use_websocket:
+            self._ws_client.stop(timeout=self.timeout_sec)
         logger.info("ASR Runtime 已停止")
 
     def asr_infer_wav_path(self, wav_path: str) -> str:
@@ -275,16 +261,14 @@ class SherpaASRRuntime(ASRRuntimeProtocol):
     def __recognize_ws(self, wav_path: str) -> str:
         """通过 WebSocket 发送 wav 文件进行识别。"""
         try:
-            return self.__run_ws_coro(
+            return self._ws_client.run(
                 self.__recognize_ws_async(wav_path), timeout=self.timeout
             )
         except TimeoutError:
             logger.error("ASR WebSocket 识别超时")
-            # self.__run_ws_coro(self.__close_ws_async(), timeout=self.timeout)
             return ""
         except Exception as e:
             logger.error(f"ASR WebSocket 识别异常: {e}")
-            # self.__run_ws_coro(self.__close_ws_async(), timeout=self.timeout)
             return ""
 
     def __recognize_ws_pcm16_bytes(
@@ -292,7 +276,7 @@ class SherpaASRRuntime(ASRRuntimeProtocol):
     ) -> str:
         """通过 WebSocket 发送 PCM16 字节流进行识别。"""
         try:
-            return self.__run_ws_coro(
+            return self._ws_client.run(
                 self.__recognize_ws_pcm16_async(
                     pcm16_bytes, sample_rate=sample_rate, channels=channels
                 ),
@@ -300,11 +284,9 @@ class SherpaASRRuntime(ASRRuntimeProtocol):
             )
         except TimeoutError:
             logger.error("ASR WebSocket 识别超时")
-            # self.__run_ws_coro(self.__close_ws_async(), timeout=self.timeout)
             return ""
         except Exception as e:
             logger.error(f"ASR WebSocket 识别异常: {e}")
-            # self.__run_ws_coro(self.__close_ws_async(), timeout=self.timeout)
             return ""
 
     async def __recognize_ws_async(self, wav_path: str) -> str:
@@ -334,15 +316,16 @@ class SherpaASRRuntime(ASRRuntimeProtocol):
         data = np.ascontiguousarray(data, dtype=np.float32)
 
         for attempt in range(2):
-            await self.__ensure_ws_connected()
-            assert self._ws is not None
+            ws = await self._ws_client.connect()
+            if ws is None:
+                raise ConnectionError("WebSocket 连接失败，未返回连接对象")
 
             try:
                 start = 0
                 while start < data.shape[0]:
                     end = min(start + self.samples_per_message, data.shape[0])
                     chunk = data.data[start:end].tobytes()
-                    await self._ws.send(chunk)
+                    await ws.send(chunk)
 
                     # Simulate streaming. You can remove the sleep if you want
                     # if self.seconds_per_message > 0:
@@ -350,19 +333,19 @@ class SherpaASRRuntime(ASRRuntimeProtocol):
 
                     start += self.samples_per_message
 
-                await self._ws.send("Done")
+                await ws.send("Done")
             except ConnectionClosed as e:
                 logger.warning(f"ASR WebSocket 会话中断，准备重连: {e}")
-                self._ws = None
+                self._ws_client.invalidate(ws)
                 if attempt == 1:
                     raise
                 continue
 
             try:
-                last_message = await self.__receive_results()
+                last_message = await self.__receive_results(ws)
             except ConnectionClosed as e:
                 logger.warning(f"ASR WebSocket 接收阶段异常断开，准备重连: {e}")
-                self._ws = None
+                self._ws_client.invalidate(ws)
                 if attempt == 1:
                     raise
                 continue
@@ -380,97 +363,21 @@ class SherpaASRRuntime(ASRRuntimeProtocol):
 
     ######################################################
 
-    ######## WebSocket连接 及事件循环相关实现 ########
-    def __start_ws_runtime(self):
-        """启动 WebSocket 事件循环线程。"""
-        if self._ws_thread is not None and self._ws_thread.is_alive():
-            return
-
-        self._ws_started.clear()
-        self._ws_thread = threading.Thread(
-            target=self.__ws_loop_worker,
-            daemon=True,
-            name="asr-ws-loop",
-        )
-        self._ws_thread.start()
-
-        if not self._ws_started.wait(timeout=5):
-            raise RuntimeError("WebSocket 事件循环线程启动超时")
-
-    def __ws_loop_worker(self):
-        """WebSocket 事件循环线程的工作函数。"""
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        self._ws_loop = loop
-        self._ws_started.set()
-        logger.info("ASR WebSocket 事件循环线程已启动")
-        try:
-            loop.run_forever()
-        finally:
-            try:
-                loop.run_until_complete(self.__close_ws_async())
-            except Exception as e:
-                logger.warning(f"ASR WebSocket 线程退出清理失败: {e}")
-            finally:
-                loop.close()
-
-    def __run_ws_coro(self, coro, timeout: Optional[float]):
-        """在 WebSocket 事件循环中运行协程，并等待结果。"""
-        if self._ws_loop is None:
-            raise RuntimeError("ASR WebSocket 事件循环未初始化")
-
-        future = asyncio.run_coroutine_threadsafe(coro, self._ws_loop)
-        try:
-            return future.result(timeout=timeout)
-        except FutureTimeoutError:
-            future.cancel()
-            raise
-
-    async def __ensure_ws_connected(self):
-        """确保 WebSocket 已连接，如果未连接则建立连接。"""
-        if self._ws is not None:
-            # 连接对象可能已被服务端关闭；仅在仍可用时复用。
-            if getattr(self._ws, "close_code", None) is None:
-                return
-            self._ws = None
-
-        url = f"ws://{self.host}:{self.port}{self.ws_path}"
-        self._ws = await websockets.connect(
-            url,
-            max_size=None,
-            ping_interval=self.ws_ping_interval,
-            ping_timeout=self.ws_ping_timeout,
-        )
-        logger.info(f"ASR WebSocket 已连接: {url}")
-
-    async def __close_ws_async(self):
-        """关闭 WebSocket 连接。"""
-        if self._ws is None:
-            return
-
-        try:
-            await self._ws.close()
-            logger.info("ASR WebSocket 已关闭")
-        except Exception as e:
-            logger.warning(f"关闭 ASR WebSocket 失败: {e}")
-        finally:
-            self._ws = None
-
-    async def __receive_results(self):
+    ######## WebSocket 业务协议相关实现 ########
+    async def __receive_results(self, ws):
         """从 WebSocket 接收识别结果，直到收到 "Done" 消息或连接关闭。返回最后一条文本消息。"""
-        assert self._ws is not None
         last_message = ""
 
         while True:
             try:
-                message = await self._ws.recv()
+                message = await ws.recv()
             except ConnectionClosed as e:
                 # 某些 ASR 服务端不会额外发送 Done 文本，而是直接以 1000 关闭。
-                if e.code == 1000:
+                if getattr(e, "code", None) == 1000:
                     logger.info("ASR WS 服务端正常关闭，按会话结束处理")
-                    self._ws = None
+                    self._ws_client.invalidate(ws)
                     break
-                self._ws = None
+                self._ws_client.invalidate(ws)
                 raise
 
             if not isinstance(message, str):

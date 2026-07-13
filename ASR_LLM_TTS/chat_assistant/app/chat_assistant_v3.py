@@ -839,11 +839,11 @@ class ChatAssistant:
         #     logger.error("TTS 播放超时 或者 TTS 播放音频太短")
         #     return False
 
-        while not self.tts_client.is_active():
+        while not self.tts_client.output_stream_active():
             if time.time() - start_time > 10.0:
                 logger.warning("TTS 播放超时 或者 TTS 播放音频太短")
                 return False
-            time.sleep(0.05)
+            time.sleep(0.02)
 
         elapsed_time = 0
         # if isinstance(self.tts_client, RealtimeTTSPlayer):
