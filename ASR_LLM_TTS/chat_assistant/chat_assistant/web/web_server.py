@@ -12,6 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import yaml
+from config import get_default_config_path
 from logger.logger import get_logs_dir
 
 ACTIVE_LOG_NAME = "asr_llm_tts"
@@ -30,9 +31,9 @@ def get_default_logs_dir() -> Path:
     return get_logs_dir()
 
 
-def get_default_config_path() -> Path:
+def web_get_default_config_path() -> Path:
     """Resolve config.yaml under the chat_assistant package root."""
-    return get_project_root_dir() / "config" / "config.yaml"
+    return get_default_config_path()
 
 
 def get_default_html_path() -> Path:
@@ -613,7 +614,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--config-path",
-        default=str(get_default_config_path()),
+        default=str(web_get_default_config_path()),
         help="Path to config.yaml",
     )
     parser.add_argument(

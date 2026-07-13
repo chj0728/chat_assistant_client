@@ -46,6 +46,7 @@ else
     if [[ "$REPLY" =~ ^[Yy]$ ]]; then
         echo "[INFO] Updating dependencies in the virtual environment..."
         source "$VENV_DIR/venv/bin/activate"
+        cd "$VENV_DIR"
         uv pip install -U -r ./ASR_LLM_TTS/requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
         uv pip uninstall setuptools
         echo "[INFO] Dependencies updated."
