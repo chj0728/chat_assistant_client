@@ -98,11 +98,11 @@ LOGGING_CONFIG = {
             "level": "INFO",
             "formatter": "default",
             "filename": os.path.join(logs_dir, "asr_llm_tts"),
-            "when": "H",
-            "interval": 1,
-            "backupCount": 48,
+            "when": "H",  # 滚动间隔：Y=年，M=月，D=日，H=时，m=分，s=秒
+            "interval": 1,  # 间隔倍数（如when="H"，interval=6则每6小时滚动）
+            "backupCount": 48,  # 保留的旧日志文件个数
             "encoding": "utf-8",
-            "atTime": dt_time(0, 0, 0),
+            "atTime": dt_time(0, 0, 0),  # 滚动时间点（每天零点）
         },
     },
     "loggers": {
@@ -118,6 +118,19 @@ LOGGING_CONFIG = {
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 
+timed_handler = next(
+    (
+        handler
+        for handler in logger.handlers
+        if isinstance(handler, logging.handlers.TimedRotatingFileHandler)
+    ),
+    None,
+)
+if timed_handler is not None:
+    # 设置日志文件后缀格式为年-月-日_时-分
+    # timed_handler.suffix = "%Y-%m-%d_%H-%M-%S"  # 精确到秒
+    # timed_handler.suffix = "%Y-%m-%d_%H-%M"  #  精确到分钟即可
+    timed_handler.suffix = "%Y-%m-%d_%H"  #  精确到小时即可
 
 _dialog_logger_lock = threading.Lock()
 _dialog_logger_cache = {}
@@ -213,4 +226,11 @@ if __name__ == "__main__":
         logger.warning("This is a warning message.")
         logger.error("This is an error message.")
         logger.critical("This is a critical message.")
+        log_user_dialog(
+            user_id="test_user",
+            user_name="Test User",
+            asr_text="Test ASR",
+            llm_text="Test LLM",
+            audio_saved_path="path/to/audio",
+        )
         time.sleep(0.1)
