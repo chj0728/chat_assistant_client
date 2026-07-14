@@ -14,24 +14,31 @@ git clone http://192.168.50.220:8090/external/ymbot.git -b dev-chj
 
 ## Creating a virtual environment && install dependencies
 
-```bash
-sudo apt install portaudio19-dev
+- manual installation
+  
+  ```bash
+  sudo apt install portaudio19-dev
 
-# use pip + virtualenv to manage dependencies and virtual environment
-python3 -m venv venv
-source venv/bin/activate
-pip3 install -r ./ASR_LLM_TTS/requirements.txt -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
+  # use pip + virtualenv to manage dependencies and virtual environment
+  python3 -m venv venv
+  source venv/bin/activate
+  pip3 install -r ./ASR_LLM_TTS/requirements.txt -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
 
-# (Recommended)or use uv to manage dependencies and virtual environment
-## install uv
-curl -LsSf https://astral.sh/uv/install.sh | sh
-uv venv venv --system-site-packages # --python 3.12
-source venv/bin/activate
-uv pip install -r ./ASR_LLM_TTS/requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
+  # (Recommended)or use uv to manage dependencies and virtual environment
+  ## install uv
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  uv venv venv --system-site-packages # --python 3.12
+  source venv/bin/activate
+  uv pip install -U -r ./ASR_LLM_TTS/requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
+  uv pip uninstall setuptools # 使用ros系统自带的setuptools，否则colcon build --symlink-install无法真正的 symlink 安装
+  ```
 
-uv pip install -U -r ./ASR_LLM_TTS/requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
-uv pip uninstall setuptools # 使用ros系统自带的setuptools，否则colcon build --symlink-install无法真正的 symlink 安装
-```
+- auto installation
+  
+  ```bash
+  cd ASR_LLM_TTS
+  ./script/install.sh
+  ```
 
 ## Build with ROS2
 
@@ -47,7 +54,7 @@ uv pip uninstall setuptools # 使用ros系统自带的setuptools，否则colcon 
 # key point: 使用 python -m colcon来编译，使用虚拟环境下的python库运行
 # python -m colcon build --symlink-install
 cd ASR_LLM_TTS
-./build.sh
+./script/build.sh
 ```
 
 ## Run the chat assistant
@@ -60,10 +67,11 @@ cd ASR_LLM_TTS
 ## python3 -m chat_assistant.web.web_server --host 0.0.0.0 --port 17890
 
 # or use the run.sh script
-./ASR_LLM_TTS/run.sh
+cd ASR_LLM_TTS
+./script/run.sh
 
 # debug mode
-# ./ASR_LLM_TTS/run.sh debug
+# ./script/run.sh debug
 ```
 
 ## Test each module individually
