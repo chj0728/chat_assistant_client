@@ -3,6 +3,7 @@ import json
 import os
 import re
 import wave
+from math import gcd
 
 import numpy as np
 import requests
@@ -137,16 +138,33 @@ class SherpaASRRuntime(ASRRuntimeProtocol):
 
     @staticmethod
     def read_wave(wave_filename: str) -> np.ndarray:
-        """读取 wav 文件并返回归一化的 float32 numpy 数组，要求 16kHz 单声道 16-bit PCM 格式。"""
-        with wave.open(wave_filename) as f:
-            assert f.getframerate() == 16000, f.getframerate()
-            assert f.getnchannels() == 1, f.getnchannels()
-            assert f.getsampwidth() == 2, f.getsampwidth()
+        """读取 WAV，并转换为 16kHz 单声道归一化 float32 数组。"""
+        try:
+            import soundfile as sf
+            from scipy.signal import resample_poly
+        except ImportError as e:
+            raise RuntimeError("读取并转换 WAV 需要安装 soundfile 和 scipy") from e
 
-            num_samples = f.getnframes()
-            samples = f.readframes(num_samples)
-            samples_int16 = np.frombuffer(samples, dtype=np.int16)
-            return samples_int16.astype(np.float32) / 32768.0
+        samples, sample_rate = sf.read(
+            wave_filename,
+            dtype="float32",
+            always_2d=True,
+        )
+        if samples.shape[0] == 0:
+            return np.empty(0, dtype=np.float32)
+
+        mono_samples = samples.mean(axis=1, dtype=np.float32)
+        target_sample_rate = 16000
+        if sample_rate != target_sample_rate:
+            logger.info(f"Resampling from {sample_rate} Hz to {target_sample_rate} Hz")
+            rate_gcd = gcd(sample_rate, target_sample_rate)
+            mono_samples = resample_poly(
+                mono_samples,
+                target_sample_rate // rate_gcd,
+                sample_rate // rate_gcd,
+            )
+
+        return np.ascontiguousarray(mono_samples, dtype=np.float32)
 
     def clean_asr_text(self, text: str) -> str:
         """对 ASR 结果文本进行清理，去除特殊标记和多余空格等。"""
