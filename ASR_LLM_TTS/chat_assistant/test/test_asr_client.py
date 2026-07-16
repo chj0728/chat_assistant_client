@@ -129,35 +129,51 @@ def test_websocket_audio_inference_uses_float32_samples_directly(monkeypatch) ->
         recognize_samples,
     )
 
-    result = runtime.asr_infer_audio(samples, b"unused-pcm16")
+    result = runtime.asr_infer_samples(samples)
 
     assert result == "direct"
     assert received_samples == [samples]
 
 
-def test_http_audio_inference_reuses_pcm16_bytes(monkeypatch) -> None:
-    """测试 HTTP ASR 继续复用已有 PCM16 数据。"""
+def test_http_audio_inference_posts_float32_samples_directly(monkeypatch) -> None:
+    """测试 HTTP ASR 直接发送 little-endian float32 音频。"""
     runtime = SherpaASRRuntime.__new__(SherpaASRRuntime)
     runtime.use_websocket = False
     runtime.sample_rate = 16000
     runtime.channels = 1
-    pcm16_bytes = b"\x01\x00\x02\x00"
-    received_pcm16 = []
+    runtime.host = "asr-server"
+    runtime.port = 6006
+    runtime.timeout = 10.0
+    samples = np.array([-0.5, 0.0, 0.5], dtype=np.float32)
+    requests_sent = []
 
-    def recognize_pcm16(self, data, sample_rate, channels) -> str:
-        received_pcm16.append((data, sample_rate, channels))
-        return " http "
+    class Response:
+        status_code = 200
+        text = ""
 
-    monkeypatch.setattr(
-        SherpaASRRuntime,
-        "_SherpaASRRuntime__recognize_http_pcm16_bytes",
-        recognize_pcm16,
-    )
+        @staticmethod
+        def json() -> dict:
+            return {"code": 0, "msg": "success", "text": " http "}
 
-    result = runtime.asr_infer_audio(np.empty(0, dtype=np.float32), pcm16_bytes)
+    def post(url, **kwargs):
+        requests_sent.append((url, kwargs))
+        return Response()
+
+    monkeypatch.setattr("asr.runtimes.sherpa_asr.requests.post", post)
+
+    result = runtime.asr_infer_samples(samples)
 
     assert result == "http"
-    assert received_pcm16 == [(pcm16_bytes, 16000, 1)]
+    assert len(requests_sent) == 1
+    url, request = requests_sent[0]
+    assert url == "http://asr-server:6006/api/asr/float32"
+    assert request["headers"] == {
+        "Content-Type": "application/octet-stream",
+        "X-Sample-Rate": "16000",
+        "X-Channels": "1",
+    }
+    assert request["timeout"] == 10.0
+    np.testing.assert_array_equal(np.frombuffer(request["data"], dtype="<f4"), samples)
 
 
 class StubASRClient(ASRClient):
@@ -202,6 +218,53 @@ def test_asr_client_initializes_queues_events_and_starts_backend() -> None:
     assert len(client.created_runtimes) == 1
     assert len(client.created_backends) == 1
     assert client.asr_backend.start_calls == 1
+
+
+def test_asr_client_reuses_created_components_and_shared_context(monkeypatch) -> None:
+    """测试 backend 复用唯一的输入流、运行时和共享上下文。"""
+    created = {"input": [], "runtime": [], "backend": []}
+
+    class Input:
+        def __init__(self, asr_backend_context, **kwargs) -> None:
+            self.context = asr_backend_context
+            created["input"].append(self)
+
+    class Runtime:
+        def __init__(self, asr_backend_context, **kwargs) -> None:
+            self.context = asr_backend_context
+            created["runtime"].append(self)
+
+    class Backend:
+        def __init__(
+            self,
+            asr_backend_context,
+            asr_runtime,
+            asr_input_stream,
+            **kwargs,
+        ) -> None:
+            self.context = asr_backend_context
+            self.runtime = asr_runtime
+            self.input_stream = asr_input_stream
+            self.start_calls = 0
+            created["backend"].append(self)
+
+        def start(self) -> None:
+            self.start_calls += 1
+
+    monkeypatch.setattr("asr.asr_client.InputStream", Input)
+    monkeypatch.setattr("asr.asr_client.SherpaASRRuntime", Runtime)
+    monkeypatch.setattr("asr.asr_client.ASRBackend", Backend)
+
+    client = ASRClient()
+
+    assert len(created["input"]) == 1
+    assert len(created["runtime"]) == 1
+    assert len(created["backend"]) == 1
+    assert client.asr_backend.input_stream is client.input_stream
+    assert client.asr_backend.runtime is client.asr_runtime
+    assert client.input_stream.context is client.backend_context
+    assert client.asr_runtime.context is client.backend_context
+    assert client.asr_backend.context is client.backend_context
 
 
 def test_create_backend_context_shares_client_state() -> None:
@@ -267,9 +330,11 @@ def test_update_vision_id_delegates_to_backend() -> None:
     client = StubASRClient()
 
     client.update_vision_id("vision-42")
+    assert client.vision_id == "vision-42"
     client.update_vision_id(None)
 
     assert client.asr_backend.updated_vision_ids == ["vision-42", None]
+    assert client.vision_id is None
 
 
 def test_from_config_passes_config_to_constructor() -> None:
