@@ -12,7 +12,7 @@ from config import get_default_pkg_dir
 from logger import logger
 from logger.logger import get_logs_dir
 
-from ..asr_backend_context import ASRBackendContext
+from ..asr_backend_context import ASRAudioData, ASRBackendContext
 from .protocol import InputStreamProtocol
 
 AudioSegment = tuple[bytes, np.ndarray, float]
@@ -316,21 +316,20 @@ class InputStream(InputStreamProtocol):
         audio_clipped = np.clip(audio_np, -1.0, 1.0)
         return (audio_clipped * 32767).astype(np.int16).tobytes()
 
-    def _enhance_audio_samples(
-        self, samples: np.ndarray, fallback_audio_bytes: bytes
-    ) -> bytes:
-        """对完整语音片段做离线人声增强，并返回 PCM16 字节流。"""
+    def _enhance_audio_samples(self, samples: np.ndarray) -> np.ndarray:
+        """对完整语音片段做离线人声增强，并返回 float32 数组。"""
+        samples = self._to_mono_float32(samples)
         if not self.enable_enhancement or samples.size == 0:
             logger.warning("音频增强未启用或输入音频为空，保留原始音频")
-            return fallback_audio_bytes
+            return samples
         if not self._ensure_speech_denoiser():
             logger.warning("音频增强器未初始化，保留原始音频")
-            return fallback_audio_bytes
+            return samples
 
         try:
             if self.speech_denoiser is None:
                 logger.warning("音频增强器未初始化，保留原始音频")
-                return fallback_audio_bytes
+                return samples
 
             denoised = self.speech_denoiser.run(samples, self.samplerate)
 
@@ -339,11 +338,13 @@ class InputStream(InputStreamProtocol):
                     "音频增强输出采样率与输入不一致，保留原始音频: "
                     f"{denoised.sample_rate} != {self.samplerate}"
                 )
-                return fallback_audio_bytes
-            return self._float_to_pcm16(np.asarray(denoised.samples, dtype=np.float32))
+                return samples
+            return self._to_mono_float32(
+                np.asarray(denoised.samples, dtype=np.float32)
+            )
         except Exception as exc:
             logger.error(f"音频增强失败，保留原始音频: {exc}")
-            return fallback_audio_bytes
+            return samples
 
     def _finalize_pending_segments(self, timestamp: float) -> None:
         """在片段结束时校验缓冲间隔并触发保存。"""
@@ -529,7 +530,7 @@ class InputStream(InputStreamProtocol):
         return None
 
     def save_audio_only(self) -> None:
-        """将当前 PCM16 音频片段送入 ASR 队列，并循环保存为 WAV 文件。"""
+        """将当前 float32/PCM16 音频片段送入 ASR 队列并准备保存。"""
         if not self.segments_to_save:
             return
 
@@ -545,9 +546,10 @@ class InputStream(InputStreamProtocol):
 
             audio_frames = self._build_audio_frames_with_pre_buffer()
             audio_bytes = b"".join(audio_frames)
+            audio_samples = self._build_audio_samples_with_pre_buffer()
             if self.enable_enhancement:
-                audio_samples = self._build_audio_samples_with_pre_buffer()
-                audio_bytes = self._enhance_audio_samples(audio_samples, audio_bytes)
+                audio_samples = self._enhance_audio_samples(audio_samples)
+                audio_bytes = self._float_to_pcm16(audio_samples)
             audio_saved_name = self._next_audio_output_name()
             audio_saved_path = self._next_audio_output_path(audio_saved_name)
 
@@ -555,7 +557,13 @@ class InputStream(InputStreamProtocol):
             self.tmp_audio_saved_path = audio_saved_path
 
             self.asr_backend_context.audio_data_queue.put(
-                (audio_bytes, str(audio_saved_name))
+                (
+                    ASRAudioData(
+                        samples=audio_samples,
+                        pcm16_bytes=audio_bytes,
+                    ),
+                    str(audio_saved_name),
+                )
             )
 
             # self._write_wav(audio_saved_path, audio_bytes)

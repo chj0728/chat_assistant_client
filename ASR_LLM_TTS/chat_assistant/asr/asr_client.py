@@ -5,7 +5,7 @@ from typing import Any, Optional
 from logger import logger
 
 from .asr_backend import ASRBackend
-from .asr_backend_context import ASRBackendContext
+from .asr_backend_context import ASRAudioData, ASRBackendContext
 from .runtimes import SherpaASRRuntime
 from .runtimes.protocol import ASRRuntimeProtocol
 from .stream.input import InputStream
@@ -13,41 +13,28 @@ from .stream.protocol import InputStreamProtocol
 
 
 class ASRClientBase:
-    """ASR客户端基类，定义了ASR客户端的基本接口和功能。"""
+    """组装 ASR 输入流、运行时和后台工作线程，并提供统一入口。"""
 
     def __init__(self, **kwargs) -> None:
-
         self.on_init(**kwargs)
-
         self.start()
 
     def on_init(self, **kwargs) -> None:
-        """ASR客户端参数初始化方法。"""
-
-        self.asr_server_type = kwargs.get(
-            "asr_server_type", "asr_local"
-        )  # ASR服务器类型，默认为 "asr_local"
-
-        # self.asr_text_queue: queue.Queue[str] = queue.Queue(
-        #     maxsize=10
-        # )  # ASR识别结果文本队列，供外部使用
-        self.audio_data_queue: queue.Queue[tuple[bytes, str | None]] = queue.Queue(
-            maxsize=10
-        )  # (音频帧, 音频待保存路径) 输入队列，供ASR后端使用
-        # self.asr_voice_result_queue: queue.Queue[tuple[str, Any | None]] = queue.Queue(
-        #     maxsize=10
-        # )  # ASR识别结果和声纹识别结果队列，供外部使用
+        """初始化共享状态，并按依赖顺序创建三个 ASR 组件。"""
+        self.asr_server_type = kwargs.get("asr_server_type", "asr_local")
+        self.audio_data_queue: queue.Queue[tuple[ASRAudioData, str | None]] = (
+            queue.Queue(maxsize=10)
+        )
         self.result_data_queue: queue.Queue[tuple[str, Any | None, str | None]] = (
             queue.Queue(maxsize=10)
-        )  # (asr_result, voice_id_result, audio_saved_path) 输出队列，ASR worker 将文本识别结果、声纹识别结果和音频保存路径放入其中供外部使用
+        )
 
         self.vision_id: Optional[str] = None
+        self.stop_event = threading.Event()
+        self.interrupt_event = threading.Event()
 
-        self.stop_event = threading.Event()  # 停止事件，通知ASR后端停止运行
-        self.interrupt_event = (
-            threading.Event()
-        )  # 中断事件，通知ASR后端立即停止当前识别并清空状态
-
+        # 三个组件必须共享同一个上下文，否则 vision_id 等可变状态会分叉。
+        self.backend_context = self.create_backend_context()
         self.input_stream = self.create_input_stream(**kwargs)
         self.asr_runtime = self.create_asr_runtime(**kwargs)
         self.asr_backend = self.create_asr_backend(**kwargs)
@@ -61,11 +48,9 @@ class ASRClientBase:
         self.asr_backend.stop()
 
     def create_backend_context(self) -> ASRBackendContext:
-        """创建ASR后端上下文对象。"""
+        """创建引用当前队列、事件和视觉 ID 的后端上下文。"""
         return ASRBackendContext(
-            # asr_text_queue=self.asr_text_queue,
             audio_data_queue=self.audio_data_queue,
-            # asr_voice_result_queue=self.asr_voice_result_queue,
             result_data_queue=self.result_data_queue,
             vision_id=self.vision_id,
             stop_event=self.stop_event,
@@ -73,21 +58,19 @@ class ASRClientBase:
         )
 
     def create_input_stream(self, **kwargs) -> InputStreamProtocol:
-        """创建ASR输入流对象。"""
-        return InputStream(asr_backend_context=self.create_backend_context(), **kwargs)
+        """创建使用共享上下文的 ASR 输入流。"""
+        return InputStream(asr_backend_context=self.backend_context, **kwargs)
 
     def create_asr_runtime(self, **kwargs) -> ASRRuntimeProtocol:
-        """创建ASR运行时对象。"""
-        return SherpaASRRuntime(
-            asr_backend_context=self.create_backend_context(), **kwargs
-        )
+        """创建使用共享上下文的 ASR 运行时。"""
+        return SherpaASRRuntime(asr_backend_context=self.backend_context, **kwargs)
 
     def create_asr_backend(self, **kwargs) -> ASRBackend:
-        """创建ASR后端对象。"""
+        """使用已创建的输入流和运行时组装 ASR 后端。"""
         return ASRBackend(
-            asr_backend_context=self.create_backend_context(),
-            asr_runtime=self.create_asr_runtime(**kwargs),
-            asr_input_stream=self.create_input_stream(**kwargs),
+            asr_backend_context=self.backend_context,
+            asr_runtime=self.asr_runtime,
+            asr_input_stream=self.input_stream,
             **kwargs,
         )
 
@@ -104,12 +87,12 @@ class ASRClientBase:
         return await self.asr_backend.async_recognize_frames(audio_frames)
 
     def update_vision_id(self, vision_id: str | None) -> None:
-        """更新当前视觉ID，供ASR后端使用。"""
-        # self.vision_id = vision_id
+        """同步更新客户端和共享后端上下文中的视觉 ID。"""
+        self.vision_id = vision_id
         self.asr_backend.update_vision_id(vision_id)
-        # logger.info(f"ASR 客户端视觉ID已更新: {self.vision_id}")
 
     def save_tmp_wav(self) -> bool:
+        """保存最近一次识别片段的临时 WAV 文件。"""
         return self.asr_backend.save_tmp_wav()
 
 
@@ -129,9 +112,8 @@ class ASRClient(ASRClientBase):
         return cls(**init_kwargs)
 
     def reset_from_config(self, config: dict) -> None:
-
+        """停止当前组件，并使用新配置完整重建客户端。"""
         self.stop()
-
         init_kwargs = self.build_init_kwargs_from_config(config)
         self.__init__(**init_kwargs)
 
@@ -147,17 +129,14 @@ if __name__ == "__main__":
     try:
         while True:
             try:
-
-                # asr_result = asr_client.asr_text_queue.get(timeout=0.1)
-                result_data = asr_client.result_data_queue.get(timeout=0.1)
-                if result_data:
-                    asr_result, voice_id, audio_saved_path = result_data
-                    logger.info(
-                        f"ASR 识别结果: {asr_result}, 关联视觉ID: {asr_client.vision_id}, 关联声纹ID: {voice_id}, 音频保存路径: {audio_saved_path}"
-                    )
-
+                asr_result, voice_id, audio_saved_path = (
+                    asr_client.result_data_queue.get(timeout=0.1)
+                )
+                logger.info(
+                    f"ASR 识别结果: {asr_result}, 关联视觉ID: {asr_client.vision_id}, "
+                    f"关联声纹ID: {voice_id}, 音频保存路径: {audio_saved_path}"
+                )
             except queue.Empty:
                 continue
     except KeyboardInterrupt:
-
         asr_client.stop()

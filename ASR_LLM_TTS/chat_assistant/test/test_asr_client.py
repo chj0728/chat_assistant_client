@@ -5,6 +5,8 @@ import threading
 import types
 from typing import Any
 
+import numpy as np
+
 websockets_stub = types.ModuleType("websockets")
 websockets_exceptions_stub = types.ModuleType("websockets.exceptions")
 websockets_exceptions_stub.ConnectionClosed = RuntimeError
@@ -28,6 +30,7 @@ sys.modules.setdefault("webrtcvad", webrtcvad_stub)
 
 from asr import ASRClient
 from asr.asr_backend_context import ASRBackendContext
+from asr.runtimes import SherpaASRRuntime
 
 
 class StubInputStream:
@@ -87,6 +90,76 @@ class StubBackend:
         self.updated_vision_ids.append(vision_id)
 
 
+def test_read_wave_normalizes_channels_sample_rate_and_dtype(monkeypatch) -> None:
+    """测试 WAV 输入会归一化为 16kHz 单声道连续 float32 数据。"""
+    stereo_samples = np.column_stack(
+        (
+            np.linspace(-1.0, 1.0, 800, dtype=np.float32),
+            np.linspace(1.0, -1.0, 800, dtype=np.float32),
+        )
+    )
+    soundfile_stub = types.ModuleType("soundfile")
+    soundfile_stub.read = lambda *args, **kwargs: (stereo_samples, 8000)
+    monkeypatch.setitem(sys.modules, "soundfile", soundfile_stub)
+
+    samples = SherpaASRRuntime.read_wave("stereo-8k.wav")
+
+    assert samples.shape == (1600,)
+    assert samples.dtype == np.float32
+    assert samples.flags.c_contiguous
+    assert np.allclose(samples, 0.0, atol=1e-6)
+
+
+def test_websocket_audio_inference_uses_float32_samples_directly(monkeypatch) -> None:
+    """测试 WebSocket ASR 不再把 PCM16 转回 float32。"""
+    runtime = SherpaASRRuntime.__new__(SherpaASRRuntime)
+    runtime.use_websocket = True
+    runtime.sample_rate = 16000
+    runtime.channels = 1
+    samples = np.linspace(-0.5, 0.5, 160, dtype=np.float32)
+    received_samples = []
+
+    def recognize_samples(self, data) -> str:
+        received_samples.append(data)
+        return " direct "
+
+    monkeypatch.setattr(
+        SherpaASRRuntime,
+        "_SherpaASRRuntime__recognize_ws_samples",
+        recognize_samples,
+    )
+
+    result = runtime.asr_infer_audio(samples, b"unused-pcm16")
+
+    assert result == "direct"
+    assert received_samples == [samples]
+
+
+def test_http_audio_inference_reuses_pcm16_bytes(monkeypatch) -> None:
+    """测试 HTTP ASR 继续复用已有 PCM16 数据。"""
+    runtime = SherpaASRRuntime.__new__(SherpaASRRuntime)
+    runtime.use_websocket = False
+    runtime.sample_rate = 16000
+    runtime.channels = 1
+    pcm16_bytes = b"\x01\x00\x02\x00"
+    received_pcm16 = []
+
+    def recognize_pcm16(self, data, sample_rate, channels) -> str:
+        received_pcm16.append((data, sample_rate, channels))
+        return " http "
+
+    monkeypatch.setattr(
+        SherpaASRRuntime,
+        "_SherpaASRRuntime__recognize_http_pcm16_bytes",
+        recognize_pcm16,
+    )
+
+    result = runtime.asr_infer_audio(np.empty(0, dtype=np.float32), pcm16_bytes)
+
+    assert result == "http"
+    assert received_pcm16 == [(pcm16_bytes, 16000, 1)]
+
+
 class StubASRClient(ASRClient):
     """用 stub 组件替代真实 ASR 组件的可测试客户端。"""
 
@@ -117,10 +190,10 @@ def test_asr_client_initializes_queues_events_and_starts_backend() -> None:
     client = StubASRClient(asr_server_type="asr_local")
 
     assert client.asr_server_type == "asr_local"
-    assert isinstance(client.audio_frames_queue, queue.Queue)
-    assert client.audio_frames_queue.maxsize == 10
-    assert isinstance(client.asr_voice_result_queue, queue.Queue)
-    assert client.asr_voice_result_queue.maxsize == 10
+    assert isinstance(client.audio_data_queue, queue.Queue)
+    assert client.audio_data_queue.maxsize == 10
+    assert isinstance(client.result_data_queue, queue.Queue)
+    assert client.result_data_queue.maxsize == 10
     assert isinstance(client.stop_event, threading.Event)
     assert isinstance(client.interrupt_event, threading.Event)
     assert client.vision_id is None
@@ -139,8 +212,8 @@ def test_create_backend_context_shares_client_state() -> None:
     context = client.create_backend_context()
 
     assert isinstance(context, ASRBackendContext)
-    assert context.audio_frames_queue is client.audio_frames_queue
-    assert context.asr_voice_result_queue is client.asr_voice_result_queue
+    assert context.audio_data_queue is client.audio_data_queue
+    assert context.result_data_queue is client.result_data_queue
     assert context.stop_event is client.stop_event
     assert context.interrupt_event is client.interrupt_event
     assert context.vision_id == "camera-1"
@@ -210,12 +283,12 @@ def test_reset_from_config_stops_and_reinitializes_client() -> None:
     """测试 reset_from_config 会停止旧后端并按新配置重建实例。"""
     client = StubASRClient(asr_server_type="old_asr")
     old_backend = client.asr_backend
-    old_audio_queue = client.audio_frames_queue
+    old_audio_queue = client.audio_data_queue
 
     client.reset_from_config({"asr_server_type": "new_asr"})
 
     assert old_backend.stop_calls == 1
     assert client.asr_server_type == "new_asr"
     assert client.asr_backend is not old_backend
-    assert client.audio_frames_queue is not old_audio_queue
+    assert client.audio_data_queue is not old_audio_queue
     assert client.asr_backend.start_calls == 1

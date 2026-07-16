@@ -1,5 +1,7 @@
 from typing import Protocol
 
+import numpy as np
+
 
 class ASRRuntimeProtocol(Protocol):
     """ASR 后端运行时 Protocol，定义了后端运行时需要实现的接口方法。"""
@@ -37,6 +39,10 @@ class ASRRuntimeProtocol(Protocol):
         Returns:
             str: 识别结果文本。
         """
+        ...
+
+    def asr_infer_samples(self, samples: np.ndarray) -> str:
+        """执行 ASR 推理，输入归一化 float32 音频数组。"""
         ...
 
     def normalize_audio_frames(self, audio_frames) -> bytes:

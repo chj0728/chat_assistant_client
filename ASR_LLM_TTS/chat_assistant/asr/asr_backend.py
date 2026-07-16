@@ -6,11 +6,11 @@ import socket
 import threading
 import time
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Awaitable, Optional
 
 from logger import logger
 
-from .asr_backend_context import ASRBackendContext
+from .asr_backend_context import ASRAudioData, ASRBackendContext
 from .runtimes.protocol import ASRRuntimeProtocol
 from .stream.protocol import InputStreamProtocol
 
@@ -23,7 +23,7 @@ from config import get_vad_no_speech_threshold
 
 TAIL_SILENCE_MS = int(get_vad_no_speech_threshold() * 1000)
 
-# 外部 ASR 文本推送服务：每行一个 UTF-8 JSON，例如 {"text": "..."}\n
+# 外部 ASR 文本推送服务：每行一个 UTF-8 JSON，例如 {"text": "..."}
 EXTERNAL_ASR_TEXT_HOST = os.environ.get("EXTERNAL_ASR_TEXT_HOST", "192.168.10.101")
 EXTERNAL_ASR_TEXT_PORT = int(os.environ.get("EXTERNAL_ASR_TEXT_PORT", "9103"))
 EXTERNAL_ASR_RECONNECT_SECONDS = float(
@@ -49,10 +49,7 @@ class ASRBackendBase(ABC):
 
 
 class ASRBackend(ASRBackendBase):
-    """ASR 后端实现类\n
-    - 后台线程持续监听音频输入队列，触发 ASR 推理请求。
-    - 提供对外的控制接口。
-    """
+    """管理 ASR 运行时、音频输入、声纹识别和后台工作线程。"""
 
     def __init__(
         self,
@@ -61,70 +58,58 @@ class ASRBackend(ASRBackendBase):
         asr_input_stream: InputStreamProtocol,
         **kwargs,
     ) -> None:
-        self.kwargs = kwargs
-
         self.asr_backend_context = asr_backend_context
         self.asr_runtime = asr_runtime
         self.asr_input_stream = asr_input_stream
         self.asr_worker_thread: Optional[threading.Thread] = None
 
-        #################### 外部 ASR 文本服务订阅相关配置 ####################
         self.enable_external_asr: bool = kwargs.get("enable_external_asr", False)
         self.external_asr_text_worker_thread: Optional[threading.Thread] = None
         self._external_asr_socket: Optional[socket.socket] = None
         self._external_asr_socket_lock = threading.Lock()
-        self.EXTERNAL_ASR_TEXT_HOST = kwargs.get(
+        self.external_asr_text_host = kwargs.get(
             "EXTERNAL_ASR_TEXT_HOST", EXTERNAL_ASR_TEXT_HOST
         )
-        self.EXTERNAL_ASR_TEXT_PORT = kwargs.get(
+        self.external_asr_text_port = kwargs.get(
             "EXTERNAL_ASR_TEXT_PORT", EXTERNAL_ASR_TEXT_PORT
         )
-        self.EXTERNAL_ASR_RECONNECT_SECONDS = kwargs.get(
+        self.external_asr_reconnect_seconds = kwargs.get(
             "EXTERNAL_ASR_RECONNECT_SECONDS", EXTERNAL_ASR_RECONNECT_SECONDS
         )
-        self.EXTERNAL_ASR_SOCKET_TIMEOUT_SECONDS = kwargs.get(
+        self.external_asr_socket_timeout_seconds = kwargs.get(
             "EXTERNAL_ASR_SOCKET_TIMEOUT_SECONDS", EXTERNAL_ASR_SOCKET_TIMEOUT_SECONDS
         )
-        ###################################################################
 
-        ########################## 声纹识别器初始化 #########################
         if VoiceRecognizer is not None:
             self.voice_recognizer = VoiceRecognizer(
                 low_thresh=0.60, high_thresh=0.67, max_prints_per_id=1
             )
         else:
             self.voice_recognizer = None
-        ##################################################################
 
     def asr_worker_loop(self) -> None:
         """ASR 后端工作线程主循环，持续监听音频输入队列，触发 ASR 推理请求。"""
 
         while not self.asr_backend_context.stop_event.is_set():
             try:
-                # 从 ASRBackendContext 的音频输入队列中获取音频数据，等待超时时间为 0.1 秒
-                audio_frames, audio_saved_path = (
+                audio_data, audio_saved_path = (
                     self.asr_backend_context.audio_data_queue.get(timeout=0.1)
                 )
-                pcm16_bytes = self.asr_runtime.normalize_audio_frames(audio_frames)
-
             except queue.Empty:
                 continue
 
             start_time = time.time()
             try:
                 asr_text, voice_id = asyncio.run(
-                    self.async_asr_voice_recognize_pcm16_bytes(pcm16_bytes)
+                    self.async_asr_voice_recognize_audio(audio_data)
                 )
-                # self.asr_backend_context.asr_text_queue.put(asr_text)
-                # self.asr_backend_context.asr_voice_result_queue.put(
-                #     (asr_text, voice_id)
-                # )
                 self.asr_backend_context.result_data_queue.put(
                     (asr_text, voice_id, audio_saved_path)
                 )
-            except Exception as e:
+            except Exception as exc:
                 logger.error(
-                    f"[vision_id: {self.asr_backend_context.vision_id}] [ASR + Voice] 推理失败: {e}"
+                    f"[vision_id: {self.asr_backend_context.vision_id}] "
+                    f"[ASR + Voice] 推理失败: {exc}"
                 )
             finally:
                 elapsed_time = time.time() - start_time
@@ -134,29 +119,29 @@ class ASRBackend(ASRBackendBase):
 
     def external_asr_text_worker_loop(self) -> None:
         """订阅外部 ASR 文本服务，将每条 text 写入统一的 ASR 结果队列。"""
-        reconnect_delay = self.EXTERNAL_ASR_RECONNECT_SECONDS
+        reconnect_delay = self.external_asr_reconnect_seconds
 
         while not self.asr_backend_context.stop_event.is_set():
             sock: Optional[socket.socket] = None
             try:
                 logger.info(
                     f"[External ASR] 正在连接 "
-                    f"{self.EXTERNAL_ASR_TEXT_HOST}:{self.EXTERNAL_ASR_TEXT_PORT}"
+                    f"{self.external_asr_text_host}:{self.external_asr_text_port}"
                 )
                 sock = socket.create_connection(
-                    (self.EXTERNAL_ASR_TEXT_HOST, self.EXTERNAL_ASR_TEXT_PORT),
-                    timeout=self.EXTERNAL_ASR_SOCKET_TIMEOUT_SECONDS,
+                    (self.external_asr_text_host, self.external_asr_text_port),
+                    timeout=self.external_asr_socket_timeout_seconds,
                 )
-                sock.settimeout(self.EXTERNAL_ASR_SOCKET_TIMEOUT_SECONDS)
+                sock.settimeout(self.external_asr_socket_timeout_seconds)
 
                 with self._external_asr_socket_lock:
                     self._external_asr_socket = sock
 
-                reconnect_delay = self.EXTERNAL_ASR_RECONNECT_SECONDS
+                reconnect_delay = self.external_asr_reconnect_seconds
                 recv_buffer = b""
                 logger.info(
                     f"[External ASR] 已连接 "
-                    f"{self.EXTERNAL_ASR_TEXT_HOST}:{self.EXTERNAL_ASR_TEXT_PORT}"
+                    f"{self.external_asr_text_host}:{self.external_asr_text_port}"
                 )
 
                 while not self.asr_backend_context.stop_event.is_set():
@@ -194,12 +179,7 @@ class ASRBackend(ASRBackendBase):
                         if not text:
                             continue
 
-                        # 复用既有队列格式：(asr_text, voice_id)。
-                        # 外部服务未提供声纹结果，故 voice_id 为 None。
-                        # self.asr_backend_context.asr_voice_result_queue.put(
-                        #     (text, None)
-                        # )
-                        # 将识别结果放入 result_data_queue，audio_saved_path 为 None
+                        # 外部服务不提供声纹和音频路径，统一以 None 入队。
                         self.asr_backend_context.result_data_queue.put(
                             (text, None, None)
                         )
@@ -296,7 +276,6 @@ class ASRBackend(ASRBackendBase):
     def update_vision_id(self, vision_id: str | None) -> None:
         """更新当前视觉ID，供ASR后端使用。"""
         self.asr_backend_context.vision_id = vision_id
-        # logger.info(f"ASR 后端视觉ID已更新: {self.asr_backend_context.vision_id}")
 
     def recognize(self, wav_path: str) -> str:
         """识别指定 WAV 文件，返回识别结果文本。"""
@@ -320,27 +299,52 @@ class ASRBackend(ASRBackendBase):
             self.asr_runtime.asr_infer_pcm16_bytes, pcm16_bytes
         )
 
+    async def async_recognize_audio(self, audio_data: ASRAudioData) -> str:
+        """直接使用采集阶段保留的 float32 音频执行识别。"""
+        return await asyncio.to_thread(
+            self.asr_runtime.asr_infer_samples,
+            audio_data.samples,
+        )
+
+    async def _recognize_with_voice(
+        self, asr_result: Awaitable[str], pcm16_bytes: bytes
+    ) -> tuple[str, Optional[str]]:
+        """并行执行 ASR 与可选声纹识别，并统一整理声纹结果。"""
+        logger.debug(
+            f"基于 vision_id:[ {self.asr_backend_context.vision_id} ] "
+            "的 ASR + Voice 识别正在进行中..."
+        )
+        voice_result = (
+            self.voice_recognizer.recognize_async(
+                pcm16_bytes,
+                user_id=self.asr_backend_context.vision_id,
+                tail_silence_ms=TAIL_SILENCE_MS,
+            )
+            if self.voice_recognizer is not None
+            else asyncio.sleep(0, result=None)
+        )
+        asr_text, voice_matches = await asyncio.gather(asr_result, voice_result)
+        voice_id = voice_matches[0] if voice_matches else None
+        return asr_text, voice_id
+
+    async def async_asr_voice_recognize_audio(
+        self, audio_data: ASRAudioData
+    ) -> tuple[str, Optional[str]]:
+        """并行执行 ASR 与声纹识别，分别复用其所需的音频格式。"""
+        return await self._recognize_with_voice(
+            self.async_recognize_audio(audio_data),
+            audio_data.pcm16_bytes,
+        )
+
     async def async_asr_voice_recognize_pcm16_bytes(
         self, pcm16_bytes: bytes
     ) -> tuple[str, Optional[str]]:
-        """异步识别指定 PCM16 bytes 音频数据，返回识别结果文本和声纹结果。"""
-        logger.debug(
-            f"基于 vision_id:[ {self.asr_backend_context.vision_id} ] 的 ASR + Voice 识别正在进行中..."
-        )
-        asr_text, vr_results = await asyncio.gather(
+        """兼容 PCM16 调用，并行返回 ASR 文本和声纹结果。"""
+        return await self._recognize_with_voice(
             self.async_recognize_pcm16_bytes(pcm16_bytes),
-            (
-                self.voice_recognizer.recognize_async(
-                    pcm16_bytes,
-                    user_id=self.asr_backend_context.vision_id,
-                    tail_silence_ms=TAIL_SILENCE_MS,
-                )
-                if self.voice_recognizer is not None
-                else asyncio.sleep(0, result=None)
-            ),
+            pcm16_bytes,
         )
-        voice_id = vr_results[0] if vr_results else None
-        return asr_text, voice_id
 
     def save_tmp_wav(self) -> bool:
+        """委托输入流保存最近一次识别音频。"""
         return self.asr_input_stream.save_tmp_wav()
