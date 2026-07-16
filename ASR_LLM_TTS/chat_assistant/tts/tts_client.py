@@ -22,19 +22,17 @@ LOCAL_AUDIO_STOP_WAIT_SEC = 0.1
 
 
 class TTSClientBase:
+    """组装 TTS runtime、输出流和后台 worker，并维护共享运行状态。"""
+
     def __init__(self, **kwargs) -> None:
-
         self.sound = None
-
         self.on_init(**kwargs)
-
         self.start()
 
     def on_init(self, **kwargs) -> None:
-
+        """初始化配置、队列和共享上下文，并按依赖顺序创建组件。"""
         self._init_kwargs = kwargs
 
-        # self.tts_server_type = kwargs.get("tts_server_type", "tts_local")
         self.primary_factory = kwargs.get("primary_factory", "qwen3_tts")
         self.fallback_factory = kwargs.get("fallback_factory", "sherpa_onnx_tts")
         self.timeout_sec = kwargs.get("timeout_sec", 10.0)
@@ -50,30 +48,30 @@ class TTSClientBase:
         self.interrupt_event = threading.Event()
         self.output_stream_started = False
 
+        # 所有组件共享同一个 context，确保队列和中断状态只有一个来源。
+        self.backend_context = self.create_backend_context()
         self.output_stream = self.create_output_stream()
         self.tts_runtime = self.create_tts_runtime()
         self.tts_backend = self.create_tts_backend()
 
     def start(self) -> None:
-        """启动ASR客户端，初始化相关资源。"""
+        """启动 TTS worker、runtime 和输出流。"""
         self.tts_backend.on_start()
         self.output_stream_started = True
 
     def stop(self) -> None:
-        """停止ASR客户端，释放相关资源。"""
+        """停止 TTS 组件并释放输出资源。"""
         self.tts_backend.on_stop()
         self.output_stream_started = False
 
     def get_playback_config_value(self, server_type: str, key: str, default):
+        """优先读取指定 TTS 工厂的播放配置，再回退到全局配置。"""
         return self._init_kwargs.get(server_type, {}).get(
             key, self._init_kwargs.get(key, default)
         )
 
-    def create_backend_context(
-        self, server_type: str | None = None
-    ) -> TTSBackendContext:
-        # active_server_type = server_type or self.tts_server_type
-
+    def create_backend_context(self) -> TTSBackendContext:
+        """创建引用当前队列和事件的共享后端上下文。"""
         return TTSBackendContext(
             timeout=self.timeout_sec,
             text_queue=self.text_queue,
@@ -83,6 +81,7 @@ class TTSClientBase:
         )
 
     def create_output_stream(self, server_type: str | None = None) -> MyOutputStream:
+        """按指定工厂的音频格式创建输出流，并复用共享上下文。"""
         active_server_type = server_type or self.primary_factory
         sample_rate = self.get_playback_config_value(
             active_server_type, "sample_rate", 16000
@@ -104,7 +103,7 @@ class TTSClientBase:
         )
 
         return MyOutputStream(
-            context=self.create_backend_context(),
+            context=self.backend_context,
             sample_rate=sample_rate,
             channels=channels,
             buffer_size=buffer_size,
@@ -115,32 +114,11 @@ class TTSClientBase:
         )
 
     def create_tts_runtime(self) -> TTSRuntimeProtocol:
-
-        # if self.tts_server_type == "qwen3_tts":
-        #     from .runtimes.fallback import FallbackTTSRuntime
-
-        #     return FallbackTTSRuntime(
-        #         context=self.create_backend_context(),
-        #         primary_factory=lambda: self.create_qwen_tts_runtime(),
-        #         fallback_factory=lambda: self.create_sherpa_tts_runtime(),
-        #         fallback_switch_callback=lambda: self.switch_output_stream(
-        #             "sherpa_onnx_tts"
-        #         ),
-        #         primary_name="远端 Qwen TTS",
-        #         fallback_name="本地 Sherpa TTS",
-        #     )
-        # elif self.tts_server_type == "sherpa_onnx_tts":
-        #     return self.create_sherpa_tts_runtime()
-        # elif self.tts_server_type == "voxcpm_cpp_tts":
-        #     return self.create_voxcpm_cpp_tts_runtime()
-
-        # else:
-        #     raise ValueError(f"未知的 TTS 服务器类型: {self.tts_server_type}")
-
+        """创建带故障切换能力的 TTS runtime。"""
         from .runtimes.fallback import FallbackTTSRuntime
 
         return FallbackTTSRuntime(
-            context=self.create_backend_context(),
+            context=self.backend_context,
             primary_factory=lambda: self.create_factory_runtime(self.primary_factory),
             fallback_factory=lambda: self.create_factory_runtime(self.fallback_factory),
             fallback_switch_callback=lambda: self.switch_output_stream(
@@ -151,27 +129,27 @@ class TTSClientBase:
         )
 
     def create_factory_runtime(self, factory_name: str) -> TTSRuntimeProtocol:
+        """按工厂名称按需创建具体 runtime。"""
         if factory_name == "qwen3_tts":
             return self.create_qwen_tts_runtime()
-        elif factory_name == "sherpa_onnx_tts":
+        if factory_name == "sherpa_onnx_tts":
             return self.create_sherpa_tts_runtime()
-        elif factory_name == "voxcpm_cpp_tts":
+        if factory_name == "voxcpm_cpp_tts":
             return self.create_voxcpm_cpp_tts_runtime()
-        else:
-            raise ValueError(f"未知的 TTS 工厂名称: {factory_name}")
+        raise ValueError(f"未知的 TTS 工厂名称: {factory_name}")
 
     def create_qwen_tts_runtime(self) -> TTSRuntimeProtocol:
         from .runtimes.qwen_tts import QwenTTSRuntime
 
         return QwenTTSRuntime(
-            self.create_backend_context(), **self._init_kwargs.get("qwen3_tts", {})
+            self.backend_context, **self._init_kwargs.get("qwen3_tts", {})
         )
 
     def create_sherpa_tts_runtime(self) -> TTSRuntimeProtocol:
         from .runtimes.sherpa_onnx_tts import SherpaTTSRuntime
 
         return SherpaTTSRuntime(
-            self.create_backend_context(),
+            self.backend_context,
             **self._init_kwargs.get("sherpa_onnx_tts", {}),
         )
 
@@ -179,11 +157,12 @@ class TTSClientBase:
         from .runtimes.voxcpm_cpp_tts import VoxCPMCppTTSRuntime
 
         return VoxCPMCppTTSRuntime(
-            self.create_backend_context(),
+            self.backend_context,
             **self._init_kwargs.get("voxcpm_cpp_tts", {}),
         )
 
     def switch_output_stream(self, server_type: str) -> None:
+        """切换备用 runtime 时同步替换匹配音频格式的输出流。"""
         logger.info("正在切换 TTS 输出流格式: %s", server_type)
         old_output_stream = self.output_stream
 
@@ -193,13 +172,13 @@ class TTSClientBase:
 
         try:
             old_output_stream.stop()
-        except Exception as e:
-            logger.warning("停止旧 TTS 输出流失败: %s", e)
+        except Exception as exc:
+            logger.warning("停止旧 TTS 输出流失败: %s", exc)
 
         try:
             old_output_stream.close()
-        except Exception as e:
-            logger.warning("关闭旧 TTS 输出流失败: %s", e)
+        except Exception as exc:
+            logger.warning("关闭旧 TTS 输出流失败: %s", exc)
 
         self.output_stream = self.create_output_stream(server_type)
 
@@ -210,9 +189,9 @@ class TTSClientBase:
             self.output_stream.start()
 
     def create_tts_backend(self) -> MyTTSBackend:
-
+        """使用已创建的 runtime、输出流和共享上下文组装后端。"""
         return MyTTSBackend(
-            tts_backend_context=self.create_backend_context(),
+            tts_backend_context=self.backend_context,
             tts_runtime=self.tts_runtime,
             output_stream=self.output_stream,
             worker_thread_name="tts-loop-worker",
@@ -222,21 +201,19 @@ class TTSClientBase:
 
     @staticmethod
     def _drain_queue(target_queue: queue.Queue) -> None:
-        """清空指定的队列，丢弃其中的所有元素，确保队列在中断或停止播放时被正确清理。"""
+        """非阻塞地清空指定队列。"""
         while not target_queue.empty():
             try:
                 target_queue.get_nowait()
             except queue.Empty:
                 break
 
-    ################ 对外接口 #####################
-
     def generate_wav(self, text: str, filename: str) -> bool:
         """生成 WAV 文件，适用于需要将合成的音频保存为本地文件的场景。"""
         return self.tts_backend.generate_wav(text, filename)
 
-    def speak(self, text, interrupt=True):
-        """请求 TTS 播放指定的文本内容，如果 interrupt 参数为 True，则在请求播放前会先中断当前的播放状态，确保新的文本能够立即被播放而不会与之前的播放内容产生冲突或叠加。"""
+    def speak(self, text: str, interrupt: bool = True) -> None:
+        """提交合成文本；默认先中断当前任务以便立即播放新内容。"""
         normalized_text = text.strip()
         if not normalized_text:
             return
@@ -249,12 +226,8 @@ class TTSClientBase:
 
         self.text_queue.put(normalized_text)
 
-    def interrupt(self):
-        """
-        1. 停止本地音频文件播放
-        2. 清空文本和音频队列，确保没有残留的待播放内容
-        3. 调用 TTS 后端的中断方法
-        """
+    def interrupt(self) -> None:
+        """停止本地播放、清空待处理队列并中断 runtime 和输出流。"""
         self.interrupt_event.set()
 
         self.stop_local_audio_playback()
@@ -267,13 +240,7 @@ class TTSClientBase:
         self.tts_backend.interrupt()
 
     def is_active(self) -> bool:
-        """根据以下条件判断 TTS 客户端是否处于活跃状态：
-        1. TTS 后端是否处于活跃状态
-        2. 当前是否有本地音频正在播放
-        3. 文本队列是否为空
-        4. 音频队列是否为空 \n
-        如果任一条件为 True，则认为 TTS 客户端处于活跃状态
-        """
+        """返回后端、本地播放或待处理队列是否仍处于活跃状态。"""
         return (
             self.output_stream_active()
             or (self.sound is not None and self.sound.is_alive())
@@ -285,18 +252,18 @@ class TTSClientBase:
         """判断输出流是否处于活跃状态。"""
         return self.tts_backend.is_active()
 
-    def play_audio(self, file_path, block=False):
-        """播放指定路径的本地音频文件，适用于需要播放预先合成的音频文件的场景。"""
+    def play_audio(self, file_path: str, block: bool = False) -> None:
+        """使用本地播放器播放指定音频文件。"""
         try:
             if playsound is None:
                 raise RuntimeError("playsound3 未安装，无法播放本地音频")
 
             self.stop_local_audio_playback()
             self.sound = playsound(file_path, block=block)
-        except Exception as e:
-            logger.error(f"播放{file_path}失败: {e}")
+        except Exception as exc:
+            logger.error(f"播放{file_path}失败: {exc}")
 
-    def play_audio_from_pcm(self, pcm_bytes):
+    def play_audio_from_pcm(self, pcm_bytes: bytes) -> None:
         """从 PCM 字节数据临时生成 WAV 文件并播放。"""
         with wave.open("temp.wav", "wb") as wf:
             wf.setnchannels(1)
@@ -306,18 +273,18 @@ class TTSClientBase:
         self.play_audio("temp.wav")
 
     def stop_local_audio_playback(self) -> None:
-        """停止当前正在播放的本地音频，如果有的话，并等待一段时间以确保音频播放已经完全停止，避免与后续的 TTS 音频播放产生冲突或叠加。"""
+        """停止本地文件播放，并短暂等待播放器完成清理。"""
         if self.sound is not None and self.sound.is_alive():
             logger.info("正在停止当前播放的音频...")
             self.sound.stop()
             time.sleep(LOCAL_AUDIO_STOP_WAIT_SEC)
 
-    def get_playback_start_delay_sec(self):
+    def get_playback_start_delay_sec(self) -> float:
         """获取播放开始的延迟时间。"""
         return self.playback_start_delay_sec
 
     def wait_until_playback_starts(self, timeout_sec: float = 5.0) -> bool:
-        """等待output_stream进入播放状态，返回是否成功进入播放状态，适用于需要确认音频已经开始播放的场景。"""
+        """等待输出流进入播放状态。"""
         return self.tts_backend.wait_until_playback_starts(timeout_sec=timeout_sec)
 
 
@@ -327,7 +294,7 @@ class TTSClient(TTSClientBase):
 
     @staticmethod
     def build_init_kwargs_from_config(config: dict) -> dict:
-        # tts_kwargs = config.get("TTS", {})
+        """将 TTS 配置转换为构造参数。"""
         return config
 
     @classmethod
@@ -336,9 +303,8 @@ class TTSClient(TTSClientBase):
         return cls(**init_kwargs)
 
     def reset_from_config(self, config: dict) -> None:
-
+        """停止当前组件，并使用新配置完整重建客户端。"""
         self.stop()
-
         init_kwargs = self.build_init_kwargs_from_config(config)
         self.__init__(**init_kwargs)
 

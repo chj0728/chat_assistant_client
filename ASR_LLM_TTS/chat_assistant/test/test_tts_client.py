@@ -24,7 +24,8 @@ class DummySound:
 class StubOutputStream:
     """记录输出流生命周期调用。"""
 
-    def __init__(self) -> None:
+    def __init__(self, context: TTSBackendContext | None = None) -> None:
+        self.context = context
         self.start_calls = 0
         self.stop_calls = 0
         self.close_calls = 0
@@ -55,7 +56,8 @@ class StubOutputStream:
 class StubRuntime:
     """记录 TTS runtime 调用，避免测试中访问真实服务。"""
 
-    def __init__(self) -> None:
+    def __init__(self, context: TTSBackendContext | None = None) -> None:
+        self.context = context
         self.start_calls = 0
         self.stop_calls = 0
         self.generate_wav_calls: list[tuple[str, str]] = []
@@ -77,7 +79,13 @@ class StubRuntime:
 class StubBackend:
     """记录 TTS backend 入口调用，便于断言客户端转发行为。"""
 
-    def __init__(self, output_stream: StubOutputStream, runtime: StubRuntime) -> None:
+    def __init__(
+        self,
+        output_stream: StubOutputStream,
+        runtime: StubRuntime,
+        context: TTSBackendContext | None = None,
+    ) -> None:
+        self.context = context
         self.output_stream = output_stream
         self.runtime = runtime
         self.start_calls = 0
@@ -120,17 +128,21 @@ class StubTTSClient(TTSClient):
 
     def create_output_stream(self, server_type: str | None = None) -> StubOutputStream:
         self.created_output_stream_server_types.append(server_type)
-        stream = StubOutputStream()
+        stream = StubOutputStream(self.backend_context)
         self.created_output_streams.append(stream)
         return stream
 
     def create_tts_runtime(self) -> StubRuntime:
-        runtime = StubRuntime()
+        runtime = StubRuntime(self.backend_context)
         self.created_runtimes.append(runtime)
         return runtime
 
     def create_tts_backend(self) -> StubBackend:
-        backend = StubBackend(self.output_stream, self.tts_runtime)
+        backend = StubBackend(
+            self.output_stream,
+            self.tts_runtime,
+            self.backend_context,
+        )
         self.created_backends.append(backend)
         return backend
 
@@ -156,6 +168,19 @@ def test_tts_client_initializes_queues_events_components_and_starts_backend() ->
     assert client.tts_backend.start_calls == 1
 
 
+def test_tts_components_share_single_backend_context() -> None:
+    """测试 output、runtime 和 backend 始终共享同一个上下文对象。"""
+    client = StubTTSClient()
+
+    assert client.output_stream.context is client.backend_context
+    assert client.tts_runtime.context is client.backend_context
+    assert client.tts_backend.context is client.backend_context
+    assert client.backend_context.text_queue is client.text_queue
+    assert client.backend_context.audio_queue is client.audio_queue
+    assert client.backend_context.stop_event is client.stop_event
+    assert client.backend_context.interrupt_event is client.interrupt_event
+
+
 def test_create_backend_context_shares_client_state() -> None:
     """测试后端上下文复用客户端队列和事件。"""
     client = StubTTSClient(timeout_sec=8.0)
@@ -168,6 +193,17 @@ def test_create_backend_context_shares_client_state() -> None:
     assert context.audio_queue is client.audio_queue
     assert context.stop_event is client.stop_event
     assert context.interrupt_event is client.interrupt_event
+
+
+def test_backend_context_defaults_are_not_shared() -> None:
+    """测试独立创建的 context 不会共享默认队列和事件。"""
+    first = TTSBackendContext()
+    second = TTSBackendContext()
+
+    assert first.text_queue is not second.text_queue
+    assert first.audio_queue is not second.audio_queue
+    assert first.stop_event is not second.stop_event
+    assert first.interrupt_event is not second.interrupt_event
 
 
 def test_get_playback_config_value_prefers_server_specific_value() -> None:
@@ -301,6 +337,7 @@ def test_switch_output_stream_replaces_stream_and_updates_backend() -> None:
     assert old_stream.close_calls == 1
     assert client.output_stream is not old_stream
     assert client.tts_backend.output_stream is client.output_stream
+    assert client.output_stream.context is client.backend_context
     assert client.output_stream.start_calls == 1
     assert client.created_output_stream_server_types[-1] == "sherpa_onnx_tts"
 

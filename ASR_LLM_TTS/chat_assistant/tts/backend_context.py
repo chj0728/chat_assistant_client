@@ -1,6 +1,6 @@
 import queue
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(slots=True)
@@ -16,7 +16,7 @@ class TTSBackendContext:
     """
 
     timeout: float = 10.0
-    text_queue: queue.Queue[str] = queue.Queue()
-    audio_queue: queue.Queue[bytes] = queue.Queue()
-    stop_event: threading.Event = threading.Event()
-    interrupt_event: threading.Event = threading.Event()
+    text_queue: queue.Queue[str] = field(default_factory=queue.Queue)
+    audio_queue: queue.Queue[bytes] = field(default_factory=queue.Queue)
+    stop_event: threading.Event = field(default_factory=threading.Event)
+    interrupt_event: threading.Event = field(default_factory=threading.Event)
