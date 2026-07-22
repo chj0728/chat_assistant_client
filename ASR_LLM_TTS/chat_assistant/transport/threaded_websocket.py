@@ -27,6 +27,7 @@ class ThreadedWebSocketClient:
         ping_interval: Optional[float] = None,
         ping_timeout: Optional[float] = None,
         startup_timeout: float = 5.0,
+        use_proxy: bool = False,
     ) -> None:
         """保存连接参数，但不立即创建线程或网络连接。"""
         self.url = url
@@ -34,6 +35,7 @@ class ThreadedWebSocketClient:
         self.ping_interval = ping_interval
         self.ping_timeout = ping_timeout
         self.startup_timeout = startup_timeout
+        self.use_proxy = use_proxy
 
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._thread: Optional[threading.Thread] = None
@@ -67,9 +69,7 @@ class ThreadedWebSocketClient:
         if not self._started.wait(timeout=self.startup_timeout):
             raise RuntimeError(f"{self.name} WebSocket 事件循环线程启动超时")
 
-    def run(
-        self, coroutine: Coroutine[Any, Any, T], timeout: Optional[float]
-    ) -> T:
+    def run(self, coroutine: Coroutine[Any, Any, T], timeout: Optional[float]) -> T:
         """在线程事件循环中执行协程，并将结果同步返回给调用方。"""
         loop = self._loop
         if loop is None or not loop.is_running():
@@ -102,6 +102,9 @@ class ThreadedWebSocketClient:
                 max_size=None,
                 ping_interval=self.ping_interval,
                 ping_timeout=self.ping_timeout,
+                proxy=(
+                    None if not self.use_proxy else True
+                ),  # 是否使用系统代理，None 表示不使用
             )
             logger.info("%s WebSocket 已连接: %s", self.name, self.url)
             return self._connection
@@ -152,9 +155,10 @@ class ThreadedWebSocketClient:
 
     def _is_connection_open(self) -> bool:
         """判断缓存的连接是否仍可复用。"""
-        return self._connection is not None and getattr(
-            self._connection, "close_code", None
-        ) is None
+        return (
+            self._connection is not None
+            and getattr(self._connection, "close_code", None) is None
+        )
 
     def _loop_worker(self) -> None:
         """创建并持续运行当前客户端专属的 asyncio 事件循环。"""

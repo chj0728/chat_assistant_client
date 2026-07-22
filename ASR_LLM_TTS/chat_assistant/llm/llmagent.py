@@ -42,6 +42,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from logger import logger
+from openai import DefaultAsyncHttpxClient, DefaultHttpxClient
 from pydantic import SecretStr
 
 from llm.custom_callback_handlers import get_callback_handlers
@@ -72,12 +73,20 @@ def GET_API_ENDPOINT_FROM_ENV():
     return os.getenv("API_ENDPOINT", "").strip()
 
 
-def GET_MODEL_ID_FROM_ENV():
+def GET_MODEL_ID_FROM_ENV() -> str | None:
     """从环境变量获取 MODEL_ID，并进行基本验证。"""
-    return os.getenv("MODEL_ID", "").strip()
+    value = os.getenv("MODEL_ID", "").strip()
+    return value if value else None
+
+
+def GET_DASHSCOPE_MODEL_ID_FROM_ENV() -> str | None:
+    """从环境变量获取 DASHSCOPE_MODEL_ID，并进行基本验证。"""
+    value = os.getenv("DASHSCOPE_MODEL_ID", "").strip()
+    return value if value else None
 
 
 DEFAULT_MODEL_ID = GET_MODEL_ID_FROM_ENV() or "qwen3.7-max"
+DEFAULT_DASHSCOPE_MODEL_ID = GET_DASHSCOPE_MODEL_ID_FROM_ENV()
 DEFAULT_DB_PATH = (
     Path(__file__).resolve().parent.parent / "db" / "agent_conversations.db"
 )
@@ -126,6 +135,7 @@ class LLMAgent:
         enable_rag=False,
         enable_cloud=False,
         enable_health_check=True,
+        use_proxy=False,
     ):
         """
         初始化 LLMAgent 实例。
@@ -143,6 +153,7 @@ class LLMAgent:
             extra_system_prompt (str | None): 额外的系统提示信息。用于初始化agent时构建的全局系统提示词。默认值为 None。
             enable_rag (bool): 是否启用 RAG 功能。默认值为 False。启用后会在 调用LLM回复前先进行检索增强。
             enable_cloud (bool): 是否启用云端 LLM 服务，启用后会使用云端 API 进行推理，确保.env 中的 EAS_TOKEN 和 EAS_ENDPOINT 已正确配置。默认值为 False。
+            use_proxy (bool): 是否读取 HTTP_PROXY/HTTPS_PROXY 等代理环境变量。默认值为 False。
         """
 
         self._apply_init_kwargs(
@@ -159,6 +170,7 @@ class LLMAgent:
             enable_rag=enable_rag,
             enable_cloud=enable_cloud,
             enable_health_check=enable_health_check,
+            use_proxy=use_proxy,
         )
         self._initialize_runtime_components()
 
@@ -189,6 +201,7 @@ class LLMAgent:
             "dynamic_middlewares": dynamic_middlewares,
             "enable_cloud": llm_cfg.get("enable_cloud", False),
             "enable_health_check": llm_cfg.get("enable_health_check", True),
+            "use_proxy": llm_cfg.get("use_proxy", False),
         }
 
     def _apply_init_kwargs(
@@ -207,6 +220,7 @@ class LLMAgent:
         enable_rag=False,
         enable_cloud=False,
         enable_health_check=True,
+        use_proxy=False,
     ) -> None:
         """将初始化参数写入实例状态。"""
 
@@ -225,8 +239,10 @@ class LLMAgent:
         self.enable_rag = enable_rag
         self.enable_cloud = enable_cloud
         self.enable_health_check = enable_health_check
+        self.use_proxy = use_proxy
         self.health_check_active = False
         self.health_check_thread = None
+        self._llm_requests_session: requests.Session | None = None
         self.interrupt_event = threading.Event()
 
         self.dynamic_middlewares = dynamic_middlewares if dynamic_middlewares else []
@@ -243,6 +259,9 @@ class LLMAgent:
 
     def _initialize_runtime_components(self) -> None:
         """初始化与运行时相关的模型、Agent 和 RAG 状态。"""
+
+        self._llm_requests_session = requests.Session()
+        self._llm_requests_session.trust_env = self.use_proxy
 
         # 初始化api_key, base_url等模型参数
         self._init_api_key_and_base_url()
@@ -382,16 +401,18 @@ class LLMAgent:
             return None
         return {"Authorization": f"Bearer {token}"}
 
+    def _get_llm_requests_session(self) -> requests.Session:
+        """返回按当前代理配置创建的 requests 会话。"""
+        session = self._llm_requests_session
+        if session is None:
+            raise RuntimeError("LLM HTTP 会话尚未初始化")
+        return session
+
     def _load_model_metadata(self) -> None:
         """拉取远端模型信息，失败时回退默认模型。"""
-        if self.enable_cloud:
-            self.model_id = DEFAULT_MODEL_ID
-            self.model_root = None
-            logger.info(f"云端 LLM 使用默认模型ID: {self.model_id}")
-            return
 
         try:
-            response = requests.get(
+            response = self._get_llm_requests_session().get(
                 self.llm_url,
                 timeout=self.timeout,
                 headers=self._build_cloud_auth_headers(),
@@ -402,11 +423,25 @@ class LLMAgent:
             if not model_list:
                 raise ValueError("模型列表为空或返回结构不符合预期")
 
-            first_model = model_list[0]
-            self.model_id = first_model["id"]
-            self.model_root = first_model.get("root")
-            logger.info(f"使用的模型ID: {self.model_id}")
-            logger.info(f"模型根目录: {self.model_root}")
+            # 如果 model_list 中包含多个模型，选择DEFAULT_DASHSCOPE_MODEL_ID
+            if len(model_list) > 1:
+                self.model_root = None
+                self.model_id = (
+                    DEFAULT_DASHSCOPE_MODEL_ID
+                    if DEFAULT_DASHSCOPE_MODEL_ID
+                    else model_list[0]["id"]
+                )
+                logger.info(
+                    f"远端模型列表数量: {len(model_list)}，使用模型ID: {self.model_id}"
+                )
+            else:
+                first_model = model_list[0]
+                self.model_id = first_model["id"]
+                self.model_root = first_model.get("root")
+
+                logger.info(f"模型根目录: {self.model_root}")
+                logger.info(f"远端模型ID: {self.model_id}")
+
         except Exception as e:
             logger.error(f"获取模型列表失败: {e}")
             self.model_id = DEFAULT_MODEL_ID
@@ -429,6 +464,9 @@ class LLMAgent:
         创建底层 ChatOpenAI 模型实例。
         refer from: https://reference.langchain.com/python/langchain-openai/chat_models/base/ChatOpenAI
         """
+        self._llm_http_client = DefaultHttpxClient(trust_env=self.use_proxy)
+        self._llm_http_async_client = DefaultAsyncHttpxClient(trust_env=self.use_proxy)
+
         return ChatOpenAI(
             model=self.model_id if self.model_id else DEFAULT_MODEL_ID,
             stream_usage=True,
@@ -438,6 +476,9 @@ class LLMAgent:
             api_key=self.api_key,
             base_url=self.base_url,
             max_retries=2,
+            http_client=self._llm_http_client,
+            http_async_client=self._llm_http_async_client,
+            http_socket_options=(),
             # 查看日志专用
             # callbacks=self.callback_handlers,
             # vLLM parameters
@@ -478,7 +519,7 @@ class LLMAgent:
 
             while self.health_check_active:
                 try:
-                    response = requests.get(
+                    response = self._get_llm_requests_session().get(
                         health_check_url, headers=headers, timeout=self.timeout
                     )
                     if response.status_code == 200:
@@ -489,7 +530,7 @@ class LLMAgent:
                         )
                 except Exception as e:
                     logger.error(f"LLM 服务健康检查异常: {e}")
-                time.sleep(5)  # 每5秒检查一次
+                time.sleep(10)  # 每10秒检查一次
 
         self.health_check_thread = threading.Thread(
             target=health_check_loop, name="llm-health-check", daemon=True
@@ -564,6 +605,11 @@ class LLMAgent:
         self._async_sqlite_conn = None
         if async_sqlite_conn is not None:
             await async_sqlite_conn.close()
+
+        llm_http_async_client = getattr(self, "_llm_http_async_client", None)
+        self._llm_http_async_client = None
+        if llm_http_async_client is not None:
+            await llm_http_async_client.aclose()
 
     def _use_direct_agent_path(self) -> bool:
         """测试替身或手工注入 agent 时，允许不经过后台 loop 直接调用。"""
@@ -659,24 +705,30 @@ class LLMAgent:
     def close(self):
         """停止后台事件循环线程并释放长期资源。"""
         background_lock = getattr(self, "_background_lock", None)
-        if background_lock is None:
-            return
+        if background_lock is not None:
+            with background_lock:
+                background_loop = getattr(self, "_background_loop", None)
+                background_thread = getattr(self, "_background_thread", None)
 
-        with background_lock:
-            background_loop = getattr(self, "_background_loop", None)
-            background_thread = getattr(self, "_background_thread", None)
-
-        if background_loop is None or background_thread is None:
-            return
-
-        background_loop.call_soon_threadsafe(background_loop.stop)
-        background_thread.join(timeout=5)
-        self._background_thread = None
+            if background_loop is not None and background_thread is not None:
+                background_loop.call_soon_threadsafe(background_loop.stop)
+                background_thread.join(timeout=5)
+                self._background_thread = None
 
         self.health_check_active = False
         if self.health_check_thread is not None:
             self.health_check_thread.join(timeout=5)
             self.health_check_thread = None
+
+        llm_http_client = getattr(self, "_llm_http_client", None)
+        self._llm_http_client = None
+        if llm_http_client is not None:
+            llm_http_client.close()
+
+        llm_requests_session = getattr(self, "_llm_requests_session", None)
+        self._llm_requests_session = None
+        if llm_requests_session is not None:
+            llm_requests_session.close()
 
         logger.info("LLM Agent已停止")
 
