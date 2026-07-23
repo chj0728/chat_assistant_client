@@ -30,26 +30,15 @@ langchain-openai
 langchain-text-splitters
 langgraph-checkpoint-sqlite
 
-# --- 向量库 ---
-faiss-cpu
-
-# --- 本地 Embedding / Rerank ---
-sentence-transformers
-
-# --- 文档解析 ---
-docx2txt
-pypdf
-
-# 声纹识别相关
-# torch 和 torchaudio 需要保持同一版本线，否则导入 torchaudio 原生扩展时会因依赖不匹配而失败。
-torch==2.10.0
-torchaudio==2.10.0
-modelscope>=1.30.0
-addict>=2.4.0
-simplejson>=4.0
-python-dateutil>=2.8.2
-six>=1.16.0
-sortedcontainers>=2.4.0
-
 # 阿里云百炼官方的 DashScope SDK
 dashscope
+
+# # --- 向量库 ---
+# faiss-cpu
+
+# # --- 本地 Embedding / Rerank ---
+# sentence-transformers
+
+# # --- 文档解析 ---
+# docx2txt
+# pypdf

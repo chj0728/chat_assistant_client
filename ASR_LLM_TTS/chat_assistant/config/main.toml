@@ -9,7 +9,7 @@ user_id_subscribe_topic = "user_id"             # 用户ID订阅话题
 user_id_stale_timeout_sec = 5                   # 用户ID过期时间，超过此时间未更新则认为用户离开，回退为 None (秒)
 enable_user_face_info = true                    # 是否启用用户人脸信息订阅功能，启用后会订阅 user_face_subscribe_topic 话题获取用户人脸状态
 user_face_subscribe_topic = "is_faced"          # 用户人脸信息订阅话题  
-user_face_stale_timeout_sec = 0.2               # 用户人脸信息过期时间，超过此时间未更新则认为用户离开，回退为 None (秒)
+user_face_stale_timeout_sec = 0.1               # 用户人脸信息过期时间，超过此时间未更新则认为用户离开，回退为 None (秒)
 
 ################## 上层交互逻辑 ###################
 asr_enable = true               # 交互逻辑中是否启用ASR模块，可通过ROS服务接口动态控制
@@ -55,8 +55,8 @@ output_dir = "audio"        # 音频文件保存目录
 mode = 2                    # 0：最宽松，允许更多非语音通过  1：平衡模式 2：较严格，减少非语音通过  3：最严格，过滤更多非语音   
 decibel_threshold = -40     # 分贝阈值，低于此值认为是静音 (dB)
 no_speech_duration = 0.8    # 静音持续多长时间后认为是语音结束 (秒)
-min_recording_duration = 0.4   # 最短录音时长 (秒)
-max_recording_duration = 8     # 最长录音时长 (秒)
+min_recording_duration = 0.2   # 最短录音时长 (秒)
+max_recording_duration = 10     # 最长录音时长 (秒)
 pre_recording_buffer_duration = 0.6  # 有效录音保存前，补到开头的历史缓冲时长 (秒)
 pause_duration = 2          # 距离上次录音片段保存结束时间后，允许再次保存音频 (秒)
 #####################################################
@@ -68,7 +68,7 @@ port = 8000                 # 局域网内 LLM 服务器端口
 timeout_sec = 10
 temperature = 0.6           # 生成文本的随机程度，范围0-1，值越大越随机
 max_tokens = 150            # 历史消息的最大 token 数量，配合 max_messages 控制上下文长度，根据实际情况调整
-max_messages = 5            # 历史消息的最大条数，配合 max_tokens 控制上下文长度，根据实际情况调整
+max_messages = 15            # 历史消息的最大条数，配合 max_tokens 控制上下文长度，根据实际情况调整
 max_completion_tokens = 100 # 只限制 生成内容（completion） 的 token 数量，不是输入（prompt）+输出（completion）的总token数，根据实际情况调整
 use_proxy = false           # 是否读取 HTTP_PROXY/HTTPS_PROXY 等环境变量；false 表示 LLM 请求强制直连
 enable_cloud = true         # 是否启用云端 LLM 服务，启用后会优先使用云端 LLM 服务，确保.env 中的 EAS_TOKEN 和 EAS_ENDPOINT 已正确配置。禁用后只使用局域网内 LLM 服务
@@ -121,7 +121,7 @@ default_system_prompt = """
 ###################### TTS 配置 ######################
 [TTS]
 primary_factory = "qwen3_tts"
-fallback_factory = "sherpa_onnx_tts"
+fallback_factory = "qwen3_tts"
 timeout_sec = 5
 # ----- 全局播放参数设置，会被各 TTS 服务的播放参数覆盖 -----
 sample_rate = 16000             # 采样率（Hz），需要与 TTS 服务器的输出采样率一致，确保音频播放正常
