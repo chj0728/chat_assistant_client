@@ -10,8 +10,15 @@ setup(
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
     ],
-    package_data={package_name: ["web/web_server.html", "web/web_server.js"]},
-    install_requires=["setuptools"],
+    package_data={
+        package_name: [
+            "web/web_server.html",
+            "web/web_server.js",
+            "config/*.toml",
+            "config/*.yaml",
+        ]
+    },
+    install_requires=["setuptools", 'tomli; python_version < "3.11"'],
     zip_safe=True,
     maintainer="xuyao",
     maintainer_email="997650637@qq.com",

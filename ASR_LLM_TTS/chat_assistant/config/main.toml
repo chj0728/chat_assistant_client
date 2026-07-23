@@ -1,0 +1,200 @@
+################ ROS 话题配置 ################
+[ros_cfg]
+asr_publish_topic = "asr_result"                # ASR 识别结果发布话题
+llm_publish_topic = "llm_result"                # LLM 识别结果发布话题
+response_publish_topic = "assistant_response"   # 综合响应结果话题,同时包含ASR,LLM结果
+resolved_user_name_topic = "resolved_user_name" # 解析后的用户名称话题
+tts_active_topic = "sound_detected_default"     # TTS 播放状态话题
+user_id_subscribe_topic = "user_id"             # 用户ID订阅话题
+user_id_stale_timeout_sec = 5                   # 用户ID过期时间，超过此时间未更新则认为用户离开，回退为 None (秒)
+enable_user_face_info = true                    # 是否启用用户人脸信息订阅功能，启用后会订阅 user_face_subscribe_topic 话题获取用户人脸状态
+user_face_subscribe_topic = "is_faced"          # 用户人脸信息订阅话题  
+user_face_stale_timeout_sec = 0.2               # 用户人脸信息过期时间，超过此时间未更新则认为用户离开，回退为 None (秒)
+
+################## 上层交互逻辑 ###################
+asr_enable = true               # 交互逻辑中是否启用ASR模块，可通过ROS服务接口动态控制
+llm_enable = true               # 交互逻辑中是否启用LLM模块
+llm_stream_infer_enable = true  # 交互逻辑中是否启用LLM流式推理模式
+tts_enable = false              # 交互逻辑中是否启用TTS模块
+enable_replace_special_characters = false # 是否启用特殊字符替换功能（将用户输入中的特殊字符替换为指定字符）
+enable_interrupt_tts = true               # 是否启用TTS中断功能（当用户说话时，TTS会被中断）
+enable_interrupt_by_asr_face = true       # 是否启用通过 ASR, 人脸信息打断(ASR 有效文本，启用了人脸信息订阅，且检测到人脸信息，打断 LLM，TTS 后台输出)
+##############################################
+
+##################### ASR 配置 ######################
+[ASR]
+asr_server_type = "asr_local" # 默认使用本地 ASR 服务器
+enable_external_asr = false # 是否启用外部 ASR 文本服务订阅功能，启用后会连接外部 ASR 文本服务获取识别结果，会强制关闭音频采集模块
+EXTERNAL_ASR_TEXT_HOST = "192.168.10.101"
+EXTERNAL_ASR_TEXT_PORT = 9103
+EXTERNAL_ASR_RECONNECT_SECONDS = 10
+EXTERNAL_ASR_SOCKET_TIMEOUT_SECONDS = 10
+
+[ASR.asr_local]
+host = "192.168.10.101"     # 本地 ASR 服务器地址，通常是 Jetson Orin 设备的 IP 地址             
+port = 6006
+use_websocket = true        # 是否使用 WebSocket 连接 ASR 服务器，确保服务器支持 WebSocket
+ws_path = "/ws/api/asr"
+timeout_sec = 5
+sample_rate = 16000
+channels = 1
+
+[ASR.Audio]
+enable = true               # 是否启用音频采集模块
+enable_enhancement = true   # 是否启用音频增强模块，启用后会对采集的音频进行降噪处理
+enhancement_model_path = "models/speech_enhancement/dpdfnet4.onnx"
+enhancement_provider = "cpu"  # 音频增强模型推理设备，支持 "cpu" 或 "cuda"，根据实际情况调整
+enhancement_num_threads = 2   # 音频增强模型推理线程数
+samplerate = 16000          # 采样率(Hz)
+channels = 1                # 单声道
+chunk_duration_ms = 20      # 每次读取的音频块持续时间（毫秒）10,20,30
+max_file_count = 20         # 最大保存音频文件数量，超过后循环覆盖
+
+[ASR.VAD]
+output_dir = "audio"        # 音频文件保存目录
+mode = 2                    # 0：最宽松，允许更多非语音通过  1：平衡模式 2：较严格，减少非语音通过  3：最严格，过滤更多非语音   
+decibel_threshold = -40     # 分贝阈值，低于此值认为是静音 (dB)
+no_speech_duration = 0.8    # 静音持续多长时间后认为是语音结束 (秒)
+min_recording_duration = 0.4   # 最短录音时长 (秒)
+max_recording_duration = 8     # 最长录音时长 (秒)
+pre_recording_buffer_duration = 0.6  # 有效录音保存前，补到开头的历史缓冲时长 (秒)
+pause_duration = 2          # 距离上次录音片段保存结束时间后，允许再次保存音频 (秒)
+#####################################################
+
+###################### LLM 配置 ######################
+[LLM]
+host = "192.168.50.125"     # 局域网内 LLM 服务器地址
+port = 8000                 # 局域网内 LLM 服务器端口
+timeout_sec = 10
+temperature = 0.6           # 生成文本的随机程度，范围0-1，值越大越随机
+max_tokens = 150            # 历史消息的最大 token 数量，配合 max_messages 控制上下文长度，根据实际情况调整
+max_messages = 5            # 历史消息的最大条数，配合 max_tokens 控制上下文长度，根据实际情况调整
+max_completion_tokens = 100 # 只限制 生成内容（completion） 的 token 数量，不是输入（prompt）+输出（completion）的总token数，根据实际情况调整
+use_proxy = false           # 是否读取 HTTP_PROXY/HTTPS_PROXY 等环境变量；false 表示 LLM 请求强制直连
+enable_cloud = true         # 是否启用云端 LLM 服务，启用后会优先使用云端 LLM 服务，确保.env 中的 EAS_TOKEN 和 EAS_ENDPOINT 已正确配置。禁用后只使用局域网内 LLM 服务
+enable_health_check = false # 是否启用 LLM 健康检查，启用后会定期检查 LLM 服务的健康状态
+enable_thinking = false     # 是否启用思考过程
+enable_rag = true           # 是否启用 RAG 功能，启用后会在 LLM 回复前先进行检索增强
+default_system_prompt = """
+你需要简洁且有礼貌地回答用户的问题，请保持回答简短且有条理。
+正文中请正常使用中文标点符号来表达停顿和语义边界，便于流式切分和语音合成。
+如果不确定精确答案，先回答已知的相关信息，再说明具体细节以官方配置表或门店信息为准；避免生硬输出“抱歉，我无法回答”。
+只有当用户回答退出、结束等相关内容时，调用结束对话的工具函数，礼貌地结束对话。
+同时你要根据根据用户的输入，判断用户想要进入哪个状态，并在回答开头附加状态标签，格式为：<INTENT>状态</INTENT>
+可用的状态及示例：
+- NEEDS_GUIDANCE：需要参观（例如：“参观一下”、“带我看看”、“带我逛逛”、“想看看”）
+- MOVE_TO_WAIT：退下/不用了（例如：“退一下”、“不用了”、“退下”、“回去吧”、“回去充电吧”）
+- WAIT_FOR_TALK：等待对话（默认状态，用于普通对话或不确定的情况）
+- INTERRUPT：中断对话（例如：“好了好了”、“我打断你一下”、“先停一下”）
+关于 <LOCATION> 标签的严格约束（必须遵守）：
+- <LOCATION> 标签的值只能填写【参观意向】区块中明确告知的预设地点标识，禁止自行从用户发言或对话历史中提取任意文字作为地点值
+- 若当次 Prompt 的【参观意向】区块未指明具体地点，则绝对禁止输出 <LOCATION> 标签
+示例：{
+      "instruction": "能带我去ls6展区看看吗？（系统已在【参观意向】区块中指明地点：ls6）",
+      "input": "",
+      "output": "<INTENT>NEEDS_GUIDANCE<LOCATION>ls6</LOCATION></INTENT>好的，请跟我这边走。",
+      "system": ""
+     },
+     {
+      "instruction": "能带我去参观一下么？（系统【参观意向】区块未指明具体地点）",
+      "input": "",
+      "output": "<INTENT>NEEDS_GUIDANCE</INTENT>好的，请问您想参观哪个展区呢？",
+      "system": ""
+     },
+     {
+      "instruction": "你能给我介绍一下智己ls6么？",
+      "input": "",
+      "output": "<INTENT>WAIT_FOR_TALK</INTENT>......",
+      "system": ""
+     },
+     {
+      "instruction": "你退下回去充电吧",
+      "input": "",
+      "output": "<INTENT>MOVE_TO_WAIT</INTENT>好的，我先退下了",
+      "system": ""
+     }
+如果不确定用户意图，则输出 WAIT_FOR_TALK 状态
+回答应简洁、可追溯，控制在100字以内，并严格以状态标签开头（标签前不要添加其他内容）
+"""
+#####################################################
+
+###################### TTS 配置 ######################
+[TTS]
+primary_factory = "qwen3_tts"
+fallback_factory = "sherpa_onnx_tts"
+timeout_sec = 5
+# ----- 全局播放参数设置，会被各 TTS 服务的播放参数覆盖 -----
+sample_rate = 16000             # 采样率（Hz），需要与 TTS 服务器的输出采样率一致，确保音频播放正常
+channels = 1                    # 单声道
+dtype = "int16"                 # 音频数据类型，通常是 int16 或 float32，根据 TTS 服务器的输出格式调整
+buffer_size = 4096              # 音频缓冲区大小，单位为字节，确保音频播放流畅
+playback_start_delay_sec = 0.5  # 起播确认延迟时间，单位秒，根据实际情况调整，影响 tts_active_topic 发布时机
+playback_hangover_sec = 0.1     # 播放挂起时间，单位秒，根据实际情况调整，避免因回调调度抖动导致的状态频繁切换
+playback_gain = 1.0             # 本地播放音量增益；仅放大客户端播放音量，不修改服务端合成结果。过大可能削波失真
+# ----------------------------------------------------
+
+[TTS.sherpa_onnx_tts]
+host = "192.168.10.101"         # 本地 TTS 服务器地址，通常是 Jetson Orin 设备的 IP 地址
+port = 50000
+chunk_size = 2048
+use_websocket = true
+ws_path = "/ws/api/tts"
+
+# {speaker_id:0} {sample_rate:16000} {speed:1.0}(https://k2-fsa.github.io/sherpa/onnx/tts/all/Chinese-English/matcha-icefall-zh-en.html)
+# {speaker_id:1,3,4} {sample_rate:16000} {speed:0.7}(https://k2-fsa.github.io/sherpa/onnx/tts/pretrained_models/vits.html#csukuangfj-sherpa-onnx-vits-zh-ll-chinese-5-speakers)
+# {speaker_id: 62, 69, 95,96} {sample_rate:24000} {speed:1.0}(https://k2-fsa.github.io/sherpa/onnx/tts/pretrained_models/kokoro.html#kokoro-multi-lang-v1-1-chinese-english-103-speakers)
+# {speaker_id: 50} {sample_rate:24000} {speed:1.0}(https://k2-fsa.github.io/sherpa/onnx/tts/pretrained_models/kokoro.html#kokoro-multi-lang-v1-0-chinese-english-53-speakers)
+speaker_id = 4
+speed = 0.50
+channels = 1
+dtype = "float32"
+buffer_size = 4096
+sample_rate = 16000
+playback_gain = 3.0
+
+[TTS.qwen3_tts]
+# https://help.aliyun.com/zh/model-studio/qwen-tts-voice-list?spm=a2c4g.11186623.0.0.4b081457cdvDn3#0ad0bfdd635ar
+# Ethan(标准普通话，带部分北方口音。阳光、温暖、活力、朝气（男性）)  
+# Cherry(阳光积极、亲切自然小姐姐（女性）) 
+voice = "Ethan"
+model = "qwen3-tts-flash-realtime"
+
+## server_commit(由服务端智能处理文本分段与合成时机，适合大段文本的连续合成场景。客户端只需持续追加文本，无需关注分段和提交。)
+## commit(由客户端主动提交文本缓冲区以触发合成，适合需要精确控制合成时机的场景（如对话式 AI 逐轮合成）。)
+## 目前语音客户端只支持 commit
+remote_mode = "commit"
+remote_url = "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
+channels = 1
+dtype = "int16"
+buffer_size = 4096
+sample_rate = 24000
+playback_gain = 1.5
+
+[TTS.voxcpm_cpp_tts]
+host = "127.0.0.1"
+port = 8080
+base_url = ""
+speech_path = "/v1/audio/speech"
+health_path = "/healthz"
+enable_health_check = true
+api_key = ""            # 服务端未使用 --disable-auth 时填写 Bearer token
+model = "voxcpm-0.5b"   # 必须与 voxcpm-server 启动参数 --model-name 一致
+voice = "Ethan"         # 必须是已通过 /v1/voices 注册的 voice id
+speed = 1.0
+max_attempts = 1
+chunk_size = 2048        # HTTP PCM 流式响应每次读取的字节数
+channels = 1
+dtype = "int16"
+buffer_size = 4096
+sample_rate = 24000
+playback_gain = 1.0
+################################################
+
+################# 唤醒词检测配置 #################
+[KWS]
+enable = false                    # 是否启用唤醒词检测
+failed_kws_counts = 1             # 连续未检测到唤醒词次数达到此值时，推送提示语音
+failed_kws_threshold = 30         # 连续未检测到唤醒词次数 达到 failed_kws_counts 后，推送提示语音的时间间隔 (秒)
+reactive_kws_threshold = 100      # 重置 需要唤醒词检测 激活 LLM 时间间隔 (秒)
+wake_word = "你好小特"
+fuzzy_similarity_threshold = 0.78 # 唤醒词模糊匹配相似度阈值，范围0-1，值越大越严格

@@ -50,7 +50,7 @@ ASR:
 ###################### LLM 配置 ######################
 llm_enable: true # 是否启动激活 LLM 模块
 llm_stream_infer_enable: true # 是否启用 LLM 流式推理，开启后可以配合 tts_stream_infer 实现边说边播效果
-llm:
+LLM:
   host: "192.168.50.125" # 局域网内 LLM 服务器地址
   port: 8000 # 局域网内 LLM 服务器端口
 

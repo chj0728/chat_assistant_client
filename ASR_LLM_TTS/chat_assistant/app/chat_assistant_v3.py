@@ -32,7 +32,7 @@ class ChatAssistant:
         self.config_path = (
             Path(config_path).expanduser().resolve() if config_path else None
         )
-        self.configs = {}
+        self.configs = load_config(self.config_path) if self.config_path else {}
         self.dynamic_middlewares = dynamic_middlewares
 
         self.asr_text = ""
@@ -177,7 +177,7 @@ class ChatAssistant:
         self.tts_client.stop()
 
     def load_config_and_initialize(self):
-        self.configs = load_config(self.config_path) if self.config_path else {}
+        self.configs = load_config()
         logger.debug("当前配置:\n%s", yaml.dump(self.configs, allow_unicode=True))
 
         self._initialize_clients()

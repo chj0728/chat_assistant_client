@@ -6,6 +6,7 @@ scipy
 # --- 配置与网络 ---#
 python-dotenv
 pyyaml
+tomli; python_version < "3.11"
 requests
 websockets
 

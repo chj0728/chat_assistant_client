@@ -186,7 +186,7 @@ class LLMAgent:
         dynamic_middlewares: list[AgentMiddleware] | None = None,
     ) -> dict[str, Any]:
         """从配置字典中提取 LLMAgent 初始化参数。"""
-        llm_cfg = config.get("llm", {})
+        llm_cfg = config.get("LLM", {})
         return {
             "host": llm_cfg.get("host", "localhost"),
             "port": llm_cfg.get("port", 8000),

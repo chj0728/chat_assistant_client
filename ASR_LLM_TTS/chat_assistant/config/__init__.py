@@ -8,11 +8,34 @@ from logger import logger
 DEFAULT_MAX_MESSAGES = 5
 _CONFIG_CACHE: dict[Path, dict[str, Any]] = {}
 _CONFIG_CACHE_LOCK = RLock()
+_CONFIG_DIR = Path(__file__).resolve().parent
+_PROJECT_CONFIG_PATH = _CONFIG_DIR / "project.toml"
+_FALLBACK_CONFIG_PATH = _CONFIG_DIR / "config.toml"
 
 
 def get_default_config_path() -> Path:
-    """Return the default config.yaml path under this package."""
-    return Path(__file__).resolve().parent / "config.yaml"
+    """Return the active config path selected by project.toml."""
+    project_config = _read_config(_PROJECT_CONFIG_PATH)
+    active_toml = project_config.get("active_toml", "config.toml")
+
+    if not isinstance(active_toml, str) or not active_toml.strip():
+        logger.error("project.toml 中的 active_toml 必须是非空字符串")
+        return _FALLBACK_CONFIG_PATH
+
+    active_path = (_CONFIG_DIR / active_toml).resolve()
+    if (
+        active_path.parent != _CONFIG_DIR
+        or active_path.suffix.lower() != ".toml"
+        or active_path == _PROJECT_CONFIG_PATH
+    ):
+        logger.error("project.toml 中的 active_toml 无效: %s", active_toml)
+        return _FALLBACK_CONFIG_PATH
+
+    if not active_path.is_file():
+        logger.error("project.toml 指定的配置文件不存在: %s", active_path)
+        return _FALLBACK_CONFIG_PATH
+
+    return active_path
 
 
 def get_default_pkg_dir() -> Path:
@@ -29,10 +52,19 @@ def _resolve_config_path(config_path: str | Path | None = None) -> Path:
 def _read_config(path: Path) -> dict[str, Any]:
     """Read config from disk and normalize to a dict."""
     try:
-        import yaml
+        if path.suffix.lower() == ".toml":
+            try:
+                import tomllib
+            except ModuleNotFoundError:
+                import tomli as tomllib  # type: ignore[import-not-found,no-redef]
 
-        with path.open("r", encoding="utf-8") as f:
-            data = yaml.safe_load(f) or {}
+            with path.open("rb") as f:
+                data = tomllib.load(f)
+        else:
+            import yaml
+
+            with path.open("r", encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
 
         return data if isinstance(data, dict) else {}
     except Exception as exc:
@@ -41,10 +73,10 @@ def _read_config(path: Path) -> dict[str, Any]:
 
 
 def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
-    """Load YAML config and always return a dict.
+    """Load TOML or YAML config and always return a dict.
 
     The config is cached per path, so repeated calls from other modules do not
-    repeatedly read or parse the YAML file.
+    repeatedly read or parse the config file.
     """
     path = _resolve_config_path(config_path)
 
