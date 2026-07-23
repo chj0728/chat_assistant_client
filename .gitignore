@@ -9,6 +9,7 @@ log/
 **/venv/
 
 **/logs/
+**/test/
 **/.run.pid
 **/.run.pids/
 
