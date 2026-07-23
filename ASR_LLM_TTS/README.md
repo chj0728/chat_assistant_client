@@ -1,18 +1,16 @@
-# A Chat Assistant with ASR, LLM, and TTS capabilities
+# A Chat Assistant with ASR, LLM, and TTS
 
 This project implements a chat assistant that integrates Automatic Speech Recognition (ASR), Large Language Models (LLM), and Text-to-Speech (TTS) functionalities. The assistant can process voice inputs, generate responses using LLMs, and convert text responses back to speech.
 
-## Workflow diagram of the complete chat assistant
+![Workflow diagram of the complete chat assistant](<./docs/workflow.svg>)
 
-![alt text](<./docs/workflow.svg>)
-
-## Clone the repository
+## Clone
 
 ```bash
 git clone http://192.168.50.220:8090/external/ymbot.git -b dev-chj
 ```
 
-## Creating a virtual environment && install dependencies
+## Install
 
 - manual installation
   
@@ -40,7 +38,7 @@ git clone http://192.168.50.220:8090/external/ymbot.git -b dev-chj
   ./script/install.sh
   ```
 
-## Build with ROS2
+## Build
 
 - build the interfaces and package
 
@@ -57,7 +55,7 @@ cd ASR_LLM_TTS
 ./script/build.sh
 ```
 
-## Run the chat assistant
+## Run
 
 ```bash
 # use the module way to run the chat assistant, you can run each module in a separate terminal
@@ -74,7 +72,30 @@ cd ASR_LLM_TTS
 # ./script/run.sh debug
 ```
 
-## Test each module individually
+## Deploy
+
+使用 `deploy.sh` 脚本可以将 chat_assistant 部署为开机自启
+
+```bash
+# deploy the chat assistant
+cd ASR_LLM_TTS
+./script/deploy.sh
+```
+
+```bash
+./deploy.sh              # 完整部署，等同于 deploy
+./deploy.sh deploy       # 安装 Supervisor、更新配置并启动
+./deploy.sh start        # 启动 chat_agent
+./deploy.sh stop         # 停止 chat_agent
+./deploy.sh restart      # 重启 chat_agent
+./deploy.sh status       # 查看运行状态
+./deploy.sh reload       # 执行 supervisorctl reload
+./deploy.sh update       # 重新读取并应用配置
+./deploy.sh logs         # 持续查看 stdout 和 stderr 日志
+./deploy.sh help         # 显示帮助
+```
+
+## Test
 
 Refer to [chat_assistant/README.md](chat_assistant/README.md) for detailed instructions on testing each module (ASR, LLM, TTS) and the integrated chat assistant.
 
