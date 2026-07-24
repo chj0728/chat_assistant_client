@@ -339,9 +339,7 @@ class InputStream(InputStreamProtocol):
                     f"{denoised.sample_rate} != {self.samplerate}"
                 )
                 return samples
-            return self._to_mono_float32(
-                np.asarray(denoised.samples, dtype=np.float32)
-            )
+            return self._to_mono_float32(np.asarray(denoised.samples, dtype=np.float32))
         except Exception as exc:
             logger.error(f"音频增强失败，保留原始音频: {exc}")
             return samples
@@ -499,10 +497,10 @@ class InputStream(InputStreamProtocol):
             if info["max_input_channels"] > 0
         ]
 
-        logger.info(f"共发现 {len(input_devices)} 个音频输入设备:")
+        logger.debug(f"共发现 {len(input_devices)} 个音频输入设备:")
         for idx, info in input_devices:
             hostapi = sd.query_hostapis(info["hostapi"])["name"]
-            logger.info(
+            logger.debug(
                 f"  [{idx}] {info['name']} "
                 f"(max_input_channels={info['max_input_channels']}, "
                 f"default_samplerate={info['default_samplerate']}, hostapi={hostapi})"
@@ -510,23 +508,23 @@ class InputStream(InputStreamProtocol):
 
         if self.device is not None:
             if isinstance(self.device, int) and self.device < len(devices):
-                logger.info(
+                logger.debug(
                     f"使用指定输入设备: [{self.device}] "
                     f"{devices[self.device]['name']}"
                 )
             else:
-                logger.info(f"使用指定输入设备: {self.device}")
+                logger.debug(f"使用指定输入设备: {self.device}")
             return self.device
 
         default_device = sd.default.device[0]
         if default_device is not None and default_device < len(devices):
-            logger.info(
+            logger.debug(
                 f"使用系统默认输入设备: [{default_device}] "
                 f"{devices[default_device]['name']}"
             )
             return default_device
 
-        logger.info("使用 sounddevice 自动选择的默认设备")
+        logger.debug("使用 sounddevice 自动选择的默认设备")
         return None
 
     def save_audio_only(self) -> None:

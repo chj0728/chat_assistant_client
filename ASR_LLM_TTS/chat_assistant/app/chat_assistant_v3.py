@@ -283,6 +283,9 @@ class ChatAssistant:
         )
 
     def _initial_component_state(self, config_key: str) -> ComponentState:
+        logger.info(
+            f"组件 {config_key} 初始状态: {'ACTIVE' if self.configs.get(config_key, False) else 'IDLE'}"
+        )
         return (
             ComponentState.ACTIVE
             if self.configs.get(config_key, False)

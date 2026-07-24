@@ -101,10 +101,10 @@ class MyOutputStream(MyOutputStreamProtocol):
             if info["max_output_channels"] > 0
         ]
 
-        logger.info(f"共发现 {len(output_devices)} 个音频输出设备:")
+        logger.debug(f"共发现 {len(output_devices)} 个音频输出设备:")
         for idx, info in output_devices:
             hostapi = sd.query_hostapis(info["hostapi"])["name"]
-            logger.info(
+            logger.debug(
                 f"  [{idx}] {info['name']} "
                 f"(max_output_channels={info['max_output_channels']}, "
                 f"default_samplerate={info['default_samplerate']}, hostapi={hostapi})"
@@ -112,20 +112,20 @@ class MyOutputStream(MyOutputStreamProtocol):
 
         if device is not None:
             if isinstance(device, int) and device < len(devices):
-                logger.info(f"使用指定输出设备: [{device}] {devices[device]['name']}")
+                logger.debug(f"使用指定输出设备: [{device}] {devices[device]['name']}")
             else:
-                logger.info(f"使用指定输出设备: {device}")
+                logger.debug(f"使用指定输出设备: {device}")
             return device
 
         default_device = sd.default.device[1]
         if default_device is not None and default_device < len(devices):
-            logger.info(
+            logger.debug(
                 f"使用系统默认输出设备: [{default_device}] "
                 f"{devices[default_device]['name']}"
             )
             return default_device
 
-        logger.info("使用 sounddevice 自动选择的默认设备")
+        logger.debug("使用 sounddevice 自动选择的默认设备")
         return None
 
     def _audio_callback(self, outdata, frames, time_info, status) -> None:

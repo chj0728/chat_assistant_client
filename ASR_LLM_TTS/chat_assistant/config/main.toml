@@ -1,3 +1,22 @@
+################## 上层交互逻辑 ###################
+asr_enable = true               # 交互逻辑中是否启用ASR模块，可通过ROS服务接口动态控制
+llm_enable = true               # 交互逻辑中是否启用LLM模块
+llm_stream_infer_enable = true  # 交互逻辑中是否启用LLM流式推理模式
+tts_enable = false              # 交互逻辑中是否启用TTS模块
+enable_replace_special_characters = false # 是否启用特殊字符替换功能（将用户输入中的特殊字符替换为指定字符）
+enable_interrupt_tts = true               # 是否启用TTS中断功能（当用户说话时，TTS会被中断）
+enable_interrupt_by_asr_face = true       # 是否启用通过 ASR, 人脸信息打断(ASR 有效文本，启用了人脸信息订阅，且检测到人脸信息，打断 LLM，TTS 后台输出)
+##############################################
+
+################# 唤醒词检测配置 #################
+[KWS]
+enable = false                    # 是否启用唤醒词检测
+failed_kws_counts = 1             # 连续未检测到唤醒词次数达到此值时，推送提示语音
+failed_kws_threshold = 30         # 连续未检测到唤醒词次数 达到 failed_kws_counts 后，推送提示语音的时间间隔 (秒)
+reactive_kws_threshold = 100      # 重置 需要唤醒词检测 激活 LLM 时间间隔 (秒)
+wake_word = "你好小特"
+fuzzy_similarity_threshold = 0.78 # 唤醒词模糊匹配相似度阈值，范围0-1，值越大越严格
+
 ################ ROS 话题配置 ################
 [ros_cfg]
 asr_publish_topic = "asr_result"                # ASR 识别结果发布话题
@@ -10,16 +29,6 @@ user_id_stale_timeout_sec = 5                   # 用户ID过期时间，超过�
 enable_user_face_info = true                    # 是否启用用户人脸信息订阅功能，启用后会订阅 user_face_subscribe_topic 话题获取用户人脸状态
 user_face_subscribe_topic = "is_faced"          # 用户人脸信息订阅话题  
 user_face_stale_timeout_sec = 0.1               # 用户人脸信息过期时间，超过此时间未更新则认为用户离开，回退为 None (秒)
-
-################## 上层交互逻辑 ###################
-asr_enable = true               # 交互逻辑中是否启用ASR模块，可通过ROS服务接口动态控制
-llm_enable = true               # 交互逻辑中是否启用LLM模块
-llm_stream_infer_enable = true  # 交互逻辑中是否启用LLM流式推理模式
-tts_enable = false              # 交互逻辑中是否启用TTS模块
-enable_replace_special_characters = false # 是否启用特殊字符替换功能（将用户输入中的特殊字符替换为指定字符）
-enable_interrupt_tts = true               # 是否启用TTS中断功能（当用户说话时，TTS会被中断）
-enable_interrupt_by_asr_face = true       # 是否启用通过 ASR, 人脸信息打断(ASR 有效文本，启用了人脸信息订阅，且检测到人脸信息，打断 LLM，TTS 后台输出)
-##############################################
 
 ##################### ASR 配置 ######################
 [ASR]
@@ -189,12 +198,3 @@ buffer_size = 4096
 sample_rate = 24000
 playback_gain = 1.0
 ################################################
-
-################# 唤醒词检测配置 #################
-[KWS]
-enable = false                    # 是否启用唤醒词检测
-failed_kws_counts = 1             # 连续未检测到唤醒词次数达到此值时，推送提示语音
-failed_kws_threshold = 30         # 连续未检测到唤醒词次数 达到 failed_kws_counts 后，推送提示语音的时间间隔 (秒)
-reactive_kws_threshold = 100      # 重置 需要唤醒词检测 激活 LLM 时间间隔 (秒)
-wake_word = "你好小特"
-fuzzy_similarity_threshold = 0.78 # 唤醒词模糊匹配相似度阈值，范围0-1，值越大越严格

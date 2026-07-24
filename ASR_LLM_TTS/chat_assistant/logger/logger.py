@@ -15,16 +15,19 @@ DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
 logger_dir = Path(__file__).resolve().parent
 
 # logs 目录路径: ...ASR_LLM_TTS/logs
-logs_dir = logger_dir.parents[1] / "logs"
+logs_root_dir = logger_dir.parents[1] / "logs"
+if not logs_root_dir.exists():
+    logs_root_dir.mkdir(parents=True, exist_ok=True)
 
-# logs_dir = os.path.join(current_dir, "../../../", "logs")
 # 年月日目录
-# logs_dir = os.path.join(logs_dir, time.strftime("%Y-%m-%d"))
-user_dialog_logs_dir = logs_dir / "user_dialogs"
+_current_log_date = time.strftime("%Y-%m-%d")
 
-# logs_dir = "logs"
-if not logs_dir.exists():
-    logs_dir.mkdir(parents=True, exist_ok=True)
+# logs_dir = logs_root_dir / _current_log_date
+# if not logs_dir.exists():
+#     logs_dir.mkdir(parents=True, exist_ok=True)
+
+# 用户对话日志目录: ...ASR_LLM_TTS/logs/dialogs/YYYY-MM-DD
+user_dialog_logs_dir = logs_root_dir / "dialogs" / _current_log_date
 if not user_dialog_logs_dir.exists():
     user_dialog_logs_dir.mkdir(parents=True, exist_ok=True)
 
@@ -97,7 +100,7 @@ LOGGING_CONFIG = {
             "class": "logging.handlers.TimedRotatingFileHandler",
             "level": "INFO",
             "formatter": "default",
-            "filename": os.path.join(logs_dir, "asr_llm_tts"),
+            "filename": logs_root_dir / "asr_llm_tts",
             "when": "H",  # 滚动间隔：Y=年，M=月，D=日，H=时，m=分，s=秒
             "interval": 1,  # 间隔倍数（如when="H"，interval=6则每6小时滚动）
             "backupCount": 48,  # 保留的旧日志文件个数
@@ -132,9 +135,29 @@ if timed_handler is not None:
     # timed_handler.suffix = "%Y-%m-%d_%H-%M"  #  精确到分钟即可
     timed_handler.suffix = "%Y-%m-%d_%H"  #  精确到小时即可
 
-_dialog_logger_lock = threading.Lock()
+_dialog_logger_lock = threading.RLock()
 _dialog_logger_cache = {}
 _dialog_formatter = logging.Formatter(USER_DIALOG_LOG_FORMAT)
+_dialog_log_date = _current_log_date
+
+
+def _refresh_user_dialog_logs_dir() -> None:
+    """跨日后切换对话日志目录，并关闭旧日期的日志处理器。"""
+    global _dialog_log_date, user_dialog_logs_dir
+
+    current_date = time.strftime("%Y-%m-%d")
+    if current_date == _dialog_log_date:
+        return
+
+    for dialog_logger in _dialog_logger_cache.values():
+        for handler in dialog_logger.handlers[:]:
+            dialog_logger.removeHandler(handler)
+            handler.close()
+    _dialog_logger_cache.clear()
+
+    _dialog_log_date = current_date
+    user_dialog_logs_dir = logs_root_dir / "dialogs" / current_date
+    user_dialog_logs_dir.mkdir(parents=True, exist_ok=True)
 
 
 def _safe_path_name(value: str | None, default: str) -> str:
@@ -159,11 +182,13 @@ def get_user_dialog_logger(user_id: str | None) -> logging.Logger:
     safe_user_id = _safe_path_name(user_id, "unknown_user")
 
     with _dialog_logger_lock:
+        _refresh_user_dialog_logs_dir()
+
         if safe_user_id in _dialog_logger_cache:
             return _dialog_logger_cache[safe_user_id]
 
-        user_log_dir = os.path.join(user_dialog_logs_dir, safe_user_id)
-        os.makedirs(user_log_dir, exist_ok=True)
+        user_log_dir = user_dialog_logs_dir / safe_user_id
+        user_log_dir.mkdir(parents=True, exist_ok=True)
 
         dialog_logger = logging.getLogger(f"user_dialog.{safe_user_id}")
         dialog_logger.setLevel(logging.INFO)
@@ -171,7 +196,7 @@ def get_user_dialog_logger(user_id: str | None) -> logging.Logger:
 
         if not dialog_logger.handlers:
             dialog_handler = logging.handlers.TimedRotatingFileHandler(
-                filename=os.path.join(user_log_dir, "dialog.jsonl"),
+                filename=user_log_dir / "dialog.jsonl",
                 when="H",
                 interval=1,
                 backupCount=48,
@@ -197,23 +222,24 @@ def log_user_dialog(
     """
     记录单轮用户对话，只保存时间、用户姓名、ASR 结果和 LLM 回复。
     """
-    dialog_logger = get_user_dialog_logger(user_id)
-    dialog_logger.info(
-        "",
-        extra={
-            "user_name": _normalize_dialog_text(user_name) or "未知用户",
-            "asr_text": _normalize_dialog_text(asr_text),
-            "llm_text": _normalize_dialog_text(llm_text),
-            "audio_saved_path": _normalize_dialog_text(audio_saved_path),
-        },
-    )
+    with _dialog_logger_lock:
+        dialog_logger = get_user_dialog_logger(user_id)
+        dialog_logger.info(
+            "",
+            extra={
+                "user_name": _normalize_dialog_text(user_name) or "未知用户",
+                "asr_text": _normalize_dialog_text(asr_text),
+                "llm_text": _normalize_dialog_text(llm_text),
+                "audio_saved_path": _normalize_dialog_text(audio_saved_path),
+            },
+        )
 
 
 def get_logs_dir() -> Path:
     """
     获取日志目录路径。
     """
-    return logs_dir
+    return logs_root_dir
 
 
 if __name__ == "__main__":
