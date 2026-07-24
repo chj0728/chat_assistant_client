@@ -66,7 +66,7 @@ class FallbackTTSRuntime(TTSRuntimeProtocol):
         if self._primary_runtime is not None:
             try:
                 self._primary_runtime.stop()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - shutdown is best effort
                 logger.warning("停止 %s 失败: %s", self._primary_name, e)
 
         self._drain_audio_queue()
@@ -85,7 +85,7 @@ class FallbackTTSRuntime(TTSRuntimeProtocol):
 
         try:
             self._get_primary_runtime().start()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - primary failures trigger fallback
             self._switch_to_fallback(e)
 
     def stop(self) -> None:
@@ -94,7 +94,7 @@ class FallbackTTSRuntime(TTSRuntimeProtocol):
                 continue
             try:
                 runtime.stop()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - shutdown is best effort
                 logger.warning("停止 TTS runtime 失败: %s", e)
 
     def interrupt(self) -> None:
@@ -110,7 +110,7 @@ class FallbackTTSRuntime(TTSRuntimeProtocol):
 
         try:
             runtime.interrupt()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - interrupt is best effort
             logger.warning("中断 TTS runtime 失败: %s", e)
 
     def tts_infer(self, text: str) -> None:
@@ -120,7 +120,7 @@ class FallbackTTSRuntime(TTSRuntimeProtocol):
 
         try:
             self._get_primary_runtime().tts_infer(text)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - primary failures trigger fallback
             fallback_runtime = self._switch_to_fallback(e)
             fallback_runtime.tts_infer(text)
 
@@ -132,7 +132,7 @@ class FallbackTTSRuntime(TTSRuntimeProtocol):
             if self._get_primary_runtime().generate_wav(text, filename):
                 return True
             fallback_runtime = self._switch_to_fallback("生成 WAV 失败")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - primary failures trigger fallback
             fallback_runtime = self._switch_to_fallback(e)
 
         return fallback_runtime.generate_wav(text, filename)
@@ -144,6 +144,6 @@ class FallbackTTSRuntime(TTSRuntimeProtocol):
 
         try:
             self._get_primary_runtime().change_voice(voice)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - primary failures trigger fallback
             fallback_runtime = self._switch_to_fallback(e)
             fallback_runtime.change_voice(voice)

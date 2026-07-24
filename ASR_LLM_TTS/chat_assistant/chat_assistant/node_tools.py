@@ -12,7 +12,6 @@ from chat_assistant.node_handlers import ToolEvent, push_queue, tool_event_queue
 def response_wave_hands_tool():
     logger.info("调用工具函数->机器人挥了挥手，表示问候！")
     push_queue(tool_event_queue, ToolEvent.WAVE_HANDS.value)
-    return
 
 
 @tool(
@@ -21,7 +20,6 @@ def response_wave_hands_tool():
 def end_conversation_tool():
     logger.info("调用工具函数->机器人礼貌地结束了对话。")
     push_queue(tool_event_queue, ToolEvent.END_CONVERSATION.value)
-    return
 
 
 @tool(description="调整默认扬声器音量")
@@ -36,7 +34,6 @@ def adjust_speaker_volume_tool(volume: int):
         volume = 100
 
     os.system(f"pactl set-sink-volume @DEFAULT_SINK@ {volume}%")
-    return
 
 
 class DynamicToolMiddleware(AgentMiddleware):

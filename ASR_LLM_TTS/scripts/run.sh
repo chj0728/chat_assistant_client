@@ -19,15 +19,68 @@ NODE_PID_DIR="$WORK_DIR/.run.pids"
 LOG_RETENTION_COUNT=40
 RESTART_DELAY=10
 SHUTDOWN_TIMEOUT=5
+WEB_HOST=${WEB_HOST:-0.0.0.0}
+WEB_PORT=${WEB_PORT:-2000}
+WEB_PORT_SEARCH_LIMIT=20
 
 # 节点格式："名称|启动命令"。
 # 每个节点均在独立进程组中运行，确保停止时可以同时清理其子进程。
-NODES=(
-    "web_server|python3 -m chat_assistant.web.web_server --host 0.0.0.0 --port 17890"
-    "chat_assistant_node|ros2 run chat_assistant chat_assistant_node"
-)
+NODES=()
 
 declare -A PIDS
+
+configure_nodes() {
+    NODES=(
+        "web_server|python3 -m chat_assistant.web.web_server --host $WEB_HOST --port $WEB_PORT"
+        "chat_assistant_node|ros2 run chat_assistant chat_assistant_node"
+    )
+}
+
+# 默认端口被占用时，选择临近可用端口，避免守护循环无意义地反复重启。
+select_web_port() {
+    local requested_port=$WEB_PORT
+    local max_port=$((requested_port + WEB_PORT_SEARCH_LIMIT))
+
+    while ss -H -ltn "sport = :$WEB_PORT" 2>/dev/null | grep -q .; do
+        WEB_PORT=$((WEB_PORT + 1))
+        if (( WEB_PORT > max_port )); then
+            echo "[ERROR] No free Web port found in range $requested_port-$max_port"
+            return 1
+        fi
+    done
+
+    if (( WEB_PORT != requested_port )); then
+        echo "[WARN] Web port $requested_port is already in use; using $WEB_PORT instead"
+    fi
+    echo "[INFO] Web server URL: http://127.0.0.1:$WEB_PORT"
+}
+
+# 在进入守护循环前检查 ROS 2 Python 环境，兼容 Humble、Jazzy 等发行版。
+validate_ros_environment() {
+    local python_executable
+    local ros_distro=${ROS_DISTRO:-unknown}
+
+    python_executable=$(command -v python3 2>/dev/null || true)
+    if [[ -z "$python_executable" ]]; then
+        echo "[ERROR] python3 was not found in PATH"
+        return 1
+    fi
+
+    if ! command -v ros2 >/dev/null 2>&1; then
+        echo "[ERROR] ros2 was not found in PATH"
+        echo "[ERROR] Source the ROS 2 installation and workspace setup files before starting"
+        return 1
+    fi
+
+    if python3 -c 'import rclpy' >/dev/null 2>&1; then
+        echo "[INFO] ROS 2 environment ready: distro=$ros_distro, python=$python_executable"
+        return
+    fi
+
+    echo "[ERROR] Failed to import rclpy: distro=$ros_distro, python=$python_executable"
+    echo "[ERROR] Ensure the active Python version matches this ROS 2 installation and can access its site-packages"
+    python3 -c 'import rclpy'
+}
 
 # 停止 PID 文件中记录的旧守护脚本，避免同时运行多个 run.sh。
 stop_previous_supervisor() {
@@ -239,8 +292,12 @@ prepare_environment() {
     source "$WORK_DIR/install/setup.bash"
 
     mkdir -p "$LOGS_DIR" "$NODE_PID_DIR"
+    validate_ros_environment
+    configure_nodes
     cleanup_old_logs
     cleanup_tracked_nodes
+    select_web_port
+    configure_nodes
 
     cd "$PKG_DIR"
 }

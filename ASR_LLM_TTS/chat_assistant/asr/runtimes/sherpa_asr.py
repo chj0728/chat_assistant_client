@@ -13,7 +13,10 @@ from transport import ThreadedWebSocketClient
 try:
     from websockets.exceptions import ConnectionClosed
 except ImportError:  # pragma: no cover - 仅在缺少可选依赖的环境触发
-    ConnectionClosed = Exception
+
+    class ConnectionClosed(Exception):
+        """Fallback exception when the optional websockets package is absent."""
+
 
 from ..asr_backend_context import ASRBackendContext
 from .protocol import ASRRuntimeProtocol
@@ -70,7 +73,7 @@ class SherpaASRRuntime(ASRRuntimeProtocol):
                 self._ws_client.run(self._ws_client.connect(), timeout=self.timeout_sec)
             except TimeoutError:
                 logger.error("ASR WebSocket 连接超时")
-            except Exception as exc:
+            except (ConnectionError, OSError, ConnectionClosed) as exc:
                 logger.error(f"ASR WebSocket 连接异常: {exc}")
         logger.info("ASR Runtime 已启动")
 
@@ -280,7 +283,7 @@ class SherpaASRRuntime(ASRRuntimeProtocol):
             return self._ws_client.run(coroutine, timeout=self.timeout)
         except TimeoutError:
             logger.error("ASR WebSocket 识别超时")
-        except Exception as exc:
+        except (ConnectionClosed, ConnectionError, OSError, RuntimeError) as exc:
             logger.error(f"ASR WebSocket 识别异常: {exc}")
         return ""
 

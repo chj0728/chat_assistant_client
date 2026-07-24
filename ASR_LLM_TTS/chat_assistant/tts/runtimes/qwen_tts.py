@@ -1,4 +1,5 @@
 import base64
+import binascii
 import os
 import threading
 import wave
@@ -72,7 +73,7 @@ class RemoteCallback(REMOTE_CALLBACK_BASE):
             if event_type == "session.finished":
                 self.complete_event.set()
                 self.session_finished_event.set()
-        except Exception as e:
+        except (KeyError, TypeError, ValueError, binascii.Error) as e:
             logger.error(f"处理远端 TTS 响应失败: {e}")
 
     def reset_response(self, *, playback_enabled: bool = False) -> None:
@@ -139,7 +140,7 @@ class QwenTTSRuntime(TTSRuntimeProtocol):
                 logger.info("远端 TTS 会话结束完成")
             elif callback is not None:
                 logger.warning("等待远端 TTS 会话结束超时")
-        except Exception as e:
+        except (OSError, RuntimeError) as e:
             if "closed" in str(e).lower():
                 logger.info("远端 TTS 连接已关闭，跳过重复关闭")
                 return
@@ -188,11 +189,10 @@ class QwenTTSRuntime(TTSRuntimeProtocol):
                 self.initialize_runtime()
                 return
 
-            if self.callback is not None:
-                if self.callback.is_connection_closed():
-                    logger.warning("远端 TTS 连接已关闭，正在重新建立连接...")
-                    self.reset_runtime()
-                    self.initialize_runtime()
+            if self.callback is not None and self.callback.is_connection_closed():
+                logger.warning("远端 TTS 连接已关闭，正在重新建立连接...")
+                self.reset_runtime()
+                self.initialize_runtime()
 
     def session_to_finish(self) -> None:
         with self.runtime_lock:
@@ -220,7 +220,7 @@ class QwenTTSRuntime(TTSRuntimeProtocol):
 
                     raise TimeoutError("远端 TTS 响应超时")
 
-            except Exception as e:
+            except (OSError, RuntimeError) as e:
                 if "closed" in str(e).lower():
                     logger.warning("远端 TTS 连接在请求期间关闭，正在重连后重试...")
                     self.reset_runtime()
@@ -270,7 +270,7 @@ class QwenTTSRuntime(TTSRuntimeProtocol):
                 wf.setframerate(self.sample_rate)
                 wf.writeframes(pcm_bytes)
             return True
-        except Exception as e:
+        except (OSError, RuntimeError, TimeoutError, wave.Error) as e:
             logger.error(f"远端 TTS 生成 WAV 失败: {e}")
             return False
 

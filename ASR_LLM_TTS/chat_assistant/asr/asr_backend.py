@@ -6,7 +6,7 @@ import socket
 import threading
 import time
 from abc import ABC, abstractmethod
-from typing import Awaitable, Optional
+from collections.abc import Awaitable
 
 from logger import logger
 
@@ -40,12 +40,10 @@ class ASRBackendBase(ABC):
     @abstractmethod
     def start(self) -> None:
         """初始化运行时资源。"""
-        pass
 
     @abstractmethod
     def stop(self) -> None:
         """关闭运行时资源。"""
-        pass
 
 
 class ASRBackend(ASRBackendBase):
@@ -61,11 +59,11 @@ class ASRBackend(ASRBackendBase):
         self.asr_backend_context = asr_backend_context
         self.asr_runtime = asr_runtime
         self.asr_input_stream = asr_input_stream
-        self.asr_worker_thread: Optional[threading.Thread] = None
+        self.asr_worker_thread: threading.Thread | None = None
 
         self.enable_external_asr: bool = kwargs.get("enable_external_asr", False)
-        self.external_asr_text_worker_thread: Optional[threading.Thread] = None
-        self._external_asr_socket: Optional[socket.socket] = None
+        self.external_asr_text_worker_thread: threading.Thread | None = None
+        self._external_asr_socket: socket.socket | None = None
         self._external_asr_socket_lock = threading.Lock()
         self.external_asr_text_host = kwargs.get(
             "EXTERNAL_ASR_TEXT_HOST", EXTERNAL_ASR_TEXT_HOST
@@ -106,7 +104,7 @@ class ASRBackend(ASRBackendBase):
                 self.asr_backend_context.result_data_queue.put(
                     (asr_text, voice_id, audio_saved_path)
                 )
-            except Exception as exc:
+            except (OSError, RuntimeError, ValueError) as exc:
                 logger.error(
                     f"[vision_id: {self.asr_backend_context.vision_id}] "
                     f"[ASR + Voice] 推理失败: {exc}"
@@ -122,7 +120,7 @@ class ASRBackend(ASRBackendBase):
         reconnect_delay = self.external_asr_reconnect_seconds
 
         while not self.asr_backend_context.stop_event.is_set():
-            sock: Optional[socket.socket] = None
+            sock: socket.socket | None = None
             try:
                 logger.info(
                     f"[External ASR] 正在连接 "
@@ -147,7 +145,7 @@ class ASRBackend(ASRBackendBase):
                 while not self.asr_backend_context.stop_event.is_set():
                     try:
                         data = sock.recv(4096)
-                    except socket.timeout:
+                    except TimeoutError:
                         continue
 
                     if not data:
@@ -191,11 +189,6 @@ class ASRBackend(ASRBackendBase):
                         f"[External ASR] 连接/读取失败: {e}；"
                         f"{reconnect_delay:.1f} 秒后重连"
                     )
-                    self.asr_backend_context.stop_event.wait(reconnect_delay)
-                    reconnect_delay = min(reconnect_delay * 2.0, 10.0)
-            except Exception as e:
-                if not self.asr_backend_context.stop_event.is_set():
-                    logger.exception(f"[External ASR] 工作线程异常: {e}")
                     self.asr_backend_context.stop_event.wait(reconnect_delay)
                     reconnect_delay = min(reconnect_delay * 2.0, 10.0)
             finally:
@@ -308,7 +301,7 @@ class ASRBackend(ASRBackendBase):
 
     async def _recognize_with_voice(
         self, asr_result: Awaitable[str], pcm16_bytes: bytes
-    ) -> tuple[str, Optional[str]]:
+    ) -> tuple[str, str | None]:
         """并行执行 ASR 与可选声纹识别，并统一整理声纹结果。"""
         logger.debug(
             f"基于 vision_id:[ {self.asr_backend_context.vision_id} ] "
@@ -329,7 +322,7 @@ class ASRBackend(ASRBackendBase):
 
     async def async_asr_voice_recognize_audio(
         self, audio_data: ASRAudioData
-    ) -> tuple[str, Optional[str]]:
+    ) -> tuple[str, str | None]:
         """并行执行 ASR 与声纹识别，分别复用其所需的音频格式。"""
         return await self._recognize_with_voice(
             self.async_recognize_audio(audio_data),
@@ -338,7 +331,7 @@ class ASRBackend(ASRBackendBase):
 
     async def async_asr_voice_recognize_pcm16_bytes(
         self, pcm16_bytes: bytes
-    ) -> tuple[str, Optional[str]]:
+    ) -> tuple[str, str | None]:
         """兼容 PCM16 调用，并行返回 ASR 文本和声纹结果。"""
         return await self._recognize_with_voice(
             self.async_recognize_pcm16_bytes(pcm16_bytes),

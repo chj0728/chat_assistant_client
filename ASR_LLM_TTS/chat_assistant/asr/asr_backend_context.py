@@ -1,7 +1,7 @@
 import queue
 import threading
-from dataclasses import dataclass
-from typing import Any, Optional
+from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 
@@ -38,17 +38,17 @@ class ASRBackendContext:
     seconds_per_message: float = 0.1
     # asr_text_queue: queue.Queue[str] = queue.Queue(maxsize=10)
     # audio_frames_queue: queue.Queue[bytes] = queue.Queue(maxsize=10)
-    audio_data_queue: queue.Queue[tuple[ASRAudioData, str | None]] = queue.Queue(
-        maxsize=10
+    audio_data_queue: queue.Queue[tuple[ASRAudioData, str | None]] = field(
+        default_factory=lambda: queue.Queue(maxsize=10)
     )
     # asr_voice_result_queue: queue.Queue[tuple[str, Any | None]] = queue.Queue(
     #     maxsize=10
     # )
     # (asr_result, voice_id_result,audio_saved_path) 文本识别结果、声纹识别结果和音频保存路径队列，供外部使用
-    result_data_queue: queue.Queue[tuple[str, Any | None, str | None]] = queue.Queue(
-        maxsize=10
+    result_data_queue: queue.Queue[tuple[str, Any | None, str | None]] = field(
+        default_factory=lambda: queue.Queue(maxsize=10)
     )
-    vision_id: Optional[str] = None
+    vision_id: str | None = None
     # voice_id: Optional[str] = None
-    stop_event: threading.Event = threading.Event()
-    interrupt_event: threading.Event = threading.Event()
+    stop_event: threading.Event = field(default_factory=threading.Event)
+    interrupt_event: threading.Event = field(default_factory=threading.Event)

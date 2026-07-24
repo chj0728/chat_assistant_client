@@ -162,7 +162,7 @@ class InputStream(InputStreamProtocol):
             self.speech_denoiser = sherpa_onnx.OfflineSpeechDenoiser(config)
             logger.info(f"音频增强模块已启用: {model_path}")
             return True
-        except Exception as exc:
+        except (ImportError, OSError, RuntimeError, ValueError) as exc:
             logger.error(f"音频增强模块初始化失败，已跳过降噪: {exc}")
             self.enable_enhancement = False
             return False
@@ -340,7 +340,7 @@ class InputStream(InputStreamProtocol):
                 )
                 return samples
             return self._to_mono_float32(np.asarray(denoised.samples, dtype=np.float32))
-        except Exception as exc:
+        except (OSError, RuntimeError, TypeError, ValueError) as exc:
             logger.error(f"音频增强失败，保留原始音频: {exc}")
             return samples
 

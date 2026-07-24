@@ -16,9 +16,10 @@ import os
 import re
 import threading
 import time
+from collections.abc import AsyncIterator, Generator
 from pathlib import Path
 from queue import Empty, Queue
-from typing import Any, AsyncIterator, Generator
+from typing import Any
 
 import requests
 from dotenv import load_dotenv
@@ -42,7 +43,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from logger import logger
-from openai import DefaultAsyncHttpxClient, DefaultHttpxClient
+from openai import APIError, DefaultAsyncHttpxClient, DefaultHttpxClient
 from pydantic import SecretStr
 
 from llm.custom_callback_handlers import get_callback_handlers
@@ -177,8 +178,8 @@ class LLMAgent:
     def __del__(self):
         try:
             self.close()
-        except Exception:
-            pass
+        except (AttributeError, OSError, RuntimeError) as exc:
+            logger.debug("LLM Agent 析构时关闭资源失败: %s", exc, exc_info=True)
 
     @staticmethod
     def _build_init_kwargs_from_config(
@@ -442,7 +443,7 @@ class LLMAgent:
                 logger.info(f"模型根目录: {self.model_root}")
                 logger.info(f"远端模型ID: {self.model_id}")
 
-        except Exception as e:
+        except (requests.RequestException, ValueError, KeyError, TypeError) as e:
             logger.error(f"获取模型列表失败: {e}")
             self.model_id = DEFAULT_MODEL_ID
             self.model_root = None
@@ -528,7 +529,7 @@ class LLMAgent:
                         logger.warning(
                             f"LLM 服务健康检查失败，状态码: {response.status_code}"
                         )
-                except Exception as e:
+                except requests.RequestException as e:
                     logger.error(f"LLM 服务健康检查异常: {e}")
                 time.sleep(10)  # 每10秒检查一次
 
@@ -570,7 +571,7 @@ class LLMAgent:
 
         try:
             loop.run_until_complete(self._initialize_background_runtime())
-        except Exception as exc:
+        except (OSError, RuntimeError) as exc:
             self._startup_error = exc
             self._background_ready.set()
             return
@@ -676,7 +677,7 @@ class LLMAgent:
                     logger.info("LLM 后台流式输出已中断")
                     return
                 output_queue.put(("chunk", chunk))
-        except Exception as exc:
+        except (APIError, OSError, RuntimeError, ValueError) as exc:
             output_queue.put(("error", exc))
         finally:
             output_queue.put(("done", None))

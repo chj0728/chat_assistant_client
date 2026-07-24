@@ -87,11 +87,16 @@ class VoxCPMCppTTSRuntime(TTSRuntimeProtocol):
     def start(self) -> None:
         try:
             self._health_check()
-        except Exception as e:
+        except requests.RequestException as e:
             logger.error(f"VoxCPM C++ TTS 健康检查失败: {e}")
 
     def stop(self) -> None:
         return
+
+    def interrupt(self) -> None:
+        """中断当前正在进行的 TTS 推理。"""
+        self._context.interrupt_event.set()
+        logger.info("TTS 推理已中断")
 
     def tts_infer(self, text: str) -> None:
         try:
@@ -108,7 +113,7 @@ class VoxCPMCppTTSRuntime(TTSRuntimeProtocol):
                     if not chunk:
                         continue
                     self._context.audio_queue.put(chunk)
-        except Exception as e:
+        except requests.RequestException as e:
             logger.error(f"VoxCPM C++ TTS 请求失败: {e}")
 
     def generate_wav(self, text: str, filename: str) -> bool:
@@ -128,7 +133,7 @@ class VoxCPMCppTTSRuntime(TTSRuntimeProtocol):
 
                 logger.error("VoxCPM C++ TTS 返回不是音频: %s", resp.text)
                 return False
-        except Exception as e:
+        except (requests.RequestException, OSError) as e:
             logger.error(f"VoxCPM C++ TTS 生成 WAV 失败: {e}")
             return False
 

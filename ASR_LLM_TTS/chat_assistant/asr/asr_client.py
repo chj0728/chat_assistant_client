@@ -1,6 +1,6 @@
 import queue
 import threading
-from typing import Any, Optional
+from typing import Any
 
 from logger import logger
 
@@ -29,7 +29,7 @@ class ASRClientBase:
             queue.Queue(maxsize=10)
         )
 
-        self.vision_id: Optional[str] = None
+        self.vision_id: str | None = None
         self.stop_event = threading.Event()
         self.interrupt_event = threading.Event()
 

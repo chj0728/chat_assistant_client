@@ -172,12 +172,12 @@ class TTSClientBase:
 
         try:
             old_output_stream.stop()
-        except Exception as exc:
+        except (RuntimeError, OSError) as exc:
             logger.warning("停止旧 TTS 输出流失败: %s", exc)
 
         try:
             old_output_stream.close()
-        except Exception as exc:
+        except (RuntimeError, OSError) as exc:
             logger.warning("关闭旧 TTS 输出流失败: %s", exc)
 
         self.output_stream = self.create_output_stream(server_type)
@@ -260,7 +260,7 @@ class TTSClientBase:
 
             self.stop_local_audio_playback()
             self.sound = playsound(file_path, block=block)
-        except Exception as exc:
+        except (OSError, RuntimeError) as exc:
             logger.error(f"播放{file_path}失败: {exc}")
 
     def play_audio_from_pcm(self, pcm_bytes: bytes) -> None:

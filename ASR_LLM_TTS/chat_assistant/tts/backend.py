@@ -18,12 +18,10 @@ class TTSBackendBase(ABC):
     @abstractmethod
     def on_start(self) -> None:
         """初始化运行时资源。"""
-        pass
 
     @abstractmethod
     def on_stop(self) -> None:
         """关闭运行时资源。"""
-        pass
 
 
 class MyTTSBackend(TTSBackendBase):
@@ -56,7 +54,7 @@ class MyTTSBackend(TTSBackendBase):
             start_time = time.time()
             try:
                 self.tts_runtime.tts_infer(text)
-            except Exception as e:
+            except (OSError, RuntimeError, ValueError) as e:
                 logger.error(f"{self.request_error_log_prefix}: {e}")
             finally:
                 elapsed_time = time.time() - start_time

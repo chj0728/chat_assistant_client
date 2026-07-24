@@ -85,7 +85,7 @@ class SherpaTTSRuntime(TTSRuntimeProtocol):
                     if self._should_stop_request():
                         return
                     self._context.audio_queue.put(chunk)
-        except Exception as e:
+        except requests.RequestException as e:
             logger.error(f"HTTP TTS 请求失败: {e}")
 
     def _tts_request_ws(self, text):
@@ -95,7 +95,7 @@ class SherpaTTSRuntime(TTSRuntimeProtocol):
         except TimeoutError:
             logger.error("TTS WebSocket 请求超时")
             self._close_ws_connection()
-        except Exception as e:
+        except (ConnectionError, ConnectionClosed, OSError, RuntimeError) as e:
             logger.error(f"WebSocket TTS 请求失败: {e}")
             self._close_ws_connection()
 
@@ -104,7 +104,7 @@ class SherpaTTSRuntime(TTSRuntimeProtocol):
             self._ws_client.run(
                 self._ws_client.close_connection(), timeout=self._context.timeout
             )
-        except Exception as e:
+        except (ConnectionError, ConnectionClosed, OSError, RuntimeError) as e:
             logger.warning(f"WebSocket 连接清理失败: {e}")
 
     async def _tts_request_ws_async(self, text):
@@ -178,7 +178,7 @@ class SherpaTTSRuntime(TTSRuntimeProtocol):
             )
         except TimeoutError:
             logger.error("TTS WebSocket 连接超时")
-        except Exception as e:
+        except (ConnectionError, ConnectionClosed, OSError, RuntimeError) as e:
             logger.error(f"TTS WebSocket 连接失败: {e}")
 
     def stop(self) -> None:
@@ -205,11 +205,11 @@ class SherpaTTSRuntime(TTSRuntimeProtocol):
                 with open(filename, "wb") as f:
                     f.write(resp.content)
             return True
-        except Exception as e:
+        except (OSError, requests.RequestException) as e:
             logger.error(f"TTS 请求失败: {e}")
             return False
 
     def change_voice(self, voice: str) -> None:
-        logger.warning("当前 TTS 后端不支持动态更改语音设置")
+        logger.warning("当前 TTS 后端不支持动态更改语音设置: %s", voice)
 
     ##############################################################################

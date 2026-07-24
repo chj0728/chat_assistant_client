@@ -1,7 +1,8 @@
 import threading
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional, Protocol, cast
+from typing import Any, Protocol, cast
 
 from chat_assistant_interfaces.msg import LLMResponse, Response, UserInfo
 from chat_assistant_interfaces.srv import (
@@ -90,7 +91,7 @@ class ServiceSpec:
     service_type: Any
     service_name: str
     handler_name: str
-    callback_group_attr: Optional[str] = None
+    callback_group_attr: str | None = None
 
 
 @dataclass(frozen=True)

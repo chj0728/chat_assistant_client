@@ -572,5 +572,3 @@ class ChatAssistantHandlers(
     ChatAssistantStateHandlersMixin,
 ):
     """将服务处理函数、话题处理函数和状态处理函数组合到一个类中，供 ChatAssistantNode 继承使用。"""
-
-    ...
