@@ -2,10 +2,10 @@ import asyncio
 import queue
 import threading
 import time
+from collections.abc import AsyncIterator, Iterator
 from dataclasses import asdict
 from pathlib import Path
 from queue import Empty, Full, Queue
-from typing import AsyncIterator, Iterator, Optional
 
 import yaml
 from asr import ASRClient
@@ -54,7 +54,7 @@ class ChatAssistant:
         self.response_data.clear()
 
         self.worker_thread_active = False
-        self.worker_thread: Optional[threading.Thread] = None
+        self.worker_thread: threading.Thread | None = None
 
         self.load_config_and_initialize()
 
@@ -926,9 +926,7 @@ class ChatAssistant:
 
             self.failed_enable_kws_count += 1
 
-            logger.info(
-                "未检测到唤醒词，失败次数: {}".format(self.failed_enable_kws_count)
-            )
+            logger.info(f"未检测到唤醒词，失败次数: {self.failed_enable_kws_count}")
 
             # 如果连续多次未检测到唤醒词，且距离上次提示已超过一定时间，则推送提示语音
             if (

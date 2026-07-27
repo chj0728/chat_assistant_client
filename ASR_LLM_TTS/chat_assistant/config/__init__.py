@@ -51,8 +51,8 @@ def _resolve_config_path(config_path: str | Path | None = None) -> Path:
 
 def _read_config(path: Path) -> dict[str, Any]:
     """Read config from disk and normalize to a dict."""
-    try:
-        if path.suffix.lower() == ".toml":
+    if path.suffix.lower() == ".toml":
+        try:
             try:
                 import tomllib
             except ModuleNotFoundError:
@@ -60,16 +60,20 @@ def _read_config(path: Path) -> dict[str, Any]:
 
             with path.open("rb") as f:
                 data = tomllib.load(f)
-        else:
+        except (OSError, ModuleNotFoundError, tomllib.TOMLDecodeError) as exc:
+            logger.error("加载配置文件失败: %s", exc)
+            return {}
+    else:
+        try:
             import yaml
 
             with path.open("r", encoding="utf-8") as f:
                 data = yaml.safe_load(f) or {}
+        except (OSError, ModuleNotFoundError, yaml.YAMLError) as exc:
+            logger.error("加载配置文件失败: %s", exc)
+            return {}
 
-        return data if isinstance(data, dict) else {}
-    except Exception as exc:
-        logger.error("加载配置文件失败: %s", exc)
-        return {}
+    return data if isinstance(data, dict) else {}
 
 
 def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
@@ -118,7 +122,7 @@ def print_config(config: dict[str, Any]) -> None:
 def get_max_messages(default: int = DEFAULT_MAX_MESSAGES) -> int:
     """从配置中读取最大历史消息数，读取失败时回退默认值。"""
     config = load_config()
-    max_messages = config.get("llm", {}).get("max_messages", default)
+    max_messages = config.get("LLM", {}).get("max_messages", default)
     logger.debug(f"LLM Agent 配置 - MAX_MESSAGES: {max_messages}")
     return max_messages
 
@@ -126,7 +130,7 @@ def get_max_messages(default: int = DEFAULT_MAX_MESSAGES) -> int:
 def get_max_tokens(default: int = 2048) -> int:
     """从配置中读取最大历史消息数，读取失败时回退默认值。"""
     config = load_config()
-    max_tokens = config.get("llm", {}).get("max_tokens", default)
+    max_tokens = config.get("LLM", {}).get("max_tokens", default)
     logger.debug(f"LLM Agent 配置 - MAX_TOKENS: {max_tokens}")
     return max_tokens
 
@@ -134,7 +138,7 @@ def get_max_tokens(default: int = 2048) -> int:
 def get_vad_no_speech_threshold(default: float = 0.5) -> float:
     """从配置中读取VAD无语音阈值(单位: 秒），读取失败时回退默认值。"""
     config = load_config()
-    threshold = config.get("VAD", {}).get("no_speech_threshold", default)
+    threshold = config.get("ASR", {}).get("VAD", {}).get("no_speech_duration", default)
     logger.debug(f"ASR 配置 - VAD_NO_SPEECH_THRESHOLD: {threshold} 秒")
     return threshold
 
@@ -142,6 +146,6 @@ def get_vad_no_speech_threshold(default: float = 0.5) -> float:
 def get_default_system_prompt(default: str = "") -> str:
     """从配置中读取默认系统提示词，读取失败时回退默认值。"""
     config = load_config()
-    default_system_prompt = config.get("llm", {}).get("default_system_prompt", default)
+    default_system_prompt = config.get("LLM", {}).get("default_system_prompt", default)
     logger.debug(f"LLM Agent 配置 - DEFAULT_SYSTEM_PROMPT:\n{default_system_prompt}")
     return default_system_prompt
