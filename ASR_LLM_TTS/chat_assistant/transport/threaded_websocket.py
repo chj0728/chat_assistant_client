@@ -2,8 +2,9 @@
 
 import asyncio
 import threading
+from collections.abc import Coroutine
 from concurrent.futures import TimeoutError as FutureTimeoutError
-from typing import Any, Coroutine, Optional, TypeVar
+from typing import Any, TypeVar
 
 from logger import logger
 
@@ -24,8 +25,8 @@ class ThreadedWebSocketClient:
         url: str,
         *,
         name: str,
-        ping_interval: Optional[float] = None,
-        ping_timeout: Optional[float] = None,
+        ping_interval: float | None = None,
+        ping_timeout: float | None = None,
         startup_timeout: float = 5.0,
         use_proxy: bool = False,
     ) -> None:
@@ -37,12 +38,12 @@ class ThreadedWebSocketClient:
         self.startup_timeout = startup_timeout
         self.use_proxy = use_proxy
 
-        self._loop: Optional[asyncio.AbstractEventLoop] = None
-        self._thread: Optional[threading.Thread] = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._thread: threading.Thread | None = None
         self._connection = None
         self._started = threading.Event()
         self._lifecycle_lock = threading.Lock()
-        self._connect_lock: Optional[asyncio.Lock] = None
+        self._connect_lock: asyncio.Lock | None = None
 
     @property
     def connection(self):
@@ -69,7 +70,7 @@ class ThreadedWebSocketClient:
         if not self._started.wait(timeout=self.startup_timeout):
             raise RuntimeError(f"{self.name} WebSocket 事件循环线程启动超时")
 
-    def run(self, coroutine: Coroutine[Any, Any, T], timeout: Optional[float]) -> T:
+    def run(self, coroutine: Coroutine[Any, Any, T], timeout: float | None) -> T:
         """在线程事件循环中执行协程，并将结果同步返回给调用方。"""
         loop = self._loop
         if loop is None or not loop.is_running():
@@ -123,7 +124,7 @@ class ThreadedWebSocketClient:
         try:
             await connection.close()
             logger.info("%s WebSocket 已关闭", self.name)
-        except Exception as exc:
+        except (OSError, RuntimeError, asyncio.TimeoutError) as exc:
             logger.warning("关闭 %s WebSocket 失败: %s", self.name, exc)
         finally:
             if connection is self._connection:
@@ -138,7 +139,7 @@ class ThreadedWebSocketClient:
 
         try:
             self.run(self.close_connection(), timeout=timeout)
-        except Exception as exc:
+        except (RuntimeError, TimeoutError) as exc:
             logger.warning("%s WebSocket 连接清理失败: %s", self.name, exc)
         finally:
             if loop.is_running():
