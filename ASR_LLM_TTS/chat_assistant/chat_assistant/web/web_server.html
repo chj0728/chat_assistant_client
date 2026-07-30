@@ -215,6 +215,7 @@
     .config-card {
       display: flex;
       flex-direction: column;
+      flex: 1;
       min-height: 0;
     }
 
@@ -223,6 +224,22 @@
       gap: 8px;
       align-items: center;
       flex-wrap: wrap;
+    }
+
+    .config-select {
+      min-width: 180px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 7px 10px;
+      font-size: 13px;
+      color: var(--text);
+      background: #fff;
+      outline: none;
+    }
+
+    .config-select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.12);
     }
 
     .config-editor {
@@ -284,161 +301,6 @@
     @keyframes fade-in {
       from { opacity: 0; transform: translateY(4px); }
       to { opacity: 1; transform: translateY(0); }
-    }
-
-    .config-sub-tabs {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
-    .sub-tab {
-      border: 1px solid var(--line);
-      background: #f8fafc;
-      color: var(--text);
-      border-radius: 10px;
-      padding: 9px 14px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: border-color 0.2s ease, transform 0.12s ease;
-    }
-
-    .sub-tab:hover { transform: translateY(-1px); border-color: #9cb3cc; }
-    .sub-tab.active { border-color: var(--accent); background: #ecfdf9; box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.12); }
-
-    .quick-config-form {
-      padding: 16px;
-      overflow: auto;
-      flex: 1;
-      min-height: 0;
-    }
-
-    .config-group { margin-bottom: 22px; }
-
-    .config-group-title {
-      font-size: 14px;
-      font-weight: 700;
-      color: var(--accent);
-      border-bottom: 2px solid #d1ede9;
-      padding-bottom: 6px;
-      margin: 0 0 12px 0;
-    }
-
-    .config-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 10px 20px;
-    }
-
-    .config-field { display: flex; flex-direction: column; gap: 4px; }
-    .config-field.wide { grid-column: 1 / -1; }
-
-    .config-field > label {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--muted);
-      user-select: none;
-    }
-
-    .config-field input[type="text"],
-    .config-field input[type="number"],
-    .config-field select {
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      padding: 7px 10px;
-      font-size: 13px;
-      background: #fbfdff;
-      color: var(--text);
-      outline: none;
-      transition: border-color 0.2s;
-    }
-
-    .config-field textarea {
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      padding: 7px 10px;
-      font-size: 13px;
-      background: #fbfdff;
-      color: var(--text);
-      outline: none;
-      resize: vertical;
-      min-height: 56px;
-      font-family: inherit;
-      transition: border-color 0.2s;
-    }
-
-    .config-field input:focus,
-    .config-field select:focus,
-    .config-field textarea:focus { border-color: var(--accent); }
-
-    .toggle-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      height: 34px;
-    }
-
-    .toggle {
-      position: relative;
-      width: 40px;
-      height: 22px;
-      -webkit-appearance: none;
-      appearance: none;
-      background: #d1d5db;
-      border-radius: 11px;
-      cursor: pointer;
-      transition: background 0.2s;
-      border: none;
-      outline: none;
-      flex-shrink: 0;
-    }
-
-    .toggle:checked { background: var(--accent); }
-
-    .toggle::after {
-      content: "";
-      position: absolute;
-      top: 3px;
-      left: 3px;
-      width: 16px;
-      height: 16px;
-      background: #fff;
-      border-radius: 50%;
-      transition: transform 0.2s;
-    }
-
-    .toggle:checked::after { transform: translateX(18px); }
-
-    .toggle-text {
-      font-size: 13px;
-      color: var(--text);
-    }
-
-    .checklist-wrapper {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      align-items: center;
-      min-height: 34px;
-    }
-
-    .checklist-item {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .checklist-item input[type="checkbox"] {
-      accent-color: var(--accent);
-    }
-
-    .checklist-item label {
-      font-size: 13px;
-      color: var(--text);
-      font-weight: 400;
-      cursor: pointer;
     }
   </style>
 </head>
@@ -502,40 +364,14 @@
 
       <section id="configPane" class="tab-pane hidden">
         <div class="config-layout">
-          <div class="config-sub-tabs">
-            <button id="subTabQuick" class="sub-tab active">⚡ 快速配置</button>
-            <button id="subTabAdvanced" class="sub-tab">📝 高级编辑（调试）</button>
-          </div>
-
-          <!-- Quick Config Form -->
-          <section id="quickConfigPane" class="panel config-card">
+          <section class="panel config-card">
             <div class="panel-header">
               <div>
-                <h2 class="title" style="font-size:16px;">快速参数配置</h2>
-                <p class="subtitle">修改主要参数，保存后写回配置文件（保留注释与格式）</p>
+                <h2 class="title" style="font-size:16px;">高级编辑（调试）</h2>
+                <p id="configPath" class="subtitle">选择并直接编辑 config 目录中的 TOML 文件</p>
               </div>
               <div class="config-toolbar">
-                <button id="quickReloadBtn" class="btn btn-light">重新加载</button>
-                <button id="quickSaveBtn" class="btn">保存配置</button>
-                <button id="quickSaveReloadBtn" class="btn">保存并重载</button>
-              </div>
-            </div>
-            <div id="quickConfigForm" class="quick-config-form">
-              <div class="empty">加载中...</div>
-            </div>
-            <div class="panel-header" style="border-top: none; border-bottom: none;">
-              <span id="quickConfigStatus" class="status">等待操作</span>
-            </div>
-          </section>
-
-          <!-- Advanced Editor (hidden by default) -->
-          <section id="advancedConfigPane" class="panel config-card hidden">
-            <div class="panel-header">
-              <div>
-                <h2 class="title" style="font-size:16px;">config.yaml 原始编辑</h2>
-                <p class="subtitle">直接编辑完整配置文件（调试用途）</p>
-              </div>
-              <div class="config-toolbar">
+                <select id="configFileSelect" class="config-select" aria-label="配置文件"></select>
                 <button id="reloadConfigBtn" class="btn btn-light">重新加载</button>
                 <button id="saveConfigBtn" class="btn">保存配置</button>
                 <button id="saveAndReloadConfigBtn" class="btn">保存并重载</button>

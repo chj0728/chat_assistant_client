@@ -15,6 +15,11 @@ import yaml
 from config import get_default_config_path
 from logger.logger import get_logs_dir
 
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib  # type: ignore[import-not-found,no-redef]
+
 ACTIVE_LOG_NAME = "asr_llm_tts"
 RELOAD_CONFIG_SERVICE = "/reload_config"
 RELOAD_CONFIG_SERVICE_TYPE = "std_srvs/srv/Trigger"
@@ -32,7 +37,7 @@ def get_default_logs_dir() -> Path:
 
 
 def web_get_default_config_path() -> Path:
-    """Resolve config.yaml under the chat_assistant package root."""
+    """Resolve the active TOML file selected by config/project.toml."""
     return get_default_config_path()
 
 
@@ -78,11 +83,57 @@ def safe_log_path(logs_dir: Path, log_name: str) -> Path:
     return file_path
 
 
+def safe_config_path(config_dir: Path, config_name: str) -> Path:
+    if (
+        not config_name
+        or "/" in config_name
+        or "\\" in config_name
+        or ".." in config_name
+        or Path(config_name).suffix.lower() != ".toml"
+    ):
+        raise ValueError("invalid config name")
+    file_path = (config_dir / config_name).resolve()
+    if file_path.parent != config_dir.resolve():
+        raise ValueError("invalid config path")
+    return file_path
+
+
+def resolve_active_config_path(config_dir: Path, fallback_path: Path) -> Path:
+    project_path = config_dir / "project.toml"
+    try:
+        with project_path.open("rb") as f:
+            project_config = tomllib.load(f)
+        active_name = project_config.get("active_toml")
+        if not isinstance(active_name, str):
+            return fallback_path
+        active_path = safe_config_path(config_dir, active_name)
+        if active_path != project_path.resolve() and active_path.is_file():
+            return active_path
+    except (OSError, ValueError, tomllib.TOMLDecodeError):
+        pass
+    return fallback_path
+
+
+def list_config_files(config_dir: Path, fallback_path: Path) -> tuple[list[dict], str]:
+    active_path = resolve_active_config_path(config_dir, fallback_path).resolve()
+    files = []
+    for file_path in sorted(config_dir.glob("*.toml"), key=lambda path: path.name):
+        if not file_path.is_file():
+            continue
+        files.append(
+            {
+                "name": file_path.name,
+                "is_active": file_path.resolve() == active_path,
+                "is_project": file_path.name == "project.toml",
+            }
+        )
+    return files, active_path.name
+
+
 def read_log_incremental(
     file_path: Path, start_offset: int, max_bytes: int = 1024 * 256
 ) -> tuple[str, int, bool]:
-    if start_offset < 0:
-        start_offset = 0
+    start_offset = max(start_offset, 0)
     with file_path.open("rb") as f:
         f.seek(0, os.SEEK_END)
         file_size = f.tell()
@@ -175,9 +226,7 @@ def _replace_line_value(
             del_count = 0
             for j in range(i + 1, len(lines)):
                 next_line = lines[j]
-                if not next_line.strip():
-                    del_count += 1
-                elif next_line.startswith(" " * (indent + 1)):
+                if not next_line.strip() or next_line.startswith(" " * (indent + 1)):
                     del_count += 1
                 else:
                     break
@@ -285,6 +334,15 @@ class LogViewerHandler(BaseHTTPRequestHandler):
     def _config_path(self) -> Path:
         return self.server.config_path  # type: ignore[attr-defined]
 
+    def _config_dir(self) -> Path:
+        return self.server.config_dir  # type: ignore[attr-defined]
+
+    def _requested_config_path(self, query: dict) -> Path:
+        config_name = query.get("name", [None])[0]
+        if config_name is None:
+            return resolve_active_config_path(self._config_dir(), self._config_path())
+        return safe_config_path(self._config_dir(), config_name)
+
     def _html_path(self) -> Path:
         return self.server.html_path  # type: ignore[attr-defined]
 
@@ -355,6 +413,7 @@ class LogViewerHandler(BaseHTTPRequestHandler):
                 {
                     "ok": True,
                     "logs_dir": str(self._logs_dir()),
+                    "config_dir": str(self._config_dir()),
                     "config_path": str(self._config_path()),
                     "html_path": str(self._html_path()),
                     "js_path": str(self._js_path()),
@@ -362,9 +421,31 @@ class LogViewerHandler(BaseHTTPRequestHandler):
             )
             return
 
-        # Read config.yaml content as plain text.
+        if path == "/api/config/files":
+            config_dir = self._config_dir()
+            if not config_dir.exists() or not config_dir.is_dir():
+                self._send_json(
+                    {"error": f"config directory not found: {config_dir}"},
+                    status=HTTPStatus.NOT_FOUND,
+                )
+                return
+            files, active_name = list_config_files(config_dir, self._config_path())
+            self._send_json(
+                {
+                    "directory": str(config_dir),
+                    "active": active_name,
+                    "files": files,
+                }
+            )
+            return
+
+        # Read selected TOML config content as plain text.
         if path == "/api/config":
-            config_path = self._config_path()
+            try:
+                config_path = self._requested_config_path(query)
+            except ValueError as e:
+                self._send_json({"error": str(e)}, status=HTTPStatus.BAD_REQUEST)
+                return
             if not config_path.exists() or not config_path.is_file():
                 self._send_json(
                     {"error": f"config not found: {config_path}"},
@@ -372,7 +453,9 @@ class LogViewerHandler(BaseHTTPRequestHandler):
                 )
                 return
             content = config_path.read_text(encoding="utf-8")
-            self._send_json({"path": str(config_path), "content": content})
+            self._send_json(
+                {"name": config_path.name, "path": str(config_path), "content": content}
+            )
             return
 
         # Structured config params as parsed YAML dict.
@@ -454,11 +537,15 @@ class LogViewerHandler(BaseHTTPRequestHandler):
 
     def do_PUT(self) -> None:
         """Handle update-style API routes."""
-        path, parts, _ = self._parse_path()
+        path, _, query = self._parse_path()
 
-        # Persist config.yaml text content.
+        # Persist selected TOML config text content.
         if path == "/api/config":
-            config_path = self._config_path()
+            try:
+                config_path = self._requested_config_path(query)
+            except ValueError as e:
+                self._send_json({"error": str(e)}, status=HTTPStatus.BAD_REQUEST)
+                return
             try:
                 body = self._read_json_body()
             except ValueError as e:
@@ -473,9 +560,26 @@ class LogViewerHandler(BaseHTTPRequestHandler):
                 )
                 return
 
-            config_path.parent.mkdir(parents=True, exist_ok=True)
+            if not config_path.exists() or not config_path.is_file():
+                self._send_json(
+                    {"error": f"config not found: {config_path}"},
+                    status=HTTPStatus.NOT_FOUND,
+                )
+                return
+
+            try:
+                tomllib.loads(content)
+            except tomllib.TOMLDecodeError as e:
+                self._send_json(
+                    {"error": f"TOML parse error: {e}"},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+                return
+
             config_path.write_text(content, encoding="utf-8")
-            self._send_json({"ok": True, "saved": str(config_path)})
+            self._send_json(
+                {"ok": True, "name": config_path.name, "saved": str(config_path)}
+            )
             return
 
         # Update specific config params by dotted key paths.
@@ -615,7 +719,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--config-path",
         default=str(web_get_default_config_path()),
-        help="Path to config.yaml",
+        help="Path to the initial TOML config file",
     )
     parser.add_argument(
         "--html-path",
@@ -641,6 +745,7 @@ def main() -> None:
     server = ThreadingHTTPServer((args.host, args.port), LogViewerHandler)
     server.logs_dir = logs_dir  # type: ignore[attr-defined]
     server.config_path = config_path  # type: ignore[attr-defined]
+    server.config_dir = config_path.parent  # type: ignore[attr-defined]
     server.html_path = html_path  # type: ignore[attr-defined]
     server.js_path = js_path  # type: ignore[attr-defined]
     server.index_html = load_index_html(html_path)  # type: ignore[attr-defined]

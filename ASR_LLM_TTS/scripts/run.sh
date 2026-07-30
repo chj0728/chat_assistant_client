@@ -13,8 +13,9 @@ SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 WORK_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
 PKG_DIR="$WORK_DIR/chat_assistant"
 LOGS_DIR="$WORK_DIR/logs"
-RUN_PID_FILE="$WORK_DIR/.run.pid"
+# RUN_PID_FILE="$WORK_DIR/.run.pid"
 NODE_PID_DIR="$WORK_DIR/.run.pids"
+RUN_PID_FILE="$NODE_PID_DIR/run.pid"
 
 LOG_RETENTION_COUNT=40
 RESTART_DELAY=10
