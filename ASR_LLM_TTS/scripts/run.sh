@@ -338,6 +338,7 @@ main() {
     trap shutdown SIGINT
     trap reload SIGTERM
 
+    mkdir -p "$NODE_PID_DIR"
     stop_previous_supervisor
     printf '%s\n' "$$" > "$RUN_PID_FILE"
     prepare_environment
