@@ -1,3 +1,4 @@
+import asyncio
 import io
 import json
 import os
@@ -340,6 +341,13 @@ class SherpaASRRuntime(ASRRuntimeProtocol):
             ws = await self._ws_client.connect()
             if ws is None:
                 raise ConnectionError("WebSocket 连接失败，未返回连接对象")
+
+            # 清理 WebSocket 接收缓冲区，确保不会收到旧消息
+            while True:
+                try:
+                    await asyncio.wait_for(ws.recv(), timeout=0.1)
+                except (asyncio.TimeoutError, ConnectionClosed):
+                    break
 
             try:
                 start = 0
