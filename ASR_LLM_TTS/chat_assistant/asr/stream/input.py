@@ -304,7 +304,7 @@ class InputStream(InputStreamProtocol):
 
     @staticmethod
     def _to_mono_float32(audio_np: np.ndarray) -> np.ndarray:
-        """将 sounddevice 音频整理为连续的 mono float32 数组。"""
+        """将 sounddevice 音频整理为内存连续的 mono float32 数组。"""
         if audio_np.ndim == 2:
             audio_np = audio_np[:, 0]
         return np.ascontiguousarray(audio_np, dtype=np.float32)
@@ -360,19 +360,19 @@ class InputStream(InputStreamProtocol):
 
     def input_stream_thread(self) -> None:
         """音频输入流线程函数，持续读取音频并按 VAD 结果推送给 ASR 后端。"""
-        audio_buffer: list[np.ndarray] = []
-        frames_collected = 0
+        audio_buffer: list[np.ndarray] = []  # 缓存当前分析窗口的音频帧
+        frames_collected = 0  # 累计收集的帧数
         analysis_interval_frames = max(
             self.chunk_frames,
             int(0.20 * self.samplerate),
             1,
-        )
+        )  # 200 ms 或更长的分析间隔
         self.last_active_time = time.time()
 
         logger.info("音频录制已开始（sounddevice）")
-        logger.info(f"单次回调音频帧数: {self.chunk_frames}")
-        logger.info(f"单次回调音频时长: {self.chunk_frames / self.samplerate:.3f} 秒")
-        logger.info(f"分析间隔音频帧数: {analysis_interval_frames}")
+        logger.info(f"单次回调帧数: {self.chunk_frames}")
+        logger.info(f"单次回调时长: {self.chunk_frames / self.samplerate:.3f} 秒")
+        logger.info(f"分析间隔帧数: {analysis_interval_frames}")
         logger.info(
             f"分析间隔时长: {analysis_interval_frames / self.samplerate:.3f} 秒"
         )
@@ -396,9 +396,15 @@ class InputStream(InputStreamProtocol):
             if frames_collected < analysis_interval_frames:
                 return
 
+            # 将当前分析窗口的音频拼接为连续数组
             audio_np = np.concatenate(audio_buffer, axis=0)
+            # 将 float32 音频转换为 mono PCM16 字节流
             audio_bytes = self._float_to_pcm16(audio_np)
+
+            # 重置缓存以准备下一次分析窗口
             reset_buffer()
+
+            # 处理当前分析窗口的音频
             self._process_audio_chunk(audio_np, audio_bytes, time.time())
 
         effective_device = self._resolve_input_device()
@@ -424,21 +430,37 @@ class InputStream(InputStreamProtocol):
         self, audio_np: np.ndarray, audio_bytes: bytes, timestamp: float
     ) -> None:
         """处理一个分析窗口内的音频，按能量和 VAD 结果更新分段状态。"""
+
+        # 如果当前没有待保存的音频片段，则将当前音频加入预录音缓冲区
         if not self.segments_to_save:
             self._append_pre_recording_buffer(audio_bytes, audio_np, timestamp)
 
+        # 计算当前音频的分贝值，并根据阈值和 VAD 结果决定是否保存或丢弃音频片段
         decibel = self._calculate_decibel(audio_np)
         logger.debug(f"音频分贝: {decibel:.2f} dB，时间戳: {timestamp:.3f}")
-        if decibel < self.decibel_threshold:
-            self._handle_silence(audio_bytes, audio_np, timestamp)
-        elif self._has_speech(audio_bytes):
-            self._handle_speech(audio_bytes, audio_np, timestamp, decibel)
-        elif self.segments_to_save:
-            logger.info(f"未检测到语音活动，分贝: {decibel:.2f} dB，继续等待")
-            self.segments_to_save.append(
-                (audio_bytes, self._to_mono_float32(audio_np), timestamp)
-            )
 
+        # @2026-08-05
+        # @deprecated
+        # if decibel < self.decibel_threshold:
+        #     self._handle_silence(audio_bytes, audio_np, timestamp)
+        # elif self._has_speech(audio_bytes):
+        #     self._handle_speech(audio_bytes, audio_np, timestamp, decibel)
+        # elif self.segments_to_save:
+        #     logger.info(f"未检测到语音活动，分贝: {decibel:.2f} dB，继续等待")
+        #     self.segments_to_save.append(
+        #         (audio_bytes, self._to_mono_float32(audio_np), timestamp)
+        #     )
+
+        # @2026-08-05: 优化逻辑：先判断分贝阈值，再判断 VAD 结果。
+        if decibel >= self.decibel_threshold:
+            if self._has_speech(audio_bytes):
+                self._handle_speech(audio_bytes, audio_np, timestamp, decibel)
+            else:
+                self._handle_silence(audio_bytes, audio_np, timestamp)
+        else:
+            self._handle_silence(audio_bytes, audio_np, timestamp)
+
+        # 如果当前片段已经超过最大录音时长，则强制结束并保存音频片段
         if self._exceeds_max_recording_duration():
             logger.info(
                 f"录音片段时长超过最大值 {self.max_recording_duration} 秒，保存音频段"
@@ -456,10 +478,12 @@ class InputStream(InputStreamProtocol):
             (audio_bytes, self._to_mono_float32(audio_np), timestamp)
         )
         if timestamp - self.last_active_time > self.no_speech_duration:
-            logger.info("静音时间超过阈值，收集历史音频段")
+            logger.info(
+                f"累积静音时间超过阈值 {self.no_speech_duration:.2f} 秒，保存历史音频段"
+            )
             self._finalize_pending_segments(timestamp)
         else:
-            logger.info("静音时间未超过阈值，继续等待")
+            logger.info(f"累积静音时间 {timestamp - self.last_active_time:.2f} 秒")
 
     def _handle_speech(
         self,
@@ -560,7 +584,7 @@ class InputStream(InputStreamProtocol):
                         samples=audio_samples,
                         pcm16_bytes=audio_bytes,
                     ),
-                    str(audio_saved_name),
+                    str(audio_saved_path),
                 )
             )
 

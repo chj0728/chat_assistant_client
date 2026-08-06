@@ -91,7 +91,7 @@ class AssistantTextProcessor:
             else:
                 window_tokens_list = [
                     detected_tokens[i : i + win_len]
-                    for i in range(0, len(detected_tokens) - win_len + 1)
+                    for i in range(len(detected_tokens) - win_len + 1)
                 ]
 
             for window_tokens in window_tokens_list:
@@ -167,7 +167,7 @@ if __name__ == "__main__":
     test_inputs = [
         "小美，今天天气怎么样？<INTENT>查询天气</INTENT>",
         "我想听音乐，小美。<INTENT>播放音乐</INTENT>",
-        "小美“”小美:" "''小美",
+        "小美“”小美:''小美",
         "**小明，你好！**",
         "小美，帮我设置个闹钟",
     ]

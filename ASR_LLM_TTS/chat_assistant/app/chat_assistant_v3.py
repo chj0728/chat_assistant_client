@@ -22,6 +22,17 @@ from app.assistant_support import (
     ResponseData,
 )
 
+CLIENT_OPERATION_ERRORS = (
+    AttributeError,
+    EOFError,
+    LookupError,
+    OSError,
+    RuntimeError,
+    TimeoutError,
+    TypeError,
+    ValueError,
+)
+
 
 class ChatAssistant:
     def __init__(
@@ -84,7 +95,7 @@ class ChatAssistant:
             if callable(method):
                 try:
                     method()
-                except Exception as exc:
+                except CLIENT_OPERATION_ERRORS as exc:
                     logger.warning(f"释放 {component_name} 资源失败: {exc}")
                 return
 
@@ -438,7 +449,7 @@ class ChatAssistant:
             elapsed_time = time.time() - time_now
             logger.info(f"TTS 生成语音文件耗时: {elapsed_time:.2f} 秒")
             return tts_result
-        except Exception as e:
+        except CLIENT_OPERATION_ERRORS as e:
             logger.error(f"TTS 生成语音文件失败: {e}")
             return False
 
@@ -450,7 +461,7 @@ class ChatAssistant:
         try:
             self.tts_client.play_audio(audio_path, block=False)
             return True
-        except Exception:
+        except CLIENT_OPERATION_ERRORS:
             return False
 
     def interrupt(self) -> bool:
@@ -474,7 +485,7 @@ class ChatAssistant:
             self.llm_client.interrupt()
             logger.info("LLM 后台输出已打断")
             return True
-        except Exception as e:
+        except CLIENT_OPERATION_ERRORS as e:
             logger.error(f"打断 LLM 后台输出失败: {e}")
             return False
 
@@ -487,7 +498,7 @@ class ChatAssistant:
             self.tts_client.interrupt()
             logger.info("TTS 后台输出已打断")
             return True
-        except Exception as e:
+        except CLIENT_OPERATION_ERRORS as e:
             logger.error(f"打断 TTS 后台输出失败: {e}")
             return False
 
@@ -525,7 +536,7 @@ class ChatAssistant:
         try:
             is_active = self.tts_client.is_active()
             return is_active
-        except Exception:
+        except CLIENT_OPERATION_ERRORS:
             return False
 
     def asr_infer(self, audio_path: str | None = None, audio_frames=None):
@@ -562,7 +573,7 @@ class ChatAssistant:
                 f"ASR 识别结果: [{asr_text}], 耗时: {(time.time() - time_now) * 1000:.2f} ms"
             )
             return asr_text
-        except Exception as e:
+        except CLIENT_OPERATION_ERRORS as e:
             logger.error(f"ASR 识别失败: {e}")
             return ""
 
@@ -632,7 +643,7 @@ class ChatAssistant:
             self.last_interface_time = time.time()
             return llm_text
 
-        except Exception as e:
+        except CLIENT_OPERATION_ERRORS as e:
             logger.error(f"LLM 对话失败: {e}")
             self.last_interface_time = time.time()
 
@@ -690,7 +701,7 @@ class ChatAssistant:
 
             self.last_interface_time = time.time()
 
-        except Exception as e:
+        except CLIENT_OPERATION_ERRORS as e:
             logger.error(f"LLM 流式对话失败: {e}")
             yield "", index
 
@@ -727,7 +738,7 @@ class ChatAssistant:
             self.last_interface_time = time.time()
             return llm_text
 
-        except Exception as e:
+        except CLIENT_OPERATION_ERRORS as e:
             logger.error(f"LLM 对话失败: {e}")
             self.last_interface_time = time.time()
 
@@ -770,7 +781,7 @@ class ChatAssistant:
 
             self.last_interface_time = time.time()
 
-        except Exception as e:
+        except CLIENT_OPERATION_ERRORS as e:
             logger.error(f"LLM 流式对话失败: {e}")
             yield "", index
 
@@ -794,7 +805,7 @@ class ChatAssistant:
                 name="tts-startup-monitor",
             ).start()
             return True
-        except Exception as e:
+        except CLIENT_OPERATION_ERRORS as e:
             logger.error(f"TTS 播放失败: {e}")
             return False
 
@@ -829,7 +840,7 @@ class ChatAssistant:
                 self.tts_client.speak(text.strip(), interrupt=False)
 
             return True
-        except Exception as e:
+        except (AssertionError, *CLIENT_OPERATION_ERRORS) as e:
             logger.error(f"TTS 推送流式片段 [{index}] 失败: {e}")
             return False
 
@@ -968,7 +979,7 @@ class ChatAssistant:
             self.llm_client.delete_thread(thread_id=user_id)
             logger.info(f"已删除用户 ID {user_id} 的对话上下文")
             return True
-        except Exception as e:
+        except CLIENT_OPERATION_ERRORS as e:
             logger.error(f"删除用户 ID {user_id} 的对话上下文失败: {e}")
             return False
 
@@ -991,7 +1002,7 @@ class ChatAssistant:
                 llm_text=llm_text,
                 audio_saved_path=audio_saved_path,
             )
-        except Exception as e:
+        except CLIENT_OPERATION_ERRORS as e:
             logger.error(f"保存用户对话记录失败: {e}")
 
     def _handle_rag_llm_response(self, llm_text: str | None) -> None:
@@ -1006,7 +1017,7 @@ class ChatAssistant:
         try:
             if _rag.handle_llm_response(llm_text):
                 logger.info("RAG 已根据 LLM 回复更新机器人位置")
-        except Exception as e:
+        except CLIENT_OPERATION_ERRORS as e:
             logger.warning("RAG 处理 LLM 回复失败: %s", e)
 
     ##########################################################
@@ -1247,7 +1258,7 @@ class ChatAssistant:
                         response=self.llm_text,
                     )
                 _rag.handle_llm_response(self.llm_text)
-            except Exception as _e:
+            except CLIENT_OPERATION_ERRORS as _e:
                 logger.warning("RAG 后处理 LLM 回复失败: %s", _e)
         # ------------------------------------------------
 
@@ -1281,7 +1292,7 @@ class ChatAssistant:
                                 current_user_id,
                                 self.current_user_name,
                             )
-                    except Exception as _e:
+                    except CLIENT_OPERATION_ERRORS as _e:
                         logger.warning("抽取姓名写入 RAG 状态失败: %s", _e)
         # ----------------------------------------------------------------
 
