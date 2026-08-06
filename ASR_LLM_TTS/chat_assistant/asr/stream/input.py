@@ -48,6 +48,7 @@ class InputStream(InputStreamProtocol):
 
         self.tmp_audio_bytes = b""
         self.tmp_audio_saved_path = None
+        self.tmp_audio_saved_name = None
 
         self._init_audio_settings(kwargs.get("Audio", {}))
         self._init_vad_settings(kwargs.get("VAD", {}))
@@ -572,11 +573,12 @@ class InputStream(InputStreamProtocol):
             if self.enable_enhancement:
                 audio_samples = self._enhance_audio_samples(audio_samples)
                 audio_bytes = self._float_to_pcm16(audio_samples)
-            audio_saved_name = self._next_audio_output_name()
-            audio_saved_path = self._next_audio_output_path(audio_saved_name)
 
             self.tmp_audio_bytes = audio_bytes
-            self.tmp_audio_saved_path = audio_saved_path
+            self.tmp_audio_saved_name = self._next_audio_output_name()
+            self.tmp_audio_saved_path = self._next_audio_output_path(
+                self.tmp_audio_saved_name
+            )
 
             self.asr_backend_context.audio_data_queue.put(
                 (
@@ -584,7 +586,7 @@ class InputStream(InputStreamProtocol):
                         samples=audio_samples,
                         pcm16_bytes=audio_bytes,
                     ),
-                    str(audio_saved_path),
+                    str(self.tmp_audio_saved_name),
                 )
             )
 
@@ -650,7 +652,31 @@ class InputStream(InputStreamProtocol):
             wf.writeframes(audio_bytes)
 
     # 保存 WAV 文件接口，由上层调用主动触发
-    def save_tmp_wav(self) -> bool:
+    def save_tmp_wav(
+        self,
+        root_dir: str | None = None,
+        parent_dir_name: str | None = None,
+        file_name: str | None = None,
+    ) -> bool:
+        """将当前缓存的音频片段保存为 WAV 文件，返回是否成功。"""
+
+        if root_dir:
+            self.output_dir = Path(root_dir).resolve()
+
+        if parent_dir_name:
+            self.output_dir = self.output_dir / parent_dir_name
+
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+
+        if file_name:
+            self.tmp_audio_saved_path = self.output_dir / f"{file_name}.wav"
+        else:
+            self.tmp_audio_saved_path = self.output_dir / (
+                self.tmp_audio_saved_name
+                if self.tmp_audio_saved_name
+                else self._next_audio_output_path()
+            )
+
         if self.tmp_audio_bytes and self.tmp_audio_saved_path:
             self._write_wav(self.tmp_audio_saved_path, self.tmp_audio_bytes)
             logger.info(f"保存音频文件: {self.tmp_audio_saved_path}")

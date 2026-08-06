@@ -1241,8 +1241,10 @@ class ChatAssistant:
             audio_saved_path=self.audio_saved_path,
         )
         self.audio_saved_path = None
-        # ---------------- 保存临时音频文件 -----------------
-        self.asr_client.save_tmp_wav()
+        # ---------------- 保存用户音频文件 -----------------
+        self.asr_client.save_tmp_wav(
+            parent_dir_name=current_user_id if current_user_id else "unknown_user",
+        )
         # ------------------------------------------------
 
         # ------------ 语言规则双向标记 + RAG 处理 LLM 回复 ----------------

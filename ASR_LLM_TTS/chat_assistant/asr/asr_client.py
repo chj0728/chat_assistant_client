@@ -91,9 +91,18 @@ class ASRClientBase:
         self.vision_id = vision_id
         self.asr_backend.update_vision_id(vision_id)
 
-    def save_tmp_wav(self) -> bool:
+    def save_tmp_wav(
+        self,
+        root_dir: str | None = None,
+        parent_dir_name: str | None = None,
+        file_name: str | None = None,
+    ) -> bool:
         """保存最近一次识别片段的临时 WAV 文件。"""
-        return self.asr_backend.save_tmp_wav()
+        return self.asr_backend.save_tmp_wav(
+            root_dir=root_dir,
+            parent_dir_name=parent_dir_name,
+            file_name=file_name,
+        )
 
 
 class ASRClient(ASRClientBase):

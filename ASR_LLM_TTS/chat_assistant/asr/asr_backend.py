@@ -338,6 +338,15 @@ class ASRBackend(ASRBackendBase):
             pcm16_bytes,
         )
 
-    def save_tmp_wav(self) -> bool:
+    def save_tmp_wav(
+        self,
+        root_dir: str | None = None,
+        parent_dir_name: str | None = None,
+        file_name: str | None = None,
+    ) -> bool:
         """委托输入流保存最近一次识别音频。"""
-        return self.asr_input_stream.save_tmp_wav()
+        return self.asr_input_stream.save_tmp_wav(
+            root_dir=root_dir,
+            parent_dir_name=parent_dir_name,
+            file_name=file_name,
+        )
