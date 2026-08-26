@@ -4,8 +4,10 @@ import threading
 import time
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import asdict
+from datetime import datetime
 from pathlib import Path
 from queue import Empty, Full, Queue
+from zoneinfo import ZoneInfo
 
 import yaml
 from asr import ASRClient
@@ -66,6 +68,9 @@ class ChatAssistant:
 
         self.worker_thread_active = False
         self.worker_thread: threading.Thread | None = None
+
+        # 用于监控 TTS 流式推理的耗时
+        self.enable_monitor_cost_time = False
 
         self.load_config_and_initialize()
 
@@ -827,17 +832,31 @@ class ChatAssistant:
 
                 self.tts_client.speak(text.strip(), interrupt=True)
 
-                if text.strip():  # 只有在文本非空时才启动监控线程
-                    threading.Thread(
-                        target=self.tts_cost_time,
-                        args=(time_now,),
-                        daemon=True,
-                        name="tts-stream-startup-monitor",
-                    ).start()
+                self.enable_monitor_cost_time = True  # 在首次推送片段时启用监控
+                # if text.strip():  # 只有在文本非空时才启动监控线程
+                #     threading.Thread(
+                #         target=self.tts_cost_time,
+                #         args=(time_now,),
+                #         daemon=True,
+                #         name="tts-stream-startup-monitor",
+                #     ).start()
 
             else:
 
                 self.tts_client.speak(text.strip(), interrupt=False)
+
+            if (
+                text.strip() and self.enable_monitor_cost_time
+            ):  # 只有在文本非空且启用监控时才启动监控线程
+                self.enable_monitor_cost_time = (
+                    False  # 仅在首次推送片段时启动监控线程，避免重复启动
+                )
+                threading.Thread(
+                    target=self.tts_cost_time,
+                    args=(time_now,),
+                    daemon=True,
+                    name="tts-stream-startup-monitor",
+                ).start()
 
             return True
         except (AssertionError, *CLIENT_OPERATION_ERRORS) as e:
@@ -859,14 +878,21 @@ class ChatAssistant:
                 return False
             time.sleep(0.02)
 
+        active_time = time.time() - self.tts_client.get_playback_start_delay_sec()
+        # 时-分-秒-毫秒 上海
+        active_time_str = datetime.fromtimestamp(
+            active_time, tz=ZoneInfo("Asia/Shanghai")
+        ).strftime("%H:%M:%S.%f")[:-3]
+
         elapsed_time = 0
-        # if isinstance(self.tts_client, RealtimeTTSPlayer):
-        #     elapsed_time = time.time() - start_time
-        # else:
         elapsed_time = (
             time.time() - start_time - self.tts_client.get_playback_start_delay_sec()
         )
-        logger.info(f"TTS 首次合成并播放音频延迟: {elapsed_time:.2f} 秒")
+
+        logger.info(
+            f"TTS 首个有效音频片段开始时间: {active_time_str}, 延迟: {elapsed_time:.2f} 秒"
+        )
+        # logger.info(f"TTS 首次合成并播放音频延迟: {elapsed_time:.2f} 秒")
         return True
 
     async def async_tts_infer(self, text):
