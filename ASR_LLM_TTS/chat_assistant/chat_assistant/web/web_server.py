@@ -61,12 +61,14 @@ def list_logs(logs_dir: Path) -> list[dict]:
         if not item.is_file():
             continue
         stat = item.stat()
+        is_link = item.is_symlink()
         logs.append(
             {
                 "name": item.name,
                 "size": stat.st_size,
                 "mtime": iso_mtime(stat.st_mtime),
                 "is_active": item.name == ACTIVE_LOG_NAME,
+                "is_live": item.name == ACTIVE_LOG_NAME or is_link,
             }
         )
     logs.sort(key=lambda x: (not x["is_active"], x["name"]), reverse=False)
@@ -76,8 +78,11 @@ def list_logs(logs_dir: Path) -> list[dict]:
 def safe_log_path(logs_dir: Path, log_name: str) -> Path:
     if not log_name or "/" in log_name or "\\" in log_name or ".." in log_name:
         raise ValueError("invalid log name")
-    file_path = (logs_dir / log_name).resolve()
     logs_root = logs_dir.resolve()
+    log_entry = logs_root / log_name
+    if log_entry.is_symlink():
+        return log_entry
+    file_path = log_entry.resolve()
     if file_path.parent != logs_root:
         raise ValueError("invalid log path")
     return file_path

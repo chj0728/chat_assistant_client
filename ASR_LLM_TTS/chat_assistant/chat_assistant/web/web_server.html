@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="zh-CN">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -17,7 +18,9 @@
       --shadow: 0 10px 30px rgba(27, 39, 53, 0.08);
     }
 
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
     body {
       margin: 0;
@@ -124,10 +127,20 @@
       transition: transform 0.12s ease, opacity 0.2s ease;
     }
 
-    .btn:hover { transform: translateY(-1px); }
-    .btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+    .btn:hover {
+      transform: translateY(-1px);
+    }
 
-    .btn-danger { background: var(--danger); }
+    .btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-danger {
+      background: var(--danger);
+    }
+
     .btn-light {
       background: #f8fafc;
       border-color: var(--line);
@@ -152,8 +165,15 @@
       animation: fade-in 0.2s ease;
     }
 
-    .log-item:hover { border-color: #9cb3cc; transform: translateY(-1px); }
-    .log-item.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.12); }
+    .log-item:hover {
+      border-color: #9cb3cc;
+      transform: translateY(-1px);
+    }
+
+    .log-item.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.12);
+    }
 
     .name-row {
       display: flex;
@@ -294,16 +314,29 @@
         height: auto;
       }
 
-      .log-list { max-height: 36vh; }
-      .viewer { height: 60vh; }
+      .log-list {
+        max-height: 36vh;
+      }
+
+      .viewer {
+        height: 60vh;
+      }
     }
 
     @keyframes fade-in {
-      from { opacity: 0; transform: translateY(4px); }
-      to { opacity: 1; transform: translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
   </style>
 </head>
+
 <body>
   <div class="layout">
     <header class="tabs">
@@ -329,7 +362,7 @@
           <section id="liveViewer" class="panel viewer">
             <div class="panel-header">
               <div>
-                <h2 class="title" style="font-size:16px;">实时日志 (asr_llm_tts)</h2>
+                <h2 id="liveViewerTitle" class="title" style="font-size:16px;">实时日志</h2>
                 <p class="subtitle">实时增量更新</p>
               </div>
               <div class="viewer-toolbar">
@@ -389,4 +422,5 @@
 
   <script src="/web_server.js"></script>
 </body>
+
 </html>
